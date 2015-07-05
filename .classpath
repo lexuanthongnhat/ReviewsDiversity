@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/commons-csv-1.1/commons-csv-1.1.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/D:/UCR%20Google%20Drive/Libs/commons-csv-1.1/apidocs/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/poi-3.12/poi-3.12-20150511.jar" sourcepath="D:/UCR Google Drive/Libs/poi-3.12-src/src">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/D:/UCR%20Google%20Drive/Libs/poi-3.12/docs/apidocs/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/poi-3.12/poi-ooxml-3.12-20150511.jar" sourcepath="D:/UCR Google Drive/Libs/poi-3.12-src/src">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/D:/UCR%20Google%20Drive/Libs/poi-3.12/docs/apidocs/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/poi-3.12/ooxml-lib/xmlbeans-2.6.0.jar" sourcepath="D:/UCR Google Drive/Libs/poi-3.12-src/src">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/D:/UCR%20Google%20Drive/Libs/poi-3.12/ooxml-lib/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/poi-3.12/poi-ooxml-schemas-3.12-20150511.jar" sourcepath="D:/UCR Google Drive/Libs/poi-3.12-src/src">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/D:/UCR%20Google%20Drive/Libs/poi-3.12/docs/apidocs/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/public_mm/src/javaapi/dist/MetaMapApi.jar" sourcepath="D:/public_mm/src/javaapi/src">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/D:/public_mm/src/javaapi/doc/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/public_mm/src/javaapi/dist/prologbeans.jar"/>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/stanford-postagger-2015-04-20/stanford-postagger-3.5.2.jar" sourcepath="D:/UCR Google Drive/Libs/stanford-postagger-2015-04-20/stanford-postagger-3.5.2-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/D:/UCR%20Google%20Drive/Libs/stanford-postagger-2015-04-20/stanford-postagger-3.5.2-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/Jackson JSON/jackson-annotations-2.5.3.jar" sourcepath="D:/UCR Google Drive/Libs/Jackson JSON/jackson-annotations-2.5.3-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/D:/UCR%20Google%20Drive/Libs/Jackson%20JSON/jackson-annotations-2.5.3-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/Jackson JSON/jackson-core-2.5.3.jar" sourcepath="D:/UCR Google Drive/Libs/Jackson JSON/jackson-core-2.5.3-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/D:/UCR%20Google%20Drive/Libs/Jackson%20JSON/jackson-core-2.5.3-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/Jackson JSON/jackson-databind-2.5.3.jar" sourcepath="D:/UCR Google Drive/Libs/Jackson JSON/jackson-databind-2.5.3-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/D:/UCR%20Google%20Drive/Libs/Jackson%20JSON/jackson-databind-2.5.3-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/gurobi.jar"/>
+	<classpathentry kind="lib" path="D:/UCR Google Drive/Libs/MySQL Connector J/mysql-connector-java-5.1.35-bin.jar" sourcepath="D:/UCR Google Drive/Libs/MySQL Connector J/src"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

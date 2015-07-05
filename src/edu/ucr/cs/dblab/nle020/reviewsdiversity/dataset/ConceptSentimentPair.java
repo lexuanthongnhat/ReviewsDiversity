@@ -1,0 +1,301 @@
+package edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset;
+
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import edu.ucr.cs.dblab.nle020.ontology.DeweyUtils;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.SentimentUnit;
+import edu.ucr.cs.dblab.nle020.umls.SemanticTypeNetwork;
+
+public class ConceptSentimentPair extends SentimentUnit{
+	private String CUI;
+	private String name;
+	private float sentiment;
+	private int count;
+	
+	private List<String> types;
+	private Set<String> deweys = new HashSet<String>();
+	
+	public ConceptSentimentPair() {
+		super();
+	}
+	
+	public ConceptSentimentPair(String cUI, float sentiment) {
+		super();
+		CUI = cUI;
+		this.sentiment = sentiment;
+	}
+		
+	public ConceptSentimentPair(String cUI, float sentiment, String dewey) {
+		super();
+		CUI = cUI;
+		this.sentiment = sentiment;
+		this.deweys.add(dewey);
+	}	
+	
+	public ConceptSentimentPair(String cUI, String name, float sentiment,
+			int count, List<String> types) {
+		super();
+		CUI = cUI;
+		this.name = name;
+		this.sentiment = sentiment;
+		this.count = count;
+		this.types = types;
+	}
+
+	public void incrementCount() {
+		count++;
+	}
+	public void incrementCount(int count) {
+		this.count += count;
+	}
+	
+	public void addDewey(String dewey) {
+		deweys.add(dewey);
+	}
+	
+	public void addDeweys(Collection<? extends String> deweys) {
+		this.deweys.addAll(deweys);
+	}
+	
+	// From ROOT type to this pair types
+	@Override
+	public int calculateRootDistance() {
+		int min = Integer.MAX_VALUE;
+		for (String dewey : deweys) {
+			int rootToThisDewey = DeweyUtils.getDeweyDistanceFromRoot(dewey);			
+			if (rootToThisDewey < min)
+				min = rootToThisDewey;
+		}
+		
+		return min;
+	}
+	
+	@Override
+	public int calculateDistance(SentimentUnit other) {
+		int result = Constants.INVALID_DISTANCE;
+		
+		if (getClass() == other.getClass()) {
+			result = calculateDistance((ConceptSentimentPair) other);
+		}
+		
+		return result;
+	}
+
+	public int calculateDistance(ConceptSentimentPair otherPair) {
+		int result = Constants.INVALID_DISTANCE;
+		
+		int minPositive = Constants.INVALID_DISTANCE;
+		int maxNegative = Integer.MIN_VALUE;
+		
+		for (String thisDewey : deweys) {
+			for (String otherDewey : otherPair.getDeweys()) {
+				int distance = DeweyUtils.getDeweyDistance(thisDewey, otherDewey);
+				if (distance < 0) {
+					if (distance > maxNegative)
+						maxNegative = distance;
+				} else {
+					if (distance < minPositive) {
+						minPositive = distance;
+					}
+				}
+			}
+		}
+		
+		if (minPositive != Constants.INVALID_DISTANCE && maxNegative != Integer.MIN_VALUE) {
+	
+			if (minPositive == 0 || maxNegative == 0) {
+				result = 0;
+			} else {
+				System.err.println("Distance problem with 2 pairs: " + toString() + " and " + otherPair.toString() 
+						+ ", minPositive: " + minPositive + " - maxNegative: " + maxNegative);
+
+				// TODO	- test this
+				if (CUI.compareTo(otherPair.getCUI()) > 0) {
+					return minPositive;
+				} else {
+					return maxNegative;
+				}
+			}
+		} else if (minPositive != Constants.INVALID_DISTANCE) {
+			result = minPositive;
+		} else if (maxNegative != Integer.MIN_VALUE) {
+			result = maxNegative;
+		}	
+		
+		return result;
+	}
+
+	public boolean testDistance(ConceptSentimentPair otherPair) {
+		boolean result = true;
+		
+		int distance = calculateDistance(otherPair);
+		if (distance == Constants.INVALID_DISTANCE) {
+			if (otherPair.calculateDistance(this) != Constants.INVALID_DISTANCE)
+				result = false;
+		} else {
+			if (otherPair.calculateDistance(this) != -distance)
+				result = false;
+		}
+		
+		if (!result)
+			System.err.println("Error distance between " + this.toString() + " and " + otherPair.toString());
+		
+		return result;
+	}
+	
+
+
+	public String getCUI() {
+		return CUI;
+	}
+	public void setCUI(String cUI) {
+		CUI = cUI;
+	}
+	public String getName() {
+		return name;
+	}
+	public void setName(String name) {
+		this.name = name;
+	}
+	public List<String> getTypes() {
+		return types;
+	}
+	public void setTypes(List<String> types) {
+		this.types = types;
+	}
+	public float getSentiment() {
+		return sentiment;
+	}
+	public void setSentiment(float sentiment) {
+		this.sentiment = sentiment;
+	}
+	public int getCount() {
+		return count;
+	}
+	public void setCount(int count) {
+		this.count = count;
+	}
+	
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((CUI == null) ? 0 : CUI.hashCode());
+//		result = prime * result + count;
+		result = prime * result + Float.floatToIntBits(sentiment);
+		return result;
+	}
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		ConceptSentimentPair other = (ConceptSentimentPair) obj;
+		if (CUI == null) {
+			if (other.CUI != null)
+				return false;
+		} else if (!CUI.equals(other.CUI))
+			return false;
+//		if (count != other.count)
+//			return false;
+		if (Float.floatToIntBits(sentiment) != Float
+				.floatToIntBits(other.sentiment))
+			return false;
+		return true;
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder builder = new StringBuilder();
+		builder.append("{\"" + CUI + "\", \"" + name + "\", \"" + sentiment + "\"");
+		
+		/*builder.append(", \"types\": [");
+		for (String type : types) {
+			builder.append(SemanticTypeNetwork.getNetworkType(SemanticTypes.getInstance().getTUI(type).toUpperCase()) + ", ");
+		}
+		builder.delete(builder.length() - 2, builder.length());
+		builder.append("]");*/
+		
+		builder.append(", \"deweys\": [");
+		for (String dewey : deweys) {
+			builder.append(dewey + ", ");
+		}
+		builder.delete(builder.length() - 2, builder.length());
+		
+		builder.append("]}");
+		
+		return builder.toString();
+	}
+
+	public Set<String> getDeweys() {
+		return deweys;
+	}
+
+	public void setDeweys(Set<String> deweys) {
+		this.deweys = deweys;
+	}
+	
+	
+	
+	
+	
+	// From ROOT type to this pair types
+	public int calculateRootTypeDistance() {
+		int min = Integer.MAX_VALUE;
+		for (String type : types) {
+			int rootToThisType = SemanticTypeNetwork.distance(SemanticTypeNetwork.ROOT, type);			
+			if (rootToThisType < min)
+				min = rootToThisType;
+		}
+		
+		return min;
+	}
+	
+	// Distance between types
+	public int calculateTypeDistance(ConceptSentimentPair otherPair) {
+		int result = Constants.INVALID_DISTANCE;
+		
+		int minPositive = Integer.MAX_VALUE;
+		int maxNegative = Integer.MIN_VALUE;
+		for (String thisType : types) {
+			for (String otherType : otherPair.getTypes()) {
+				int distance = SemanticTypeNetwork.distance(thisType, otherType);
+				if (distance < 0) {
+					if (distance > maxNegative)
+						maxNegative = distance;
+				} else {
+					if (distance < minPositive) {
+						minPositive = distance;
+					}
+				}
+			}
+		}
+		
+		if (minPositive != Integer.MAX_VALUE && maxNegative != Integer.MIN_VALUE) {
+// TODO
+//			System.err.println("Distance problem with 2 pairs: " + toString() + " and " + otherPair.toString() 
+//					+ ", minPositive: " + minPositive + " - maxNegative: " + maxNegative);
+			
+			if (minPositive == 0 || maxNegative == 0) {
+				result = 0;
+			} else if (CUI.compareTo(otherPair.getCUI()) > 0) {
+				return minPositive;
+			} else {
+				return (-minPositive);
+			}
+		} else if (minPositive != Integer.MAX_VALUE) {
+			result = minPositive;
+		} else if (maxNegative != Integer.MIN_VALUE) {
+			result = maxNegative;
+		}			
+		
+		return result;
+	}	
+}
