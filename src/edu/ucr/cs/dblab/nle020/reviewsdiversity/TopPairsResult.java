@@ -12,8 +12,10 @@ public class TopPairsResult {
 	
 	private int numUncovered = 0;
 	private int numPairs = 0;
+	private int numSets = 0;								// Reviews or Sentences
+	private int numFacilities = 0;							// # of choosen facilities - for randomized rounding
 	
-	private int numUsefulCover = 0;							// After Algorithm, Actual ancestor-child relationship, not two pairs of the same CUI
+	private int numUsefulCover = 0;							// After Algorithm, Actual ancestor-child relationship/edge, not two pairs of the same CUI
 	private int numPotentialUsefulCover = 0;				// Before Algorithm
 	private int numPotentialUsefulCoverWithThreshold = 0;	// Before Algorithm, care about sentiment cover
 
@@ -156,6 +158,22 @@ public class TopPairsResult {
 	
 	public void increaseNumPotentialUsefulCoverWithThreshold() {
 		++numPotentialUsefulCoverWithThreshold;
+	}
+
+	public int getNumFacilities() {
+		return numFacilities;
+	}
+
+	public void setNumFacilities(int numFacilities) {
+		this.numFacilities = numFacilities;
+	}
+
+	public int getNumSets() {
+		return numSets;
+	}
+
+	public void setNumSets(int numSets) {
+		this.numSets = numSets;
 	}
 	
 }

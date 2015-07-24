@@ -86,9 +86,29 @@ public class POSTagger {
 		DocumentPreprocessor documentPreprocessor = new DocumentPreprocessor(new StringReader(text));
 		documentPreprocessor.setTokenizerFactory(ptbTokenizerFactory);
 		
+		
 		for (List<HasWord> sentence : documentPreprocessor) {
 			result.addAll(tagger.tagSentence(sentence));			
 		}
+		
+		return result;
+	}
+	
+	public List<String> breakingIntoSentences(String text) {
+		List<String> result = new ArrayList<String>();
+		
+		DocumentPreprocessor documentPreprocessor = new DocumentPreprocessor(new StringReader(text));
+		documentPreprocessor.setTokenizerFactory(ptbTokenizerFactory);
+		
+		for (List<HasWord> sentence : documentPreprocessor) {
+			StringBuilder builder = new StringBuilder();
+			for (HasWord word : sentence) {
+				builder.append(word.word() + " ");
+			}
+			
+			result.add(builder.toString());
+		}
+		
 		
 		return result;
 	}

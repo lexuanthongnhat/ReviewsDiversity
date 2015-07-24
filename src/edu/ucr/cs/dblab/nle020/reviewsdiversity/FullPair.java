@@ -8,27 +8,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
+
 public class FullPair implements Comparable<FullPair> {
-	private String CUI;
-	private float sentiment;	
-	private float threshold = 0.0f;
+	private String id;
 	
-	public FullPair(String cUI, float sentiment) {
-		super();
-		CUI = cUI;
-		this.sentiment = sentiment;
-		
-		if (CUI.equals(Constants.ROOT_CUI))
-			host = this;
-	}	
-	
-	public FullPair(String cUI, float sentiment, float threshold) {
-		super();
-		CUI = cUI;
-		this.sentiment = sentiment;
-		this.threshold = threshold;
-	}
-		
 	// The current closest ancestor/facility who cover this pair
 	private FullPair host;
 	
@@ -43,62 +27,75 @@ public class FullPair implements Comparable<FullPair> {
 	
 	// The possible decrease in the cost if we choose this pair 
 	private int benefit = 0;
-	
-	@Override
-	public int compareTo(FullPair o) {		
-		return (this.benefit - o.benefit);
-	}	
 
-	public boolean isSentimentCover(FullPair p) {
-		boolean result = false;
-		
-		if (this.CUI.equals(Constants.ROOT_CUI) || p.getCUI().equals(Constants.ROOT_CUI))
-			result = true;
-		else if (Math.abs(this.sentiment - p.sentiment) <= threshold)
-			result =  true;
-		 
-		return result;
-	}
-	
-	
-	
+	// For Greedy Set, keep track of the parent
+	private SentimentSet parent = null;
 	
 	
 	// For debugging
 	private List<String> deweys = new ArrayList<String>();
 	
+	public FullPair(String id) {
+		this.id = id;
+	}
+	public FullPair(String id, SentimentSet parent) {
+		this.id = id;
+		this.parent = parent;
+	}
 	
-	
-	
-	
-	
+	@Override
+	public int compareTo(FullPair o) {		
+		return (this.benefit - o.benefit);
+	}
 	
 	
 	@Override
 	public	String toString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("{<\"CUI\": " + CUI);
-		builder.append(", \"Sentiment\": " + sentiment + ">");		
+		builder.append("{\"id\": " + id);
 		builder.append(", \"benefit\": " + benefit);
-		builder.append(", \"deweys\": " + deweys.toString());
-		builder.append(", \"host\": " + host.CUI + ":"+ host.sentiment);
-		builder.append(", \"customerMap\": ");
-		for (FullPair customer : customerMap.keySet()) {
-			builder.append("<" + customer.CUI + ":"+ customer.sentiment + ">: " + customerMap.get(customer) + ", ");
+		
+		if (host != null) {
+			builder.append(", \"host\": " + host.getId());
+/*			if (host.getParent() != null)
+				builder.append(" p " + host.getParent().getId());*/
 		}
-		if (customerMap.size() >= 1)
+		
+/*		if (parent != null)
+			builder.append(", \"parent\": " + parent.getId());*/
+		
+		builder.append(", \"potentialHost\": [");
+		for (FullPair host : potentialHosts) {
+			builder.append(host.id);
+			if (host.getParent() != null)
+				builder.append(" p " + host.getParent().getId());
+			builder.append(", ");
+		}
+		if (potentialHosts.size() >= 1) {
 			builder.delete(builder.length() - 2, builder.length());
-		builder.append("}");
+		}		
+		builder.append("]");
+		
+		
+		builder.append(", \"customerMap\": [");
+		for (FullPair customer : customerMap.keySet()) {
+			builder.append(customer.id + ": " + customerMap.get(customer) + ", ");
+		}
+		if (customerMap.size() >= 1) {
+			builder.delete(builder.length() - 2, builder.length());
+		}
+		builder.append("]}");
 		
 		return builder.toString();
 	}	
-	
+
+
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + ((CUI == null) ? 0 : CUI.hashCode());
-		result = prime * result + Float.floatToIntBits(sentiment);
+		result = prime * result + ((id == null) ? 0 : id.hashCode());
 		return result;
 	}
 	@Override
@@ -110,39 +107,19 @@ public class FullPair implements Comparable<FullPair> {
 		if (getClass() != obj.getClass())
 			return false;
 		FullPair other = (FullPair) obj;
-		if (CUI == null) {
-			if (other.CUI != null)
+		if (id == null) {
+			if (other.id != null)
 				return false;
-		} else if (!CUI.equals(other.CUI))
-			return false;
-		if (Float.floatToIntBits(sentiment) != Float
-				.floatToIntBits(other.sentiment))
+		} else if (!id.equals(other.id))
 			return false;
 		return true;
 	}
-
-	public String getCUI() {
-		return CUI;
+	public String getId() {
+		return id;
 	}
 
-	public void setCUI(String cUI) {
-		CUI = cUI;
-	}
-
-	public float getSentiment() {
-		return sentiment;
-	}
-
-	public void setSentiment(float sentiment) {
-		this.sentiment = sentiment;
-	}
-
-	public float getThreshold() {
-		return threshold;
-	}
-
-	public void setThreshold(float threshold) {
-		this.threshold = threshold;
+	public void setId(String id) {
+		this.id = id;
 	}
 
 	public FullPair getHost() {
@@ -160,6 +137,20 @@ public class FullPair implements Comparable<FullPair> {
 	public void setCustomerMap(ConcurrentMap<FullPair, Integer> customerMap) {
 		this.customerMap = customerMap;
 	}
+	
+	public void addCustomer(FullPair pair, int distance) {
+		customerMap.put(pair, distance);
+	}
+	
+	public void removeCustomer(FullPair customer) {
+		customerMap.remove(customer);
+	}
+	
+	public Integer distanceToCustomer(FullPair customer) {
+		return customerMap.get(customer);
+	}
+	
+	
 
 	public int getBenefit() {
 		return benefit;
@@ -179,9 +170,17 @@ public class FullPair implements Comparable<FullPair> {
 	public Set<FullPair> getPotentialHosts() {
 		return potentialHosts;
 	}
-
+	
 	public void setPotentialHosts(Set<FullPair> potentialHosts) {
 		this.potentialHosts = potentialHosts;
+	}
+	
+	public void addPotentialHost(FullPair host) {
+		potentialHosts.add(host);
+	}
+	
+	public void removePotentialHost(FullPair host) {
+		potentialHosts.remove(host);
 	}
 
 	public List<String> getDeweys() {
@@ -194,5 +193,13 @@ public class FullPair implements Comparable<FullPair> {
 
 	public void addDeweys(Collection<? extends String> deweys) {
 		this.deweys.addAll(deweys);
+	}
+
+	public SentimentSet getParent() {
+		return parent;
+	}
+
+	public void setParent(SentimentSet parent) {
+		this.parent = parent;
 	}
 }

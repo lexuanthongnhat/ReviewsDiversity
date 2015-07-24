@@ -4,9 +4,12 @@ import edu.ucr.cs.dblab.nle020.metamap.MetaMapParser;
 import edu.ucr.cs.dblab.nle020.metamap.SemanticTypes;
 import edu.ucr.cs.dblab.nle020.metamap.Sentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
 import edu.ucr.cs.dblab.nle020.utilities.Utils;
 import gov.nih.nlm.nls.metamap.Ev;
 import gov.nih.nlm.nls.metamap.Position;
+
 import java.io.BufferedWriter;
 import java.io.FileOutputStream;
 import java.io.FileReader;
@@ -48,7 +51,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  *
  */
 public class PairExtractor {
-
+	private SentimentCalculator sentimentCalculator = new SentimentCalculator();
+	
 	private final static String REVIEWS_PATH = "D:\\Dropbox\\Reviews Diversity\\most_reviewed_providers.csv";
 	private final static String DESKTOP_FOLDER;	
 	static {
@@ -58,9 +62,10 @@ public class PairExtractor {
 			DESKTOP_FOLDER = "C:\\Users\\Nhat XT Le\\Desktop\\";
 	}
 	
-	private List<Review> reviews = null;
+	private List<RawReview> rawReviews = null;
 //	private Map<Integer, List<ConceptSentimentPair>> docToPairs = new HashMap<Integer, List<ConceptSentimentPair>>();
-	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToPairs = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
+//	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToPairs = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
+	private ConcurrentMap<Integer, List<SentimentReview>> docToSentimentReviews = new ConcurrentHashMap<Integer, List<SentimentReview>>();
 		
 	private Workbook wb = new XSSFWorkbook();
 	private XSSFFont redFont = (XSSFFont) wb.createFont();
@@ -83,9 +88,9 @@ public class PairExtractor {
 	
 	private void init() {
 
-		reviews = new CopyOnWriteArrayList<Review>();
-		reviews.addAll(getReviews(REVIEWS_PATH));
-		//reviews = getReviews(REVIEWS_PATH);
+		rawReviews = new CopyOnWriteArrayList<RawReview>();
+		rawReviews.addAll(getReviews(REVIEWS_PATH));
+		//rawReviews = getReviews(REVIEWS_PATH);
 		
 		initExcelColor();
 	}
@@ -128,14 +133,14 @@ public class PairExtractor {
 		try {			
 			fileOut = new FileOutputStream(DESKTOP_FOLDER + "reviews_diversity_" + Constants.INTERVAL + ".xlsx");
 			
-//			for (Review review : reviews) {
-			for (int i = 0; i < reviews.size(); i += Constants.INTERVAL ) {
+//			for (RawReview review : rawReviews) {
+			for (int i = 0; i < rawReviews.size(); i += Constants.INTERVAL ) {
 //			for (int i = 0; i <= 100; i += Constants.INTERVAL ) {
-				Review review = reviews.get(i);	
+				RawReview rawReview = rawReviews.get(i);	
 				
 				//addRow(sheet, i/interval + 1, review);
 				Row row = sheet.createRow(i/Constants.INTERVAL + 1);
-				addRow(row, review);				
+				addRow(row, rawReview);				
 			}
 						
 			wb.write(fileOut);
@@ -158,15 +163,15 @@ public class PairExtractor {
 		FileOutputStream fileOut;
 		try {			
 			fileOut = new FileOutputStream(DESKTOP_FOLDER + "reviews_diversity_" + Constants.INTERVAL + ".xlsx");
-			//fileOut = new FileOutputStream("D:\\UCR Google Drive\\GD - Review Diversity\\" + "reviews_diversity" + Constants.INTERVAL + ".xlsx");
+			//fileOut = new FileOutputStream("D:\\UCR Google Drive\\GD - RawReview Diversity\\" + "reviews_diversity" + Constants.INTERVAL + ".xlsx");
 			
 			CopyOnWriteArrayList<Row> rows = new CopyOnWriteArrayList<Row>();
-			for (int i = 0; i < reviews.size()/Constants.INTERVAL + 1; i++) {
+			for (int i = 0; i < rawReviews.size()/Constants.INTERVAL + 1; i++) {
 				rows.add(sheet.createRow(i + 1));
 			}
 				
-			CopyOnWriteArrayList<Review> concurrentReviews = new CopyOnWriteArrayList<Review>();
-			concurrentReviews.addAllAbsent(reviews);
+			CopyOnWriteArrayList<RawReview> concurrentReviews = new CopyOnWriteArrayList<RawReview>();
+			concurrentReviews.addAllAbsent(rawReviews);
 			
 			CellStyle cs = wb.createCellStyle();		
 			cs.setWrapText(true);
@@ -196,12 +201,12 @@ public class PairExtractor {
 		}		
 	}
 	
-	private void addRow(Row row, Review review) {		
+	private void addRow(Row row, RawReview rawReview) {		
 		CellStyle cs = wb.createCellStyle();		
 		cs.setWrapText(true);
 		cs.setShrinkToFit(true);
 		
-		addDefaultCells(row, cs, review);				
+		addDefaultCells(row, cs, rawReview);				
 
 		Cell cellInvalidConcepts = row.createCell(4);
 		Cell cellInvalidConceptTypes = row.createCell(5);
@@ -215,7 +220,7 @@ public class PairExtractor {
 		cellConceptSentiment.setCellStyle(cs);
 		cellInvalidConceptTypes.setCellStyle(cs);
 		
-		String body = review.getBody();		
+		String body = rawReview.getBody();		
 		
 		XSSFRichTextString invalidConcepts = new XSSFRichTextString(body);
 		XSSFRichTextString validConcepts = new XSSFRichTextString(body);
@@ -288,7 +293,7 @@ public class PairExtractor {
 		}
 			
 		// Building the value for columns: conceptSentiment
-		List<ConceptSentimentPair> pairs = SentimentCalculator.calculateSentiment(sentenceMap);
+		List<ConceptSentimentPair> pairs = sentimentCalculator.calculateSentiment(sentenceMap);
 		for (ConceptSentimentPair pair : pairs) {
 			conceptSentimentBuilder.append(pair.getName() + " :  " + String.format("%1$.3f", pair.getSentiment()) + "\n");
 		}
@@ -346,17 +351,17 @@ public class PairExtractor {
 		cellInvalidConcepts.setCellValue(invalidConcepts);
 	}
 	
-	public void buildDataset() {
+/*	public void buildDataset() {
 		long startTime = System.currentTimeMillis();
 		
-//		for (Review review : reviews) {
-		for (int i = 0; i < reviews.size(); i += Constants.INTERVAL ) {
+//		for (RawReview review : rawReviews) {
+		for (int i = 0; i < rawReviews.size(); i += Constants.INTERVAL ) {
 //		for (int i = 0; i <= 500; i += Constants.INTERVAL ) {
-			Review review = reviews.get(i);	
-			Integer docID = review.getDocID();
+			RawReview rawReview = rawReviews.get(i);	
+			Integer docID = rawReview.getDocID();
 						
 			
-			List<ConceptSentimentPair> pairs = getConceptSentimentPairs(review);
+			List<ConceptSentimentPair> pairs = getConceptSentimentPairs(rawReview);
 			if (!docToPairs.containsKey(docID)) {
 				docToPairs.put(docID, new ArrayList<ConceptSentimentPair>());
 				docToPairs.get(docID).addAll(pairs);
@@ -375,27 +380,28 @@ public class PairExtractor {
 		outputPairsToJson();
 		
 		Utils.printRunningTime(startTime, "Built " + (100.0f / (float) Constants.INTERVAL) + "% dataset");
-	}
+	}*/
 	
 	public void buildDatasetMultiThreads() {
 		long startTime = System.currentTimeMillis();
 		
-		ConcurrentMap<Integer, List<Review>> docToReviews = new ConcurrentHashMap<Integer, List<Review>>();
+		ConcurrentMap<Integer, List<RawReview>> docToReviews = new ConcurrentHashMap<Integer, List<RawReview>>();
 
 //		for (int i = 0; i < 3000; i += Constants.INTERVAL) {
-		for (int i = 0; i < reviews.size(); i += Constants.INTERVAL) {
-			Review review = reviews.get(i);	
-			Integer docID = review.getDocID();
+		for (int i = 0; i < rawReviews.size(); i += Constants.INTERVAL) {
+			RawReview rawReview = rawReviews.get(i);	
+			Integer docID = rawReview.getDocID();
 			if (!docToReviews.containsKey(docID)) {
-				docToReviews.put(docID, new ArrayList<Review>());
+				docToReviews.put(docID, new ArrayList<RawReview>());
 			}
 			
-			docToReviews.get(docID).add(review);
+			docToReviews.get(docID).add(rawReview);
 		}
 		
 		ExecutorService fixedPool = Executors.newFixedThreadPool(Constants.NUM_THREADS);
 		for (int i = 0; i< Constants.NUM_THREADS; i++) {
-			fixedPool.submit(new PairExtractorThread(docToReviews, docToPairs, i));
+//			fixedPool.submit(new PairExtractorThread(docToReviews, docToPairs, i));
+			fixedPool.submit(new PairExtractorThread(docToReviews, docToSentimentReviews, i));
 		}
 		fixedPool.shutdown();
 		
@@ -425,13 +431,18 @@ public class PairExtractor {
 		}
 		
 		int count = 1;
-		for (Integer docID : docToPairs.keySet()) {
+//		for (Integer docID : docToPairs.keySet()) {
+		for (Integer docId : docToSentimentReviews.keySet()) {
 			try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileOut), 
 				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 				if (count > 1)						
 					writer.newLine();
-				DoctorPairs docPair = new DoctorPairs(docID, docToPairs.get(docID));					
-				mapper.writeValue(writer, docPair);					
+				
+				/*DoctorPairs docPair = new DoctorPairs(docID, docToPairs.get(docID));					
+				mapper.writeValue(writer, docPair);*/				
+				DoctorSentimentReview doctorReview = new DoctorSentimentReview(docId, docToSentimentReviews.get(docId));
+				mapper.writeValue(writer, doctorReview);
+				
 //				System.out.println(count + ". Output docID " + docID);
 				count++;
 			} catch (IOException e) {
@@ -445,16 +456,16 @@ public class PairExtractor {
 	}
 	
 	public void testSentimentCalculation() {
-		for (Review review : reviews){
-			if (review.getDocID() == 138856 && review.getBody().startsWith("I would like to share my wonderful experience")) {
-				getConceptSentimentPairs(review);				
+		for (RawReview rawReview : rawReviews){
+			if (rawReview.getDocID() == 138856 && rawReview.getBody().startsWith("I would like to share my wonderful experience")) {
+				getConceptSentimentPairs(rawReview);				
 			}
 		}
 	}
 	
-	private List<ConceptSentimentPair> getConceptSentimentPairs(Review review) {			
-		Map<Sentence, List<Ev>> sentenceMap = mmParser.parseToSentenceMap(review.getBody());		
-		return SentimentCalculator.calculateSentiment(sentenceMap);
+	private List<ConceptSentimentPair> getConceptSentimentPairs(RawReview rawReview) {			
+		Map<Sentence, List<Ev>> sentenceMap = mmParser.parseToSentenceMap(rawReview.getBody());		
+		return sentimentCalculator.calculateSentiment(sentenceMap);
 	}
 	
 
@@ -473,7 +484,7 @@ public class PairExtractor {
 		cellDoc.setCellValue("DocID");
 		cellRate.setCellValue("Rate");
 		cellTitle.setCellValue("Title");
-		cellBody.setCellValue("Review");
+		cellBody.setCellValue("RawReview");
 		
 		
 		cellDoc.setCellStyle(cs);
@@ -503,7 +514,7 @@ public class PairExtractor {
 	}
 	
 	// Add 4 default cells: doctor ID, review's rate, title, original body
-	private void addDefaultCells(Row row, CellStyle cs, Review review) {
+	private void addDefaultCells(Row row, CellStyle cs, RawReview rawReview) {
 		Cell cellDoc = row.createCell(0);
 		Cell cellRate = row.createCell(1);
 		Cell cellTitle = row.createCell(2);
@@ -514,16 +525,16 @@ public class PairExtractor {
 		cellTitle.setCellStyle(cs);
 		cellBody.setCellStyle(cs);
 		
-		cellDoc.setCellValue(review.getDocID());
-		cellRate.setCellValue(review.getRate());
-		cellTitle.setCellValue(review.getTitle());
-		cellBody.setCellValue(review.getBody());
+		cellDoc.setCellValue(rawReview.getDocID());
+		cellRate.setCellValue(rawReview.getRate());
+		cellTitle.setCellValue(rawReview.getTitle());
+		cellBody.setCellValue(rawReview.getBody());
 	}
 	
-	private List<Review> getReviews(String file) {
+	private List<RawReview> getReviews(String file) {
 		long startTime = System.currentTimeMillis();	
 
-		List<Review> results = new ArrayList<Review>();
+		List<RawReview> results = new ArrayList<RawReview>();
 		
 		try {
 			Reader in = new FileReader(file);
@@ -536,19 +547,27 @@ public class PairExtractor {
 					continue;
 				}
 				
+				int id = Integer.parseInt(record.get(0).trim());
 				int docID = Integer.parseInt(record.get(1).trim());
 				String tittle = record.get(5).trim();
 				String body = record.get(6).trim();
 				body = body.replace("DR.", "DR").replace("dr.", "dr").replace("Dr.", "Dr").replace("dR.", "dR");
+				body = body.replace("Drs.", "Drs").replace("DRs.", "DRs");
 				
-				// The review "Â " cause MetaMap server to fail
+				body = body.replace("Mr.", "Mr").replace("mr.", "mr").replace("MR.", "MR");
+				body = body.replace("Mrs.", "Mrs").replace("mrs.", "mrs").replace("MRS.", "MRS");
+				body = body.replace("Miss.", "Miss");
+				
+				// The review "Â " cause MetaMap server to fail				
 				body = body.replace("Â ", "");
 				body = body.replace("Â", "");
+				body = body.replaceAll("â€¦", "").replaceAll("¨", "").replaceAll("¦", "").replace("Ã¯»¿", "");
+				
 				if (body.trim().length() == 0)
 					continue;
 				
 				String temp = record.get(8).trim();
-				int rate = 50;
+				int rate = -1;
 				if (temp.length() > 0)
 					rate = Integer.parseInt(temp);
 				else {
@@ -564,22 +583,22 @@ public class PairExtractor {
 					}
 					if (sum > 0) {
 						rate = sum/count;
-				//		System.out.println("Review: " + body + ", rate: " + rate);
+				//		System.out.println("RawReview: " + body + ", rate: " + rate);
 					} else {
-				//		System.out.println("Review: " + body);
+				//		System.out.println("RawReview: " + body);
 					}				
 				}
 				
-				
-				Review review = new Review(docID, tittle, body, rate);
-				results.add(review);
-				
+				if (rate >= 0) {
+					RawReview rawReview = new RawReview(id, docID, tittle, body, rate);
+					results.add(rawReview);
+				}
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		
-		Utils.printRunningTime(startTime, "Importing " + results.size() + " reviews");
+		Utils.printRunningTime(startTime, "Importing " + results.size() + " rawReviews");
 		
 		return results;
 	}

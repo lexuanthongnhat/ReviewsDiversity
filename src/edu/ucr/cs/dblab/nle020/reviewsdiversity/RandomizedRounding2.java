@@ -1,0 +1,55 @@
+package edu.ucr.cs.dblab.nle020.reviewsdiversity;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentMap;
+
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
+import edu.ucr.cs.dblab.nle020.utilities.Utils;
+
+public class RandomizedRounding2 extends RandomizedRounding implements Runnable {
+
+	private int index;			// To specify the thread order
+	private int numThreadsAlgorithm;
+	
+	Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs;	
+	public RandomizedRounding2(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult,
+			int index, int numThreadsAlgorithm, 
+			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs) {
+		super(k, threshold, docToTopPairsResult);
+		
+		this.index = index;
+		this.numThreadsAlgorithm = numThreadsAlgorithm;		
+		this.docToConceptSentimentPairs = docToConceptSentimentPairs;
+	}
+	
+	public RandomizedRounding2(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult,
+			int index, int numThreadsAlgorithm, 
+			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs, 
+			LPMethod method) {
+		super(k, threshold, docToTopPairsResult, method);
+		
+		this.index = index;
+		this.numThreadsAlgorithm = numThreadsAlgorithm;		
+		this.docToConceptSentimentPairs = docToConceptSentimentPairs;
+	}
+
+	@Override
+	public void run() {
+		long startTime = System.currentTimeMillis();
+		Integer[] docIDs = docToConceptSentimentPairs.keySet().toArray(new Integer[docToConceptSentimentPairs.size()]); 
+		int numDocs = Constants.NUM_DOCS < docIDs.length ? Constants.NUM_DOCS : docIDs.length;
+		
+		for (int i = index; i < numDocs; i += numThreadsAlgorithm) {
+//		for (int i = 580; i < numDocs; i += numThreadsAlgorithm) {
+			Integer docId = docIDs[i];
+			
+			docToTopPairsResult.put(docId, runRandomizedRoundingPerDoc(docId, docToConceptSentimentPairs.get(docId)));
+			
+			Utils.printRunningTime(startTime, "RR finished " + i + ", final cost: " + docToTopPairsResult.get(docId).getFinalCost());
+			startTime = System.currentTimeMillis();
+		}		
+	}
+
+}

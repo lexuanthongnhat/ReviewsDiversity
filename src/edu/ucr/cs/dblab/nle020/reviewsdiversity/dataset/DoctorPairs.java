@@ -2,6 +2,8 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset;
 
 import java.util.List;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
+
 public class DoctorPairs {
 	private Integer docID;
 	private List<ConceptSentimentPair> pairs;

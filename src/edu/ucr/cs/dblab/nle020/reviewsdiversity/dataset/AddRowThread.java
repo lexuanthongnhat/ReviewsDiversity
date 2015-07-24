@@ -4,12 +4,14 @@ import edu.ucr.cs.dblab.nle020.metamap.MetaMapParser;
 import edu.ucr.cs.dblab.nle020.metamap.SemanticTypes;
 import edu.ucr.cs.dblab.nle020.metamap.Sentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.utilities.Utils;
 import gov.nih.nlm.nls.metamap.Ev;
 import gov.nih.nlm.nls.metamap.Position;
 
 import java.util.List;
 import java.util.Map;
+
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
@@ -17,10 +19,11 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFRichTextString;
 
 public class AddRowThread implements Runnable {
-
+	private SentimentCalculator sentimentCalculator = new SentimentCalculator();
+	
 	private int index;
 	private List<Row> rows;
-	private List<Review> reviews;
+	private List<RawReview> rawReviews;
 	
 	private CellStyle cs;
 	private Font validFont;
@@ -28,12 +31,12 @@ public class AddRowThread implements Runnable {
 	
 	private MetaMapParser mmParser = new MetaMapParser();
 		
-	public AddRowThread(int index, List<Row> rows, List<Review> reviews,
+	public AddRowThread(int index, List<Row> rows, List<RawReview> rawReviews,
 			CellStyle cs, Font validFont, Font invalidFont) {
 		super();
 		this.index = index;
 		this.rows = rows;
-		this.reviews = reviews;
+		this.rawReviews = rawReviews;
 		this.cs = cs;
 		this.validFont = validFont;
 		this.invalidFont = invalidFont;
@@ -49,10 +52,10 @@ public class AddRowThread implements Runnable {
 		//			index = 1:	100, 500, 900
 		//          index = 2:  200, 600, 1000
 		// 			index = 3:  300, 700, 1100
-		for (int i = 0 + index * Constants.INTERVAL; i < reviews.size(); i += Constants.INTERVAL * Constants.NUM_THREADS) {
-			Review review = reviews.get(i);
+		for (int i = 0 + index * Constants.INTERVAL; i < rawReviews.size(); i += Constants.INTERVAL * Constants.NUM_THREADS) {
+			RawReview rawReview = rawReviews.get(i);
 			Row row = rows.get(i / Constants.INTERVAL + i % Constants.INTERVAL);
-			addRow(row, review);
+			addRow(row, rawReview);
 		}
 		
 		mmParser.disconnect();
@@ -60,8 +63,8 @@ public class AddRowThread implements Runnable {
 		Utils.printRunningTime(startTime, Thread.currentThread().getName()	+ " finished");
 	}	
 	
-	private void addRow(Row row, Review review) {			
-		addDefaultCells(row, cs, review);				
+	private void addRow(Row row, RawReview rawReview) {			
+		addDefaultCells(row, cs, rawReview);				
 
 		Cell cellInvalidConcepts = row.createCell(4);
 		Cell cellInvalidConceptTypes = row.createCell(5);
@@ -75,7 +78,7 @@ public class AddRowThread implements Runnable {
 		cellConceptSentiment.setCellStyle(cs);
 		cellInvalidConceptTypes.setCellStyle(cs);
 		
-		String body = review.getBody();		
+		String body = rawReview.getBody();		
 		
 		XSSFRichTextString invalidConcepts = new XSSFRichTextString(body);
 		XSSFRichTextString validConcepts = new XSSFRichTextString(body);
@@ -148,10 +151,10 @@ public class AddRowThread implements Runnable {
 			
 		// Building the value for columns: conceptSentiment TODO
 //		List<ConceptSentimentPair> pairs = calculateSentiment(sentenceMap);
-		List<ConceptSentimentPair> pairs = SentimentCalculator.calculateSentiment(sentenceMap);
+		List<ConceptSentimentPair> pairs = sentimentCalculator.calculateSentiment(sentenceMap);
 		
 		for (ConceptSentimentPair pair : pairs) {
-			conceptSentimentBuilder.append(pair.getName() + " :  " + String.format("%1$.3f", pair.getSentiment()) + "\n");
+			conceptSentimentBuilder.append(pair.getName() + " :  " + String.format("%1$." + Constants.NUM_DIGIT_PRECISION_SENTIMENT + "f", pair.getSentiment()) + "\n");
 		}
 			
 		// Finalizing	
@@ -221,7 +224,7 @@ public class AddRowThread implements Runnable {
 	}	
 	
 	// Add 4 default cells: doctor ID, review's rate, title, original body
-	private void addDefaultCells(Row row, CellStyle cs, Review review) {
+	private void addDefaultCells(Row row, CellStyle cs, RawReview rawReview) {
 		Cell cellDoc = row.createCell(0);
 		Cell cellRate = row.createCell(1);
 		Cell cellTitle = row.createCell(2);
@@ -232,9 +235,9 @@ public class AddRowThread implements Runnable {
 		cellTitle.setCellStyle(cs);
 		cellBody.setCellStyle(cs);
 		
-		cellDoc.setCellValue(review.getDocID());
-		cellRate.setCellValue(review.getRate());
-		cellTitle.setCellValue(review.getTitle());
-		cellBody.setCellValue(review.getBody());
+		cellDoc.setCellValue(rawReview.getDocID());
+		cellRate.setCellValue(rawReview.getRate());
+		cellTitle.setCellValue(rawReview.getTitle());
+		cellBody.setCellValue(rawReview.getBody());
 	}
 }

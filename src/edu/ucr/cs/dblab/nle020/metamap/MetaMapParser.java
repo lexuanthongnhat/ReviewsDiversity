@@ -249,6 +249,41 @@ public class MetaMapParser {
 		return result;
 	}
 	
+	public List<Ev> getValidMappings(String sentence) {
+		List<Ev> result = new ArrayList<Ev>();
+		
+		List<Result> resultList = api.processCitationsFromString(options, sentence);
+		for (Result re : resultList) {
+			List<Utterance> utters;
+			try {
+				utters = re.getUtteranceList();
+				for (Utterance utter : utters) {										
+					List<Ev> mappings = new ArrayList<Ev>();
+					
+					List<PCM> pcms = utter.getPCMList();
+					for (PCM pcm : pcms){
+						for (Mapping map : pcm.getMappingList()) {
+							for (Ev ev : map.getEvList()) {
+								if (isValidSource(ev) && isValidType(ev.getSemanticTypes())
+									&& !erroneousCUIs.contains(ev.getConceptId()) && !isStopWord(ev) ) {
+										
+										mappings.add(ev);
+									
+								}
+							}
+						}
+					}
+					
+					result.addAll(mappings);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		
+		return result;
+	}
+	
 	public List<Ev> getValidMappings(List<Ev> mappings) {
 		List<Ev> result = new ArrayList<Ev>();
 		
