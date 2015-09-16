@@ -17,9 +17,11 @@ public class ILPAlgorithm1 extends ILPAlgorithm implements Runnable {
 	private int docId;
 	private List<ConceptSentimentPair> conceptSentimentPairs;	
 	
-	public ILPAlgorithm1(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult, 
+	public ILPAlgorithm1(int k, float threshold, 
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult, 
+			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult, 
 			int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
-		super(k, threshold, docToTopPairsResult);
+		super(k, threshold, docToStatisticalResult, docToTopKPairsResult);
 		this.docId = docId;
 		this.conceptSentimentPairs = conceptSentimentPairs;	
 	}
@@ -27,6 +29,6 @@ public class ILPAlgorithm1 extends ILPAlgorithm implements Runnable {
 	@Override
 	public void run() {
 
-		docToTopPairsResult.put(docId, runILPPerDoc(docId, conceptSentimentPairs));
+		runILPPerDoc(docId, conceptSentimentPairs);
 	}
 }

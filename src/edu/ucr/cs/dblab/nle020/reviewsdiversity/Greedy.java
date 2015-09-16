@@ -1,11 +1,14 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +17,7 @@ import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.TimeUnit;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utilities.Utils;
 
 public class Greedy {
@@ -22,14 +26,17 @@ public class Greedy {
 
 	protected FullPair root = new FullPair(Constants.ROOT_CUI);
 	
-	protected ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult = new ConcurrentHashMap<Integer, TopPairsResult>();
-			
+	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
+	protected ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
+	
 	public Greedy(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult) {
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
-		this.docToTopPairsResult = docToTopPairsResult;
+		this.docToStatisticalResult = docToStatisticalResult;
+		this.docToTopKPairsResult = docToTopKPairsResult;
 	}
 
 	/**
@@ -38,15 +45,15 @@ public class Greedy {
 	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected TopPairsResult runGreedyPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
+	protected void runGreedyPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
 		long startTime = System.currentTimeMillis();
 				
-		TopPairsResult result = new TopPairsResult(docId, k, threshold);		
+		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
 		List<FullPair> topK = new ArrayList<FullPair>();	
 
 //		printInitialization();		
 		List<FullPair> pairs = new ArrayList<FullPair>();
-		initPairs(conceptSentimentPairs, pairs, result);
+		initPairs(conceptSentimentPairs, pairs, statisticalResult);
 		
 		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<FullPair, Map<FullPair, Integer>>();	
 		if (Constants.DEBUG_MODE)
@@ -60,21 +67,37 @@ public class Greedy {
 			for (int i = 0; i < k; i++) {
 				if (System.currentTimeMillis() - startTime > 1000 * 60)
 					System.err.println("???");
-				chooseNextPair(heap, topK, result);
+				chooseNextPair(heap, topK, statisticalResult);
 			}
 		}
 				
 		if (Constants.DEBUG_MODE)
-			checkResult(topK, distances, result);
+			checkResult(topK, distances, statisticalResult);
 		
-		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), result, topK);
-
+		List<ConceptSentimentPair> topKPairsResult = convertTopKFullPairsToTopKPairs(conceptSentimentPairs, topK);
+		
+		docToTopKPairsResult.put(docId, topKPairsResult);
+		docToStatisticalResult.put(docId, statisticalResult);
+		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), statisticalResult, topK);
 //		Utils.printRunningTime(startTime, "Greedy finished docId " + docId);
-//		printResult();	
-		return result;
 	}	
 	
-	private void initPairs(List<ConceptSentimentPair> conceptSentimentPairs, List<FullPair> fullPairs, TopPairsResult result) {
+	private List<ConceptSentimentPair> convertTopKFullPairsToTopKPairs(
+			Collection<ConceptSentimentPair> conceptSentimentPairs,
+			List<FullPair> topK) {
+		List<ConceptSentimentPair> topKPairsResult = new ArrayList<ConceptSentimentPair>();
+		Set<String> topSetIds = new HashSet<String>(); 
+		for (FullPair fullPair : topK) {
+			topSetIds.add(fullPair.getId());
+		}
+		for (ConceptSentimentPair conceptSentimentPair : conceptSentimentPairs) {
+			if (topSetIds.contains(conceptSentimentPair.getId() + "_s" + conceptSentimentPair.getSentiment()))
+				topKPairsResult.add(conceptSentimentPair);
+		}
+		return topKPairsResult;
+	}
+	
+	private void initPairs(List<ConceptSentimentPair> conceptSentimentPairs, List<FullPair> fullPairs, StatisticalResult statisticalResult) {
 		long startTime = System.currentTimeMillis();
 		
 		for (int i = 0 ; i < conceptSentimentPairs.size() ; i++) {
@@ -166,13 +189,13 @@ public class Greedy {
 		
 		
 		// Init result
-		result.setInitialCost(initialCost);
-		result.setFinalCost(initialCost);
-		result.setNumPairs(conceptSentimentPairs.size());
+		statisticalResult.setInitialCost(initialCost);
+		statisticalResult.setFinalCost(initialCost);
+		statisticalResult.setNumPairs(conceptSentimentPairs.size());
 //		initNumPotentialUsefulCover(result, conceptSentimentPairs);
-		initNumPotentialUsefulCoverWithThreshold(result, fullPairs);
+		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairs);
 		
-		Utils.printRunningTime(startTime, "Finished initPairs of docId " + result.getDocID(), true);
+		Utils.printRunningTime(startTime, "Finished initPairs of docId " + statisticalResult.getDocID(), true);
 	}
 
 	private void initDistances(List<ConceptSentimentPair> conceptSentimentPairs, 
@@ -211,7 +234,7 @@ public class Greedy {
 		}
 	}
 	
-	private void initNumPotentialUsefulCover(TopPairsResult result, List<ConceptSentimentPair> conceptSentimentPairs) {
+	private void initNumPotentialUsefulCover(StatisticalResult result, List<ConceptSentimentPair> conceptSentimentPairs) {
 		for (int i = 0; i < conceptSentimentPairs.size() - 1; ++i) {
 			ConceptSentimentPair pair1 = conceptSentimentPairs.get(i);
 			for (int j = i + 1; j < conceptSentimentPairs.size(); ++j) {
@@ -225,7 +248,7 @@ public class Greedy {
 		}
 	}
 	
-	private void initNumPotentialUsefulCoverWithThreshold(TopPairsResult result, List<FullPair> fullPairs) {
+	private void initNumPotentialUsefulCoverWithThreshold(StatisticalResult result, List<FullPair> fullPairs) {
 		for (FullPair pair : fullPairs) {
 			if (pair.getCustomerMap() != null) {
 				for (FullPair customer : pair.getCustomerMap().keySet()) {
@@ -255,7 +278,7 @@ public class Greedy {
 	}
 	
 	// Choose the next pair on top of the heap, then update the RELATED pairs and the heap
-	private void chooseNextPair(PriorityQueue<FullPair> heap, List<FullPair> topK, TopPairsResult result) {
+	private void chooseNextPair(PriorityQueue<FullPair> heap, List<FullPair> topK, StatisticalResult statisticalResult) {
 		long startTime = System.currentTimeMillis();
 		// Choose next pair
 		FullPair nextPair = heap.poll();
@@ -300,7 +323,7 @@ public class Greedy {
 					}
 				}
 												
-				result.decreaseFinalCost(partialBenefit);
+				statisticalResult.decreaseFinalCost(partialBenefit);
 			}			
 		}
 		
@@ -315,7 +338,7 @@ public class Greedy {
 		Utils.printRunningTime(startTime, "Finished a nextPair iteration");
 	}
 	
-	private void checkResult(List<FullPair> topK, Map<FullPair, Map<FullPair, Integer>> distances, TopPairsResult result) {
+	private void checkResult(List<FullPair> topK, Map<FullPair, Map<FullPair, Integer>> distances, StatisticalResult statisticalResult) {
 	
 		long verifyingCost = 0;
 	
@@ -334,33 +357,33 @@ public class Greedy {
 			verifyingCost += minDistance;
 		}
 
-		System.out.println("Cost: " + result.getFinalCost() + " - Verifying Cost: " + verifyingCost);
-		if (verifyingCost != result.getFinalCost())
-			System.err.println("Greedy Error at docID " + result.getDocID());
+		System.out.println("Cost: " + statisticalResult.getFinalCost() + " - Verifying Cost: " + verifyingCost);
+		if (verifyingCost != statisticalResult.getFinalCost())
+			System.err.println("Greedy Error at docID " + statisticalResult.getDocID());
 	}
 
-	private void gatherFinalResult(long runningTime, int datasetSize, TopPairsResult result, List<FullPair> topK) {
+	private void gatherFinalResult(long runningTime, int datasetSize, StatisticalResult statisticalResult, List<FullPair> topK) {
 		if (datasetSize <= k) {
-			result.setFinalCost(0);
-			result.setNumUncovered(0);
-			result.setRunningTime(0);
-			result.setNumUsefulCover(0);
+			statisticalResult.setFinalCost(0);
+			statisticalResult.setNumUncovered(0);
+			statisticalResult.setRunningTime(0);
+			statisticalResult.setNumUsefulCover(0);
 		} else {
-			result.setNumUncovered(root.getCustomerMap().size());
-			result.setRunningTime(runningTime);
+			statisticalResult.setNumUncovered(root.getCustomerMap().size());
+			statisticalResult.setRunningTime(runningTime);
 			
 			for (FullPair pair : topK) {
 				for (FullPair customer : pair.getCustomerMap().keySet()) {
 					if (pair.getCustomerMap().get(customer) != 0)
-						result.increaseNumUsefulCover();
+						statisticalResult.increaseNumUsefulCover();
 				}
 			}
 		}
-		docToTopPairsResult.put(result.getDocID(), result);
+		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
 
 	@SuppressWarnings("unused")
-	private void printInitialization(List<FullPair> pairs, List<FullPair> topK, TopPairsResult result) {
+	private void printInitialization(List<FullPair> pairs, List<FullPair> topK, StatisticalResult result) {
 		System.err.println("PAIRS: (size " + pairs.size() + ", cost " + result.getInitialCost() + ")");
 		for (FullPair pair : pairs) {
 			if (!topK.contains(pair))
@@ -369,7 +392,7 @@ public class Greedy {
 	}
 	
 	@SuppressWarnings("unused")
-	private void printResult(List<FullPair> topK, int datasetSize, TopPairsResult result) {
+	private void printResult(List<FullPair> topK, int datasetSize, StatisticalResult result) {
 		System.err.println("TOP-" + k + " with threshold " + threshold + " (actual size: " + topK.size() 
 				+ ", cost " + result.getFinalCost() + ")");
 		for (FullPair pair : topK) {

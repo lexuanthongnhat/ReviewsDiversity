@@ -24,14 +24,27 @@ public class ILPAlgorithm {
 
 	protected ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
 	
-	protected ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult = new ConcurrentHashMap<Integer, TopPairsResult>();
+	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
+	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 	
+	// Used for ILPSetAlgorithm
 	public ILPAlgorithm(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult) {
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
-		this.docToTopPairsResult = docToTopPairsResult;
+		this.docToStatisticalResult = docToStatisticalResult;
+	}
+	
+	// Used for ILPAlgorithm 1, 2
+	public ILPAlgorithm(int k, float threshold,
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult) {
+		super();
+		this.k = k;
+		this.threshold = threshold;
+		this.docToStatisticalResult = docToStatisticalResult;
+		this.docToTopKPairsResult = docToTopKPairsResult;
 	}
 
 	/**
@@ -40,31 +53,39 @@ public class ILPAlgorithm {
 	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected TopPairsResult runILPPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
+	protected void runILPPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
 		long startTime = System.currentTimeMillis();
 		
-		TopPairsResult result = new TopPairsResult(docId, k, threshold);
+		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);
 		
-		List<ConceptSentimentPair> topK = new ArrayList<ConceptSentimentPair>();
-		result.setNumPairs(conceptSentimentPairs.size());
+		List<ConceptSentimentPair> topKPairs = new ArrayList<ConceptSentimentPair>();
+		statisticalResult.setNumPairs(conceptSentimentPairs.size());
 		
 		List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
 		pairs.add(root);
 		pairs.addAll(conceptSentimentPairs);
 		
 		if (pairs.size() <= k + 1) {
-			topK = pairs;
+			topKPairs = pairs;
 		} else {
 			int[][] distances = initDistances(pairs);
-			doILP(distances, result);	
+			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult);
+			
+			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
+			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
+				topKPairs.add(conceptSentimentPairs.get(order));
+			}
 		}		
-		
-		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), result);		
-		return result;
+
+		docToStatisticalResult.put(docId, statisticalResult);
+		docToTopKPairsResult.put(docId, topKPairs);
+		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), statisticalResult);		
 	}
 	
 	// Update topK, result
-	public void doILP(int[][] distances, TopPairsResult result) {
+	public StatisticalResultAndTopKByOriginalOrder doILP(int[][] distances, StatisticalResult statisticalResult) {		
+		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
+		
 		try {
 			int numFacilities = distances.length;			// Including the root
 			int numCustomers = distances[0].length;
@@ -126,27 +147,20 @@ public class ILPAlgorithm {
 			
 			
 			// Prepare some statistics, update result					
-			result.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
-			result.setOptimalCost(model.get(GRB.DoubleAttr.ObjBound));
+			statisticalResult.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
+			statisticalResult.setOptimalCost(model.get(GRB.DoubleAttr.ObjBound));
 			for (int c = 1; c < numCustomers; ++c) {
 				if (connecting[0][c].get(GRB.DoubleAttr.X) == 1.0) {
-					result.increaseNumUncovered();
+					statisticalResult.increaseNumUncovered();
 				}
 			}
 			
-			// TODO
-/*			for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
+			// Get top K by original order
+			for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
 				if (open[f].get(GRB.DoubleAttr.X) == 1.0) {
-					topK.add(pairs.get(f));
-
-					for (int c = 1; c < numCustomers; ++c) {
-						if (connecting[f][c].get(GRB.DoubleAttr.X) == 1.0) {
-							if (pairs.get(f).calculateDistance(pairs.get(c), threshold) != 0)
-								result.increaseNumUsefulCover();
-						}
-					}
+					topKByOriginalOrders.add(f - 1);
 				}
-			}*/
+			}
 			
 			
 			//////////////////////////////////////////////////////////////////////////////
@@ -163,33 +177,20 @@ public class ILPAlgorithm {
 				}		
 				
 				// Print the solution
-	/*			System.err.println("\nTOTAL COSTS: " + model.get(GRB.DoubleAttr.ObjVal));
-				System.out.println("Solution:");
-				System.out.print("Opened Facilities:\t");*/
 				for (int f = 0; f < numFacilities; ++f) {
-					if (open[f].get(GRB.DoubleAttr.X) == 1.0) {
-	//					System.out.print(f + "\t");
+					if (open[f].get(GRB.DoubleAttr.X) == 1.0)
 						facilityOpen[f] = 1;
-					}
 				}
 				
-	//			System.out.print("\nConnecting customer:");
 				for (int c = 0; c < numCustomers; ++c) {
-	//				System.out.print("\n\tCustomer " + c + " to facility ");
 					for (int f = 0; f < numFacilities; ++f) {
-						if (connecting[f][c].get(GRB.DoubleAttr.X) == 1.0) {
-	//						System.out.print(f + "\t");
+						if (connecting[f][c].get(GRB.DoubleAttr.X) == 1.0)
 							facilityConnect[f][c] = 1;
-						}
 					}				
-				}
-				System.out.println();
+				}				
 				
-	//			System.err.println( model.get(GRB.DoubleAttr.ObjBound));
-				
-				checkResult(distances, facilityOpen, facilityConnect, result);
-			}
-			
+				checkResult(distances, facilityOpen, facilityConnect, statisticalResult);
+			}			
 			
 			model.dispose();
 			env.dispose();
@@ -198,23 +199,24 @@ public class ILPAlgorithm {
 		      e.printStackTrace();
 		}
 		
+		return new StatisticalResultAndTopKByOriginalOrder(statisticalResult, topKByOriginalOrders);
 	}
 	
-	protected void gatherFinalResult(long runningTime, int datasetSize, TopPairsResult result) {
+	protected void gatherFinalResult(long runningTime, int datasetSize, StatisticalResult statisticalResult) {
 		
 		if (datasetSize <= k + 1) {
-			result.setRunningTime(0);
-			result.setFinalCost(0);
-			result.setOptimalCost(0);
-			result.setNumUncovered(0);
-			result.setNumUsefulCover(0);
+			statisticalResult.setRunningTime(0);
+			statisticalResult.setFinalCost(0);
+			statisticalResult.setOptimalCost(0);
+			statisticalResult.setNumUncovered(0);
+			statisticalResult.setNumUsefulCover(0);
 		} else {
-			result.setRunningTime(runningTime);
+			statisticalResult.setRunningTime(runningTime);
 		}
-		docToTopPairsResult.put(result.getDocID(), result);
+		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
 	
-	private void checkResult(int[][] distances, int[] facilityOpen, int[][] facilityConnect, TopPairsResult result) {
+	private void checkResult(int[][] distances, int[] facilityOpen, int[][] facilityConnect, StatisticalResult statisticalResult) {
 		int numFacilities = facilityOpen.length;
 		int numCustomers = facilityConnect[0].length;
 		
@@ -253,9 +255,9 @@ public class ILPAlgorithm {
 			}
 		}
 		
-		System.out.println("Cost: " + result.getFinalCost() + " - Verifying Cost: " + verifyingCost);
-		if (verifyingCost != result.getFinalCost())
-			System.err.println("ILP Error at docID " + result.getDocID());
+		System.out.println("Cost: " + statisticalResult.getFinalCost() + " - Verifying Cost: " + verifyingCost);
+		if (verifyingCost != statisticalResult.getFinalCost())
+			System.err.println("ILP Error at docID " + statisticalResult.getDocID());
 		
 		
 		// Test 2
@@ -271,9 +273,9 @@ public class ILPAlgorithm {
 			verifyingCost += min;
 		}
 		
-		if (verifyingCost != result.getFinalCost())
-			System.err.println("ILP TEST 2 -  Error 2 at docID " + result.getDocID() + 
-					":\tCost: " + result.getFinalCost() + " - Verifying Cost 2: " + verifyingCost);
+		if (verifyingCost != statisticalResult.getFinalCost())
+			System.err.println("ILP TEST 2 -  Error 2 at docID " + statisticalResult.getDocID() + 
+					":\tCost: " + statisticalResult.getFinalCost() + " - Verifying Cost 2: " + verifyingCost);
 	}
 	
 
@@ -327,6 +329,25 @@ public class ILPAlgorithm {
 		
 		
 		return distances;
+	}
+	
+	public static class StatisticalResultAndTopKByOriginalOrder{
+		StatisticalResult statisticalResult;
+		List<Integer> topKByOriginalOrders;
+		public StatisticalResult getStatisticalResult() {
+			return statisticalResult;
+		}
+		public List<Integer> getTopKByOriginalOrders() {
+			return topKByOriginalOrders;
+		}
+		public StatisticalResultAndTopKByOriginalOrder(
+				StatisticalResult statisticalResult, List<Integer> topKByOriginalOrders) {
+			super();
+			this.statisticalResult = statisticalResult;
+			this.topKByOriginalOrders = topKByOriginalOrders;
+		}
+		
+		
 	}
 
 }

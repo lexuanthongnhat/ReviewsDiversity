@@ -41,7 +41,7 @@ public class CUIToSnomedMapper {
 	//////////////////////////////////////////////////////////////////////////
 	
 	private void init() {
-		initInvalidTUIs();
+//		initInvalidTUIs();
 		initErroneousCUIs("src/edu/ucr/cs/dblab/nle020/metamap/erroneous_cuis.txt");
 		initExceptionalCUIs("src/edu/ucr/cs/dblab/nle020/metamap/exceptional_cuis.txt");
 	}

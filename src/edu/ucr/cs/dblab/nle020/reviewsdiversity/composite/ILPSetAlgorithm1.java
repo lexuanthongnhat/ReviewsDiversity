@@ -10,7 +10,7 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.composite;
 import java.util.List;
 import java.util.concurrent.ConcurrentMap;
 
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsResult;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 
 public class ILPSetAlgorithm1 extends ILPSetAlgorithm implements Runnable {
@@ -18,9 +18,11 @@ public class ILPSetAlgorithm1 extends ILPSetAlgorithm implements Runnable {
 	private int docId;
 	private List<SentimentSet> sentimentSets;	
 	
-	public ILPSetAlgorithm1(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult, 
+	public ILPSetAlgorithm1(int k, float threshold, 
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult,
 			int docId, List<SentimentSet> sentimentSets) {
-		super(k, threshold, docToTopPairsResult);
+		super(k, threshold, docToStatisticalResult, docToTopKSetsResult);
 		this.docId = docId;
 		this.sentimentSets = sentimentSets;	
 	}
@@ -28,6 +30,6 @@ public class ILPSetAlgorithm1 extends ILPSetAlgorithm implements Runnable {
 	@Override
 	public void run() {
 
-		docToTopPairsResult.put(docId, runILPSetPerDoc(docId, sentimentSets));
+		runILPSetPerDoc(docId, sentimentSets);
 	}
 }

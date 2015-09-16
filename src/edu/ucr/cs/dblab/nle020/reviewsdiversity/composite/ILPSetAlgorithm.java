@@ -2,22 +2,24 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.composite;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import edu.stanford.nlp.tagger.maxent.PairsHolder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILPAlgorithm;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsResult;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 
 public class ILPSetAlgorithm extends ILPAlgorithm {
+	ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult = new ConcurrentHashMap<Integer, List<SentimentSet>>();
 
 	public ILPSetAlgorithm(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult) {
-		super(k, threshold, docToTopPairsResult);
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult) {
+		super(k, threshold, docToStatisticalResult);
+		this.docToTopKSetsResult = docToTopKSetsResult;
 	}
-
 	
 	/**
 	 * Run Integer Linear Programming for a doctor's data set
@@ -25,11 +27,11 @@ public class ILPSetAlgorithm extends ILPAlgorithm {
 	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected TopPairsResult runILPSetPerDoc(int docId, List<SentimentSet> sentimentSets) {
+	protected void runILPSetPerDoc(int docId, List<SentimentSet> sentimentSets) {
 		long startTime = System.currentTimeMillis();
 		
-		TopPairsResult result = new TopPairsResult(docId, k, threshold);		
-		List<SentimentSet> topK = new ArrayList<SentimentSet>();
+		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
+		List<SentimentSet> topKSets = new ArrayList<SentimentSet>();
 		
 		List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
 		for (SentimentSet set : sentimentSets) {
@@ -42,14 +44,21 @@ public class ILPSetAlgorithm extends ILPAlgorithm {
 		}
 		
 		if (sentimentSets.size() <= k) {
-			topK = sentimentSets;
+			topKSets = sentimentSets;
 		} else {
-			int[][] distances = initDistances(sentimentSets, pairs, result);
-			doILP(distances, result);	
+			int[][] distances = initDistances(sentimentSets, pairs, statisticalResult);
+			
+			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult);
+			
+			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
+			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
+				topKSets.add(sentimentSets.get(order));
+			}	
 		}		
 		
-		gatherFinalResult(System.currentTimeMillis() - startTime, sentimentSets.size() + 1, result);		
-		return result;
+		docToStatisticalResult.put(docId, statisticalResult);
+		docToTopKSetsResult.put(docId, topKSets);
+		gatherFinalResult(System.currentTimeMillis() - startTime, sentimentSets.size() + 1, statisticalResult);		
 	}
 	
 	/**
@@ -59,7 +68,8 @@ public class ILPSetAlgorithm extends ILPAlgorithm {
 	 * @return array of length [sentimentSets.size() + 1 ] * conceptSentimentPairs.size()
 	 * <br> +1 for the root, result[0] is the distance array of the root
 	 */
-	private int[][] initDistances(List<SentimentSet> sentimentSets, List<ConceptSentimentPair> conceptSentimentPairs, TopPairsResult result) {
+	private int[][] initDistances(List<SentimentSet> sentimentSets, List<ConceptSentimentPair> conceptSentimentPairs, 
+			StatisticalResult statisticalResult) {
 		int[][] distances = new int[sentimentSets.size() + 1][conceptSentimentPairs.size() + 1];
 		
 		conceptSentimentPairs.add(0, root);
@@ -72,7 +82,7 @@ public class ILPSetAlgorithm extends ILPAlgorithm {
 			distances[0][j] = pair.calculateRootDistance();
 			initialCost += distances[0][j]; 
 		}
-		result.setInitialCost(initialCost);		
+		statisticalResult.setInitialCost(initialCost);		
 		
 		// The sets
 		for (int s = 0; s < sentimentSets.size(); ++s) {

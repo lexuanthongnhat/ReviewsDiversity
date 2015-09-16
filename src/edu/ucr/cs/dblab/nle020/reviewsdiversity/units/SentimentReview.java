@@ -21,6 +21,15 @@ public class SentimentReview extends SentimentSet {
 		super(id, pairs);
 		this.rawReview = rawReview;		
 	}
+	
+	
+	public SentimentReview(String id, List<ConceptSentimentPair> pairs,
+			RawReview rawReview,
+			List<SentimentSentence> sentences) {
+		super(id, pairs);
+		this.rawReview = rawReview;
+		this.sentences = sentences;
+	}
 
 	public RawReview getRawReview() {
 		return rawReview;

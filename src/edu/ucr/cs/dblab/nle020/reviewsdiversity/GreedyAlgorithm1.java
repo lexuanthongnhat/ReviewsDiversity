@@ -10,9 +10,11 @@ public class GreedyAlgorithm1 extends Greedy implements Runnable {
 	private int docId;
 	private List<ConceptSentimentPair> conceptSentimentPairs;
 
-	public GreedyAlgorithm1(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult, 
+	public GreedyAlgorithm1(int k, float threshold, 
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult, 
+			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult,
 			int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
-		super(k, threshold, docToTopPairsResult);
+		super(k, threshold, docToStatisticalResult, docToTopKPairsResult);
 		
 		this.docId = docId;		
 		this.conceptSentimentPairs = conceptSentimentPairs;		
@@ -20,6 +22,6 @@ public class GreedyAlgorithm1 extends Greedy implements Runnable {
 	
 	@Override
 	public void run() {
-		docToTopPairsResult.put(docId, runGreedyPerDoc(docId, conceptSentimentPairs));
+		runGreedyPerDoc(docId, conceptSentimentPairs);
 	}	
 }

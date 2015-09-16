@@ -14,21 +14,14 @@ public class RandomizedRounding2 extends RandomizedRounding implements Runnable 
 	private int numThreadsAlgorithm;
 	
 	Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs;	
-	public RandomizedRounding2(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult,
-			int index, int numThreadsAlgorithm, 
-			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs) {
-		super(k, threshold, docToTopPairsResult);
-		
-		this.index = index;
-		this.numThreadsAlgorithm = numThreadsAlgorithm;		
-		this.docToConceptSentimentPairs = docToConceptSentimentPairs;
-	}
 	
-	public RandomizedRounding2(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult,
+	public RandomizedRounding2(int k, float threshold, 
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult,
 			int index, int numThreadsAlgorithm, 
 			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs, 
 			LPMethod method) {
-		super(k, threshold, docToTopPairsResult, method);
+		super(k, threshold, docToStatisticalResult, docToTopKPairsResult, method);
 		
 		this.index = index;
 		this.numThreadsAlgorithm = numThreadsAlgorithm;		
@@ -39,15 +32,13 @@ public class RandomizedRounding2 extends RandomizedRounding implements Runnable 
 	public void run() {
 		long startTime = System.currentTimeMillis();
 		Integer[] docIDs = docToConceptSentimentPairs.keySet().toArray(new Integer[docToConceptSentimentPairs.size()]); 
-		int numDocs = Constants.NUM_DOCS < docIDs.length ? Constants.NUM_DOCS : docIDs.length;
 		
-		for (int i = index; i < numDocs; i += numThreadsAlgorithm) {
-//		for (int i = 580; i < numDocs; i += numThreadsAlgorithm) {
+		for (int i = index; i < docIDs.length; i += numThreadsAlgorithm) {
 			Integer docId = docIDs[i];
 			
-			docToTopPairsResult.put(docId, runRandomizedRoundingPerDoc(docId, docToConceptSentimentPairs.get(docId)));
+			runRandomizedRoundingPerDoc(docId, docToConceptSentimentPairs.get(docId));
 			
-			Utils.printRunningTime(startTime, "RR finished " + i + ", final cost: " + docToTopPairsResult.get(docId).getFinalCost());
+			Utils.printRunningTime(startTime, "RR finished " + i + ", final cost: " + docToStatisticalResult.get(docId).getFinalCost());
 			startTime = System.currentTimeMillis();
 		}		
 	}

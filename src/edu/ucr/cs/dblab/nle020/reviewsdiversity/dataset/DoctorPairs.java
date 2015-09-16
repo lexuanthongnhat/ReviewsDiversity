@@ -6,7 +6,9 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 
 public class DoctorPairs {
 	private Integer docID;
+	private RawReview rawReview;
 	private List<ConceptSentimentPair> pairs;
+	
 	public Integer getDocID() {
 		return docID;
 	}
@@ -26,5 +28,11 @@ public class DoctorPairs {
 		super();
 		this.docID = docID;
 		this.pairs = pairs;
+	}
+	public RawReview getRawReview() {
+		return rawReview;
+	}
+	public void setRawReview(RawReview rawReview) {
+		this.rawReview = rawReview;
 	}
 }

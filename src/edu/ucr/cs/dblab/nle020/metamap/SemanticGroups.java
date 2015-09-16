@@ -105,10 +105,10 @@ public class SemanticGroups {
 		throw new AssertionError("This class is noninstantiable");
 	}
 	
-	// Guarantee: each TUI belong to only one group
+	// Guarantee: each type belong to only one group
 	public static String getSemanticGroup(String semanticType) {
 		String result = null;
-		semanticType = semanticType.toUpperCase();
+		semanticType = semanticType.toLowerCase();
 		
 		for (String group : groupMap.keySet()) {
 			if (groupMap.get(group).contains(semanticType))
@@ -118,7 +118,7 @@ public class SemanticGroups {
 		return result;
 	}
 	
-	// Guarantee: each TUI belong to only one group
+	// Guarantee: each type belong to only one group
 	public static String getSemanticGroupName(String semanticType) {
 		String result = null;
 

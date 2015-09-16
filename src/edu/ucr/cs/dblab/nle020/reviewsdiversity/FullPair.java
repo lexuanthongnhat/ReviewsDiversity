@@ -20,7 +20,7 @@ public class FullPair implements Comparable<FullPair> {
 	//		Don't include ROOT because the ROOT is default
 	//		Don't include the host
 	private Set<FullPair> potentialHosts = new HashSet<FullPair>();
-	
+
 	// Current pairs that have this pair as their host/facility
 	//		KEY: customer, VALUE: distance to the customer
 	private ConcurrentMap<FullPair, Integer> customerMap = new ConcurrentHashMap<FullPair, Integer>();
@@ -35,6 +35,9 @@ public class FullPair implements Comparable<FullPair> {
 	// For debugging
 	private List<String> deweys = new ArrayList<String>();
 	
+	public FullPair () {
+		super();
+	}
 	public FullPair(String id) {
 		this.id = id;
 	}

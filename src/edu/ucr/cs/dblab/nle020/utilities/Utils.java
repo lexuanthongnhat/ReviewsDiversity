@@ -7,9 +7,9 @@ public class Utils {
 	public static void printRunningTime(long startTime, String message, boolean... useErr) {
 
 		if (useErr.length == 0 || useErr[0] == false)
-			System.out.println(message + " in " + (double) (System.currentTimeMillis() - startTime) / 1000.0f + " s");
+			System.out.println(message + " in \t" + (double) (System.currentTimeMillis() - startTime) / 1000.0f + " s");
 		else if (useErr[0] == true)
-			System.err.println(message + " in " + (double) (System.currentTimeMillis() - startTime) / 1000.0f + " s");
+			System.err.println(message + " in \t" + (double) (System.currentTimeMillis() - startTime) / 1000.0f + " s");
 	}	
 	
 	public static void printTotalHeapSize(String message, boolean... useErr) {

@@ -42,7 +42,7 @@ public class CUIToDeweysMapper {
 		initSnomedToDeweys(SnomedGraphBuilderManager.SNOMED_DEWEYS_PATH);
 		
 		
-		initInvalidTUIs();
+//		initInvalidTUIs();
 		initErroneousCUIs("src/edu/ucr/cs/dblab/nle020/metamap/erroneous_cuis.txt");
 		initExceptionalCUIs("src/edu/ucr/cs/dblab/nle020/metamap/exceptional_cuis.txt");
 		
@@ -179,6 +179,9 @@ public class CUIToDeweysMapper {
 			invalidTUIsBuilder.append(")");
 			
 			String query = "SELECT DISTINCT CUI FROM mrsty WHERE TUI NOT IN " + invalidTUIsBuilder.toString() + ";";
+			if (invalidTUIs.size() == 0)
+				query = "SELECT DISTINCT CUI FROM mrsty;";
+			
 			ResultSet rs = st.executeQuery(query);
 			
 			while (rs.next()) {

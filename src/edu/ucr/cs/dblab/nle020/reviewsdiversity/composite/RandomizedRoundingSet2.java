@@ -6,8 +6,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsResult;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.utilities.Utils;
 
 public class RandomizedRoundingSet2 extends RandomizedRoundingSet implements Runnable {
@@ -17,39 +16,28 @@ public class RandomizedRoundingSet2 extends RandomizedRoundingSet implements Run
 	Map<Integer, List<SentimentSet>> docToSentimentSets;		
 	
 	public RandomizedRoundingSet2(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult,
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult,
 			int index, int numThreadsAlgorithm, 
 			Map<Integer, List<SentimentSet>> docToSentimentSets) {
-		super(k, threshold, docToTopPairsResult);
+		super(k, threshold, docToStatisticalResult, docToTopKSetsResult);
 		this.index = index;
 		this.numThreadsAlgorithm = numThreadsAlgorithm;
 		this.docToSentimentSets = docToSentimentSets;
 	}
 
-	public RandomizedRoundingSet2(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult,
-			LPMethod method,
-			int index, int numThreadsAlgorithm, 
-			Map<Integer, List<SentimentSet>> docToSentimentSets) {
-		super(k, threshold, docToTopPairsResult, method);
-		this.index = index;
-		this.numThreadsAlgorithm = numThreadsAlgorithm;
-		this.docToSentimentSets = docToSentimentSets;
-	}
 
 	@Override
 	public void run() {
 		long startTime = System.currentTimeMillis();
 		Integer[] docIDs = docToSentimentSets.keySet().toArray(new Integer[docToSentimentSets.size()]); 
-		int numDocs = Constants.NUM_DOCS < docIDs.length ? Constants.NUM_DOCS : docIDs.length;
 		
-		for (int i = index; i < numDocs; i += numThreadsAlgorithm) {
-//		for (int i = 645; i < numDocs; i += numThreadsAlgorithm) {
+		for (int i = index; i < docIDs.length; i += numThreadsAlgorithm) {
 			Integer docId = docIDs[i];
 			
-			docToTopPairsResult.put(docId, runRandomizedRoundingSetPerDoc(docId, docToSentimentSets.get(docId)));
+			runRandomizedRoundingSetPerDoc(docId, docToSentimentSets.get(docId));
 			
-			Utils.printRunningTime(startTime, "RR finished " + i + ", final cost: " + docToTopPairsResult.get(docId).getFinalCost());
+			Utils.printRunningTime(startTime, "RR finished " + i + ", final cost: " + docToStatisticalResult.get(docId).getFinalCost());
 			startTime = System.currentTimeMillis();
 		}		
 	}

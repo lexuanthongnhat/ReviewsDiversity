@@ -14,6 +14,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILPAlgorithm.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import gurobi.GRB;
 import gurobi.GRBEnv;
@@ -26,24 +27,31 @@ public class RandomizedRounding {
 	protected int k = 0;
 	protected float threshold = 0.0f;
 	
-	protected Constants.LPMethod method = Constants.MY_DEFAULT_LP_METHOD;
+	protected Constants.LPMethod method = Constants.MY_DEFAULT_LP_METHOD;	
 	protected ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
-	protected ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult = new ConcurrentHashMap<Integer, TopPairsResult>();
-		
+	
+	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
+	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
+	
+	// For RandomizedRoundingSet
 	public RandomizedRounding(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult) {
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
-		this.docToTopPairsResult = docToTopPairsResult;
+		this.docToStatisticalResult = docToStatisticalResult;
 	}
 	
+	// For RandomizedRounding 1, 2
 	public RandomizedRounding(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult, Constants.LPMethod method) {
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult, 
+			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult,
+			Constants.LPMethod method) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
-		this.docToTopPairsResult = docToTopPairsResult;
+		this.docToStatisticalResult = docToStatisticalResult;
+		this.docToTopKPairsResult = docToTopKPairsResult;
 		this.method = method;
 	}
 
@@ -53,31 +61,40 @@ public class RandomizedRounding {
 	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected TopPairsResult runRandomizedRoundingPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
+	protected void runRandomizedRoundingPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
 		long startTime = System.currentTimeMillis();
 		
-		TopPairsResult result = new TopPairsResult(docId, k, threshold);
-		result.setNumPairs(conceptSentimentPairs.size());
-		List<ConceptSentimentPair> topK = new ArrayList<ConceptSentimentPair>();
+		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);
+		statisticalResult.setNumPairs(conceptSentimentPairs.size());
+		List<ConceptSentimentPair> topKPairs = new ArrayList<ConceptSentimentPair>();
 				
 		List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();		
 		pairs.add(root);
 		pairs.addAll(conceptSentimentPairs);
 		
 		if (pairs.size() <= k + 1) {
-			topK = pairs;
+			topKPairs = pairs;
 		} else {
 			int[][] distances = initDistances(pairs);
-			doRandomizedRounding(distances, result, method);	
+			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
+					doRandomizedRounding(distances, statisticalResult, method);	
+			
+			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
+			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
+				topKPairs.add(conceptSentimentPairs.get(order));
+			}
 		}		
 		
-		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), result);
-
-		return result;
+		docToStatisticalResult.put(docId, statisticalResult);
+		docToTopKPairsResult.put(docId, topKPairs);
+		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), statisticalResult);
 	}
 	
-	// Update topK, result
-	public void doRandomizedRounding(int[][] distances, TopPairsResult result, Constants.LPMethod method) {		
+	// Update result
+	public StatisticalResultAndTopKByOriginalOrder doRandomizedRounding(int[][] distances, StatisticalResult statisticalResult, 
+			Constants.LPMethod method) {	
+		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
+
 		try {
 			int numFacilities = distances.length;
 			int numCustomers = distances[0].length;
@@ -148,15 +165,15 @@ public class RandomizedRounding {
 			model.optimize();						
 			
 			// Prepare some statistics, update result					
-			result.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
-			result.setNumFacilities(k);
+			statisticalResult.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
+			statisticalResult.setNumFacilities(k);
 			
 			int uncovered = 0;
 			for (int c = 1; c < numCustomers; ++c) {
 				if (connecting[0][c].get(GRB.DoubleAttr.X) == 1)
 					++uncovered;
 			}
-			result.setNumUncovered(uncovered);
+			statisticalResult.setNumUncovered(uncovered);
 			
 			// Retrieving the fractional solution
 			//////////////////////////////////////////////////////////////
@@ -190,9 +207,18 @@ public class RandomizedRounding {
 			if (needRandomizedRounding) {
 //				outputToFileForDebug(distances, facilityOpen, facilityConnect, result, DESKTOP_FOLDER + "rr_debug.txt");
 				roundingRandomly(distances, facilityOpen, facilityConnect, 
-						model.get(GRB.DoubleAttr.ObjVal), result, Constants.RR_TERMINATED_BY_K);
+						model.get(GRB.DoubleAttr.ObjVal), statisticalResult, Constants.RR_TERMINATED_BY_K);
 			}
 			
+			
+			// Get top K by original order
+			for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
+				if (open[f].get(GRB.DoubleAttr.X) == 1.0) {
+					topKByOriginalOrders.add(f - 1);
+				}
+			}
+/*			if (topKByOriginalOrders.size() > k)
+				System.err.println("Error, size of topK is " + topKByOriginalOrders.size() + " > k " + k);*/
 			
 			//////////////////////////////////////////////////////////////////////////////
 			// For testing
@@ -225,11 +251,12 @@ public class RandomizedRounding {
 		      e.printStackTrace();
 		}
 		
+		return new StatisticalResultAndTopKByOriginalOrder(statisticalResult, topKByOriginalOrders);
 	}
 	
-	// Output: update facilityOpen, facilityConnect
+	// Output: update facilityOpen, facilityConnect, statisticalResult
 	private void roundingRandomly(int[][] distances, double[] facilityOpen, double[][] facilityConnect, double fractionalOptimalCost,
-									TopPairsResult result, boolean terminatedByK) {
+									StatisticalResult statisticalResult, boolean terminatedByK) {
 		int numFacilities = facilityOpen.length;
 		int numCustomers = facilityConnect[0].length;
 		
@@ -428,9 +455,9 @@ public class RandomizedRounding {
 				++numFacilitiesOpened;
 		}				
 		
-		result.setFinalCost(assignmentCost);
-		result.setNumFacilities(numFacilitiesOpened);
-		result.setNumUncovered(numUncovered);
+		statisticalResult.setFinalCost(assignmentCost);
+		statisticalResult.setNumFacilities(numFacilitiesOpened);
+		statisticalResult.setNumUncovered(numUncovered);
 	}
 
 	private boolean rollTheDice(double probability) {
@@ -440,25 +467,25 @@ public class RandomizedRounding {
 			return false;
 	}
 	
-	protected void gatherFinalResult(long runningTime, int datasetSize, TopPairsResult result) {
+	protected void gatherFinalResult(long runningTime, int datasetSize, StatisticalResult statisticalResult) {
 		
 		if (datasetSize <= k + 1) {
-			result.setNumFacilities(datasetSize);
-			result.setRunningTime(0);
-			result.setFinalCost(0);
-			result.setOptimalCost(0);
-			result.setNumUncovered(0);
-			result.setNumUsefulCover(0);
+			statisticalResult.setNumFacilities(datasetSize);
+			statisticalResult.setRunningTime(0);
+			statisticalResult.setFinalCost(0);
+			statisticalResult.setOptimalCost(0);
+			statisticalResult.setNumUncovered(0);
+			statisticalResult.setNumUsefulCover(0);
 		} else {
-			result.setRunningTime(runningTime);
+			statisticalResult.setRunningTime(runningTime);
 		}
-		docToTopPairsResult.put(result.getDocID(), result);
+		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
 	
 	@SuppressWarnings("unused")
 	private void outputToFileForDebug(int[][] distances, 
 			double[] facilityOpen, double[][] facilityConnect, 
-			TopPairsResult result, String outputPath) {
+			StatisticalResult statisticalResult, String outputPath) {
 		
 		int numFacilities = facilityOpen.length;
 		int numCustomers = facilityConnect[0].length;
@@ -466,9 +493,9 @@ public class RandomizedRounding {
 		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
 				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 			
-			System.out.println("\nDoctorID " + result.getDocID() + " Open facilities: ");
+			System.out.println("\nDoctorID " + statisticalResult.getDocID() + " Open facilities: ");
 			
-			writer.append("\nDoctorID " + result.getDocID() + " Open facilities: ");
+			writer.append("\nDoctorID " + statisticalResult.getDocID() + " Open facilities: ");
 			writer.newLine();
 			
 			if (facilityOpen[0] < 1) {
@@ -511,7 +538,7 @@ public class RandomizedRounding {
 		}
 	}
 	
-	protected void checkResult(int[][] distances, double[] facilityOpen, double[][] facilityConnect, TopPairsResult result) {
+	protected void checkResult(int[][] distances, double[] facilityOpen, double[][] facilityConnect, StatisticalResult result) {
 		int numFacilities = facilityOpen.length;
 		int numCustomers = facilityConnect[0].length;
 		

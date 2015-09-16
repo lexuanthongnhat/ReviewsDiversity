@@ -45,7 +45,7 @@ public class PairExtractorThread implements Runnable {
 		//			index = 1:	100, 500, 900
 		//          index = 2:  200, 600, 1000
 		// 			index = 3:  300, 700, 1100
-//		for (int i = 0 + index * Constants.INTERVAL; i < docToReviews.size(); i += Constants.INTERVAL * Constants.NUM_THREADS) {
+//		for (int i = 0 + index * Constants.INTERVAL_TO_SAMPLE_REVIEW; i < docToReviews.size(); i += Constants.INTERVAL_TO_SAMPLE_REVIEW * Constants.NUM_THREADS) {
 		for (int i = index; i < docToReviews.size(); i += Constants.NUM_THREADS) {
 			
 			Integer docID = docIDs[i];

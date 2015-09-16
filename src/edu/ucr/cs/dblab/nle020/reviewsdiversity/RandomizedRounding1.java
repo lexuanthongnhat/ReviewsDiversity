@@ -10,17 +10,19 @@ public class RandomizedRounding1 extends RandomizedRounding implements Runnable 
 	private int docId;
 	private List<ConceptSentimentPair> conceptSentimentPairs;	
 	
-	public RandomizedRounding1(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult, 
+	public RandomizedRounding1(int k, float threshold, ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult, 
 			int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
-		super(k, threshold, docToTopPairsResult);
+		super(k, threshold, docToStatisticalResult);
 		this.docId = docId;
 		this.conceptSentimentPairs = conceptSentimentPairs;	
 	}
 	
-	public RandomizedRounding1(int k, float threshold, ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult,
+	public RandomizedRounding1(int k, float threshold, 
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult,
 			int docId, List<ConceptSentimentPair> conceptSentimentPairs,
 			Constants.LPMethod method) {
-		super(k, threshold, docToTopPairsResult, method);
+		super(k, threshold, docToStatisticalResult, docToTopKPairsResult, method);
 		this.docId = docId;
 		this.conceptSentimentPairs = conceptSentimentPairs;	
 	}
@@ -28,7 +30,7 @@ public class RandomizedRounding1 extends RandomizedRounding implements Runnable 
 	@Override
 	public void run() {
 
-		docToTopPairsResult.put(docId, runRandomizedRoundingPerDoc(docId, conceptSentimentPairs));
+		runRandomizedRoundingPerDoc(docId, conceptSentimentPairs);
 	}
 
 }

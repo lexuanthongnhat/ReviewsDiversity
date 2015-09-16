@@ -13,7 +13,9 @@ public class ConceptSentimentPair{
 	private String cui;
 	private String name;
 	private float sentiment;
+//	private float sentimentWithSelfCount;
 	private int count;	
+	private float correlation;
 	private List<String> types;
 	private Set<String> deweys = new HashSet<String>();
 	
@@ -185,6 +187,14 @@ public class ConceptSentimentPair{
 		this.deweys.addAll(deweys);
 	}
 	
+	public String getCui() {
+		return cui;
+	}
+
+	public void setCui(String cui) {
+		this.cui = cui;
+	}
+	
 	public String getId() {
 		return cui;
 	}
@@ -251,7 +261,8 @@ public class ConceptSentimentPair{
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
-		builder.append("{\"" + cui + "\", \"" + name + "\", \"" + sentiment + "\"");
+		builder.append("{\"" + cui + "-" + name + "\": \"" + sentiment + "\"}");
+//		builder.append("{\"" + cui + "\", \"" + name + "\", \"" + sentiment + "\",\"" + sentimentWithSelfCount + "\"" );
 		
 		/*builder.append(", \"types\": [");
 		for (String type : types) {
@@ -259,14 +270,16 @@ public class ConceptSentimentPair{
 		}
 		builder.delete(builder.length() - 2, builder.length());
 		builder.append("]");*/
+/*		if (!Float.isNaN(correlation) && Float.isFinite(correlation))
+			builder.append(", corr:" + correlation);*/
 		
-		builder.append(", \"deweys\": [");
+/*		builder.append(", \"deweys\": [");
 		for (String dewey : deweys) {
 			builder.append(dewey + ", ");
 		}
-		builder.delete(builder.length() - 2, builder.length());
+		builder.delete(builder.length() - 2, builder.length());*/
 		
-		builder.append("]}");
+		//builder.append("]}");
 		
 		return builder.toString();
 	}
@@ -335,6 +348,22 @@ public class ConceptSentimentPair{
 		
 		return result;
 	}
+
+	public float getCorrelation() {
+		return correlation;
+	}
+
+	public void setCorrelation(float correlation) {
+		this.correlation = correlation;
+	}
+
+/*	public float getSentimentWithSelfCount() {
+		return sentimentWithSelfCount;
+	}
+
+	public void setSentimentWithSelfCount(float sentimentWithSelfCount) {
+		this.sentimentWithSelfCount = sentimentWithSelfCount;
+	}*/
 
 
 

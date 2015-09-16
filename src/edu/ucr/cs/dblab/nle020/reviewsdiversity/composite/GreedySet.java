@@ -4,15 +4,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.FullPair;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsResult;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 
@@ -22,14 +24,17 @@ public class GreedySet {
 
 	protected FullPair root = new FullPair(Constants.ROOT_CUI);
 	
-	protected ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult = new ConcurrentHashMap<Integer, TopPairsResult>();
+	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
+	ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult = new ConcurrentHashMap<Integer, List<SentimentSet>>();
 			
 	public GreedySet(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult) {
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
-		this.docToTopPairsResult = docToTopPairsResult;
+		this.docToStatisticalResult = docToStatisticalResult;
+		this.docToTopKSetsResult = docToTopKSetsResult;
 	}
 	
 	/**
@@ -38,10 +43,10 @@ public class GreedySet {
 	 * @param sentimentUnits - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected TopPairsResult runGreedyPerDoc(int docId, Collection<? extends SentimentSet> sentimentSets) {
+	protected void runGreedyPerDoc(int docId, Collection<? extends SentimentSet> sentimentSets) {
 		long startTime = System.currentTimeMillis();
 		
-		TopPairsResult result = new TopPairsResult(docId, k, threshold);;
+		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);;
 
 //		printInitialization();		
 		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<FullPair, Map<FullPair, Integer>>();	
@@ -49,7 +54,9 @@ public class GreedySet {
 
 		List<FullPair> topK = new ArrayList<FullPair>();	
 		List<FullPair> fullPairSets = new ArrayList<FullPair>();
-		initPairs(sentimentSets, fullPairSets, result, distances);
+		initPairs(sentimentSets, fullPairSets, statisticalResult, distances);
+		if (Constants.DEBUG_MODE)
+			initDistances(fullPairSets, distances);		
 		
 		PriorityQueue<FullPair> heap = initHeap(fullPairSets);
 		if (fullPairSets.size() <= k) {
@@ -58,113 +65,191 @@ public class GreedySet {
 			for (int i = 0; i < k; i++) {
 				if (System.currentTimeMillis() - startTime > 1000 * 60)
 					System.err.println("???");
-				chooseNextPair(heap, topK, result);
+				chooseNextPair(heap, topK, statisticalResult);
 			}
 		}
 		
-		gatherFinalResult(System.currentTimeMillis() - startTime, fullPairSets.size(), result, topK);
+		gatherFinalResult(System.currentTimeMillis() - startTime, fullPairSets.size(), statisticalResult, topK);
 				
-
+		if (Constants.DEBUG_MODE)
+			checkResult(topK, distances, statisticalResult);
+					
+		List<SentimentSet> topKSetsResult = convertTopKFullPairsToTopKSets(sentimentSets, topK);
+		docToTopKSetsResult.put(docId, topKSetsResult);
+		
+		docToStatisticalResult.put(docId, statisticalResult);
 //		Utils.printRunningTime(startTime, "Greedy finished docId " + docId);
 //		printResult();	
-		return result;
 	}	
 	
-	private void initPairs(Collection<? extends SentimentSet> sentimentSets, 
-				Collection<FullPair> fullPairSets, TopPairsResult result, 
-				Map<FullPair, Map<FullPair, Integer>> distances) {
+	private List<SentimentSet> convertTopKFullPairsToTopKSets(
+			Collection<? extends SentimentSet> sentimentSets,
+			List<FullPair> topK) {
+		List<SentimentSet> topKSetsResult = new ArrayList<SentimentSet>();
+		Set<String> topSetIds = new HashSet<String>(); 
+		for (FullPair fullPair : topK) {
+			topSetIds.add(fullPair.getId());
+		}
+		for (SentimentSet sentimentSet : sentimentSets) {
+			if (topSetIds.contains(sentimentSet.getId()))
+				topKSetsResult.add(sentimentSet);
+		}
+		return topKSetsResult;
+	}
 	
-			Map<SentimentSet, FullPair> setToFullPairSet = new HashMap<SentimentSet, FullPair>();
-			// Init fullPairSets corresponding to sentimentSets
-			for (SentimentSet set : sentimentSets) {
-				FullPair fullPairSet = new FullPair(set.getId(), set);
-				fullPairSets.add(fullPairSet);
-				setToFullPairSet.put(set, fullPairSet);
-			}		
-					
-			Map<FullPair, ConceptSentimentPair> pairToConceptSentiments = new HashMap<FullPair, ConceptSentimentPair>();
-					
-			for (SentimentSet set : sentimentSets) {
-				// There is no duplicated ConceptSentimentPair in a set
-				for (ConceptSentimentPair conceptSentimentPair : set.getPairs()) {
-					
-					// FullPair need unique id
-					FullPair pair = new FullPair(conceptSentimentPair.getId() + "_s" + conceptSentimentPair.getSentiment(), set);
-					set.addFullPair(pair);
-					pairToConceptSentiments.put(pair, conceptSentimentPair);
+	private void checkResult(List<FullPair> topK,
+			Map<FullPair, Map<FullPair, Integer>> distances,
+			StatisticalResult statisticalResult) {
+		long verifyingCost = 0;
+		
+		Set<FullPair> fullPairs = new HashSet<FullPair>();
+		for (FullPair fullPairSet : distances.keySet()) {
+			fullPairs.addAll(fullPairSet.getCustomerMap().keySet());
+		}
+		
+		for (FullPair customer : fullPairs) {
+			long min = Constants.INVALID_DISTANCE;
+			for (FullPair potentialHost : topK) {
+				if (distances.get(potentialHost).get(customer) != null) {
+					if (distances.get(potentialHost).get(customer) < min)
+						min = distances.get(potentialHost).get(customer);
 				}
 			}
-							
-			// Init the host
-			for (FullPair pair : pairToConceptSentiments.keySet()) {
-				pair.setHost(root);
+			if (min == Constants.INVALID_DISTANCE) {
+				if (root.distanceToCustomer(customer) < min)
+					min = root.distanceToCustomer(customer);
 			}
+			verifyingCost += min;
+		}
+		
+		if (verifyingCost != (long) statisticalResult.getFinalCost()) 
+			System.err.println("Wrong cost, verying cost: " + verifyingCost + ", cost: " + statisticalResult.getFinalCost());
+		
+		
+		verifyingCost = 0;
+		for (FullPair customer : root.getCustomerMap().keySet()) {
+			verifyingCost += root.distanceToCustomer(customer);
+		}
+		for (FullPair facility : topK) {
+			for (FullPair customer : facility.getCustomerMap().keySet()) {
+				verifyingCost += facility.distanceToCustomer(customer);
+			}
+		}
+		if (verifyingCost != (long) statisticalResult.getFinalCost()) 
+			System.err.println("Wrong cost 2, verying cost: " + verifyingCost + ", cost: " + statisticalResult.getFinalCost());
+	}
+
+	private void initDistances(List<FullPair> fullPairSets,
+			Map<FullPair, Map<FullPair, Integer>> distances) {
+		for (FullPair fullPairSet : fullPairSets) {
+			distances.put(fullPairSet, new HashMap<FullPair, Integer>());
 			
-			for (SentimentSet set : sentimentSets) {
-				FullPair fullPairSet = setToFullPairSet.get(set);
-				for (FullPair pair : set.getFullPairs()) {
-					pair.addPotentialHost(fullPairSet);
-					fullPairSet.addCustomer(pair, 0);
+			for (FullPair customer : fullPairSet.getCustomerMap().keySet()) {
+				distances.get(fullPairSet).put(customer, fullPairSet.distanceToCustomer(customer));
+			}
+		}
+	}
+
+	private void initPairs(Collection<? extends SentimentSet> sentimentSets, 
+				Collection<FullPair> fullPairSets, StatisticalResult statisticalResult, 
+				Map<FullPair, Map<FullPair, Integer>> distances) {
+		Map<SentimentSet, FullPair> setToFullPairSet = new HashMap<SentimentSet, FullPair>();
+		// Init fullPairSets corresponding to sentimentSets
+		for (SentimentSet set : sentimentSets) {
+			FullPair fullPairSet = new FullPair(set.getId(), set);
+			fullPairSets.add(fullPairSet);
+			setToFullPairSet.put(set, fullPairSet);
+		}			
+		
+		Map<FullPair, ConceptSentimentPair> fullPairToCSPair = new HashMap<FullPair, ConceptSentimentPair>();
+		Map<ConceptSentimentPair, FullPair> csPairToFullPair = new HashMap<ConceptSentimentPair, FullPair>();
+		
+		List<FullPair> fullPairs = new ArrayList<FullPair>();
+		List<ConceptSentimentPair> conceptSentimentPairs = new ArrayList<ConceptSentimentPair>();
+		for (SentimentSet set : sentimentSets) {
+			set.getFullPairs().clear();
+			for (ConceptSentimentPair csPair : set.getPairs()) {
+				if (!conceptSentimentPairs.contains(csPair)) { 
+					conceptSentimentPairs.add(csPair);
+					
+					FullPair fullPair = new FullPair(csPair.getId() + "_s" + csPair.getSentiment());					
+					fullPairs.add(fullPair);
+					
+					fullPairToCSPair.put(fullPair, csPair);
+					csPairToFullPair.put(csPair, fullPair);
+					
+					set.addFullPair(fullPair);
+				} else {
+					set.addFullPair(csPairToFullPair.get(csPair));
 				}
-			}
-			
-			for (FullPair pair : pairToConceptSentiments.keySet()) {
-				setToFullPairSet.get(pair.getParent())
-					.increaseBenefit(pairToConceptSentiments.get(pair).calculateRootDistance());
-			}
-			
-			
-			for (SentimentSet set : sentimentSets) {
-				FullPair fullPairSet = setToFullPairSet.get(set);
-				
-				for (FullPair otherPair : pairToConceptSentiments.keySet()) {
-					if (!set.getFullPairs().contains(otherPair)) {
-						
-						int min = Constants.INVALID_DISTANCE;					
-						FullPair potentialHost = null;
-						
-						for (FullPair pair : set.getFullPairs()) {
-							int distance = pairToConceptSentiments.get(pair).calculateDistance(
-									pairToConceptSentiments.get(otherPair), 
-									threshold);
-							if (distance < min && distance >= 0) {
-								min = distance;
-								potentialHost = pair;
-							}
+			}				
+		}
+		
+	
+		for (SentimentSet set : sentimentSets) {
+			FullPair fullPairSet = setToFullPairSet.get(set);
+
+			for (FullPair fullPair : fullPairs) {
+				if (set.getFullPairs().contains(fullPair)) {
+					fullPair.addPotentialHost(fullPairSet);
+					fullPairSet.addCustomer(fullPair, 0);
+					
+					fullPairSet.increaseBenefit(fullPairToCSPair.get(fullPair).calculateRootDistance());
+				} else {
+
+					int min = Constants.INVALID_DISTANCE;					
+//					FullPair potentialHost = null;
+
+					for (FullPair fullPairInSet : set.getFullPairs()) {
+						int distance = fullPairToCSPair.get(fullPairInSet).calculateDistance(fullPairToCSPair.get(fullPair), threshold);
+						if (distance < min && distance >= 0) {
+							min = distance;
+//							potentialHost = fullPairInSet;
 						}
+					}
+
+					if (min >= 0 && min < Constants.INVALID_DISTANCE) {
+						fullPairSet.addCustomer(fullPair, min);
+						fullPair.addPotentialHost(fullPairSet);
 						
-						if (min >= 0 && min < Constants.INVALID_DISTANCE && potentialHost != null) {
-							fullPairSet.addCustomer(otherPair, min);
-							otherPair.addPotentialHost(fullPairSet);
-							fullPairSet.increaseBenefit(pairToConceptSentiments.get(potentialHost).calculateRootDistance());
-						}
+//						fullPairSet.increaseBenefit(fullPairToCSPair.get(potentialHost).calculateRootDistance());
+						fullPairSet.increaseBenefit(fullPairToCSPair.get(fullPair).calculateRootDistance() - min);
 					}
 				}
 			}
-			
-			
-			long initialCost = 0;
-			// Init the root		
-			root.getCustomerMap().clear();
-			for (FullPair pair : pairToConceptSentiments.keySet()) {
-	//			root.setHost(root);
-				
-				int distance = pairToConceptSentiments.get(pair).calculateRootDistance();
-				root.addCustomer(pair, distance);
-				initialCost += distance;
-			}
-			
-			// Init result
-			result.setInitialCost(initialCost);
-			result.setFinalCost(initialCost);
-			result.setNumSets(sentimentSets.size());
-			int numPairs = 0;
-			for (SentimentSet set : sentimentSets) {
-				numPairs += set.getPairs().size();
-			}
-			result.setNumPairs(numPairs);			
 		}
 
+
+		long initialCost = 0;
+		// Init the root		
+		root.getCustomerMap().clear();
+		for (FullPair fullPair : fullPairs) {
+			//			root.setHost(root);
+			fullPair.setHost(root);
+			
+			int distance = fullPairToCSPair.get(fullPair).calculateRootDistance();
+			root.addCustomer(fullPair, distance);
+			initialCost += distance;
+		}
+
+		// Init result
+		statisticalResult.setInitialCost(initialCost);
+		statisticalResult.setFinalCost(initialCost);
+		statisticalResult.setNumSets(sentimentSets.size());
+		statisticalResult.setNumPairs(conceptSentimentPairs.size());			
+		
+		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairSets);
+	}
+
+	private void initNumPotentialUsefulCoverWithThreshold(StatisticalResult statisticalResult, Collection<FullPair> fullPairSets) {
+		int numPotentialUsefulCoverWithThreshold = 0;
+		for (FullPair userFullSet : fullPairSets) {
+			numPotentialUsefulCoverWithThreshold += userFullSet.getCustomerMap().size();			
+		}
+		
+		statisticalResult.setNumPotentialUsefulCoverWithThreshold(numPotentialUsefulCoverWithThreshold);
+	}
+	
 	private PriorityQueue<FullPair> initHeap(List<FullPair> pairs) {
 		PriorityQueue<FullPair> heap = new PriorityQueue<FullPair>(k, new Comparator<FullPair>(){
 
@@ -174,49 +259,54 @@ public class GreedySet {
 				return (o2.getBenefit() - o1.getBenefit());			
 			}			
 		});
-		
+
 		for (FullPair pair : pairs) {
 			heap.add(pair);
 		}
-		
+
 		return heap;
 	}
-	
-	
+
+
 	// Choose the next pair on top of the heap, then update the RELATED pairs and the heap
-	private void chooseNextPair(PriorityQueue<FullPair> heap, List<FullPair> topK, TopPairsResult result) {
+	private void chooseNextPair(PriorityQueue<FullPair> heap, List<FullPair> topK, StatisticalResult statisticalResult) {
 		// Choose next pair
 		FullPair nextPairSet = heap.poll();
 		topK.add(nextPairSet);
 		
-		// Update pair of this set
-		for (FullPair inSetPair : nextPairSet.getParent().getFullPairs()) {
-			if (inSetPair.getHost().distanceToCustomer(inSetPair) == 0 
-					&& !inSetPair.getHost().equals(nextPairSet)) {
-				inSetPair.getHost().removeCustomer(inSetPair);
-				inSetPair.setHost(nextPairSet);
-				inSetPair.removePotentialHost(nextPairSet);
+/*		// Update pair of this set
+		for (FullPair fullPairInSet : nextPairSet.getParent().getFullPairs()) {
+			
+			// No change in the cost for this case
+			if (fullPairInSet.getHost().distanceToCustomer(fullPairInSet) == 0 
+					&& !fullPairInSet.getHost().equals(nextPairSet)) {
+				fullPairInSet.getHost().removeCustomer(fullPairInSet);
+				fullPairInSet.setHost(nextPairSet);
+				fullPairInSet.removePotentialHost(nextPairSet);
 			}
-		}		
+		}*/		
+
+		Set<FullPair> updatedFullPairs = new HashSet<FullPair>();
 		
 		// Update the customerMap - who it serves, and potentialHosts of servedPairs
-		//		served pairs - ones that have next pair as the closest cover ancestor
-		
+		//		served pairs - ones that have next pair as the closest cover ancestor		
 		for (FullPair servedPair : nextPairSet.getCustomerMap().keySet()) {			
-			if (nextPairSet.getParent().getFullPairs().contains(servedPair) 
+/*			if (nextPairSet.getParent().getFullPairs().contains(servedPair) 
 					&& servedPair.getHost().distanceToCustomer(servedPair) == 0)
-				continue;
+				continue;*/
 			
-			int partialBenefit = servedPair.getHost().distanceToCustomer(servedPair) - nextPairSet.distanceToCustomer(servedPair);			
+			int distanceFromOldHost = servedPair.getHost().distanceToCustomer(servedPair);
+			int distanceFromNewHost = nextPairSet.distanceToCustomer(servedPair);
+			
+			int partialBenefit = distanceFromOldHost - distanceFromNewHost;			
 			
 			// nextPair is not better than the current host of this servedPair
 			if (partialBenefit <= 0) {
 				nextPairSet.removeCustomer(servedPair); 
 				servedPair.removePotentialHost(nextPairSet);
 			} else {		
-			// nextPair becomes new host of this servedPair
+			// nextPair becomes new host of this servedPair				
 				
-				int distanceFromOldHost = servedPair.getHost().distanceToCustomer(servedPair);				
 				servedPair.getHost().removeCustomer(servedPair);
 				
 				// TODO - servedPair ~ previous next pair
@@ -230,36 +320,43 @@ public class GreedySet {
 				 * 		benefit(potentialHost over nextPair)	= distance(nextPair, servedPair) 	- distance(potentialHost, servedPair)
 				 * 												= partialBenefit(nextPair) - benefit(potentialHost over currentHost) 
 				 */
-				int distanceFromNewHost = nextPairSet.distanceToCustomer(servedPair);
+				
+				Set<FullPair> absoleteHosts = new HashSet<FullPair>();
 				for (FullPair potentialHost : servedPair.getPotentialHosts()) {
+					if (topK.contains(potentialHost)) {
+						System.err.println("humnn");
+					}
 					int distanceFromPotentialHost = potentialHost.distanceToCustomer(servedPair);
 					potentialHost.decreaseBenefit(distanceFromOldHost - distanceFromPotentialHost);
+
+					updatedFullPairs.add(potentialHost);
 					
 					int benefitOverNextPair = distanceFromNewHost - distanceFromPotentialHost;
 					if (benefitOverNextPair > 0) {
 						potentialHost.increaseBenefit(benefitOverNextPair);
+					} else {
+						absoleteHosts.add(potentialHost);
 					}
 				}
 												
-				result.decreaseFinalCost(partialBenefit);
+				servedPair.getPotentialHosts().removeAll(absoleteHosts);
+				statisticalResult.decreaseFinalCost(partialBenefit);
 			}
 		}
 		
 		
 		
 		// Update the heap of unchosen pairs
-		for (FullPair servedPair : nextPairSet.getCustomerMap().keySet()) {
-			for (FullPair potentialHost : servedPair.getPotentialHosts()) {
-				heap.remove(potentialHost);
-				heap.add(potentialHost);
-			}
+		for (FullPair updated : updatedFullPairs) {
+			heap.remove(updated);
+			heap.add(updated);
 		}
 		
 	}
 	
 	
-	private void gatherFinalResult(long runningTime, int datasetSize, TopPairsResult result, List<FullPair> topK) {
-		if (datasetSize <= Constants.K) {
+	private void gatherFinalResult(long runningTime, int datasetSize, StatisticalResult result, List<FullPair> topK) {
+		if (datasetSize <= k) {
 			result.setFinalCost(0);
 			result.setNumUncovered(0);
 			result.setRunningTime(0);
@@ -268,6 +365,8 @@ public class GreedySet {
 			result.setNumUncovered(root.getCustomerMap().size());
 			result.setRunningTime(runningTime);
 		}
-		docToTopPairsResult.put(result.getDocID(), result);
+		docToStatisticalResult.put(result.getDocID(), result);
 	}
+	
+	
 }

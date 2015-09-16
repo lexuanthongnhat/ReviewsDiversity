@@ -30,6 +30,7 @@ public class MetaMapParser {
 	
 	private MetaMapApi api = null;
 	private String options = "-y";
+//	private String options = "";
 	private String hostname = "localhost";
 	private Set<String> invalidSemanticTypes = new HashSet<String>();
 	private Set<String> invalidSemanticGroups = new HashSet<String>();
@@ -60,17 +61,24 @@ public class MetaMapParser {
 	}
 
 	private void initInvalidSemanticTypes() {
-		invalidSemanticGroups.add(SemanticConstants.CHEM);
-		invalidSemanticGroups.add(SemanticConstants.GEOG);
-		invalidSemanticGroups.add(SemanticConstants.CONC);
+		Set<String> invalidSemanticGroups = new HashSet<String>();		
+		invalidSemanticGroups.add(SemanticConstants.CHEM);		// Chemicals & Drugs
+		invalidSemanticGroups.add(SemanticConstants.GEOG);		// Geographic Areas
+		invalidSemanticGroups.add(SemanticConstants.CONC);		// Concepts & Ideas		
+		invalidSemanticGroups.add(SemanticConstants.OBJC);		// Objects		
+		invalidSemanticGroups.add(SemanticConstants.LIVB);		// Living Beings
 		
 		for (String group : invalidSemanticGroups) {
 			invalidSemanticTypes.addAll(SemanticGroups.getTypesOfGroup(group));
 		}
 		
+		invalidSemanticTypes.add("menp");			// Mental Process 	- PHYS
 		
-		invalidSemanticTypes.add("menp");			// Mental Process
-		invalidSemanticTypes.add("famg");			// Family Group
+		// Some types of LIVB group
+		invalidSemanticTypes.remove("prog");		// Professional or Occupational Group
+		invalidSemanticTypes.remove("Virus");		// Virus
+		
+		invalidSemanticTypes.add("orga");			// Organism Attribute - PHYS
 	}
 	
 	private void initErroneousCUIs(String filePath) {
@@ -124,49 +132,7 @@ public class MetaMapParser {
 	public void setHostname(String hostname) {
 		this.hostname = hostname;
 	}
-	
-	
-	/**
-	 * Get both utterances and their corresponding mapping
-	 * @param text
-	 * @return Map: utterance string -> mappings
-	 */
-	public Map<String, List<Ev>> parseToUtteranceMap(String text) {
-		Map<String, List<Ev>> result = new HashMap<String, List<Ev>>();
-		
-		List<Result> resultList = api.processCitationsFromString(options, text);
-		for (Result re : resultList) {
-			List<Utterance> utters;
-			try {
-				utters = re.getUtteranceList();
-				for (Utterance utter : utters) {
-					String utterance = utter.getString();
-					List<Ev> mappings = new ArrayList<Ev>();
-					
-					List<PCM> pcms = utter.getPCMList();
-					for (PCM pcm : pcms) {
-						for (Mapping map : pcm.getMappingList()) {
-							for (Ev ev : map.getEvList()) {	
-								if (isValidSource(ev)) {																	
-									if (exceptionalCUIS.contains(ev.getConceptId()) || 
-											(!erroneousCUIs.contains(ev.getConceptId()) && !isStopWord(ev))) 
-										mappings.add(ev);
-								}
-							}
-						}
-					}
-					
-					result.put(utterance, mappings);
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
 
-		}
-		
-		return result;
-	}
-	
 	/**
 	 * Get mappings for each sentence
 	 * @param text
@@ -175,7 +141,13 @@ public class MetaMapParser {
 	public Map<Sentence, List<Ev>> parseToSentenceMap(String text) {
 		Map<Sentence, List<Ev>> result = new HashMap<Sentence, List<Ev>>();
 		
-		List<Result> resultList = api.processCitationsFromString(options, text);
+		List<Result> resultList; 
+		if (options.length() > 0)
+			resultList = api.processCitationsFromString(options, text);
+		else
+			resultList = api.processCitationsFromString(text);
+		
+		
 		for (Result re : resultList) {
 			List<Utterance> utters;
 			try {
@@ -206,6 +178,51 @@ public class MetaMapParser {
 		}
 		
 		return result;
+	}
+	
+	/**
+	 * Parsing the text into both valid and invalid concepts that are outputted into 2 provided maps 
+	 * @param text
+	 * @param validConceptMap
+	 * @param invalidConceptMap
+	 */
+	public void parseToSentenceMap(String text,	Map<Sentence, List<Ev>> validConceptMap, Map<Sentence, List<Ev>> invalidConceptMap) {			
+		System.out.println("Parsing: \"" + text + "\"");
+		
+		List<Result> resultList = api.processCitationsFromString(options, text);
+		for (Result re : resultList) {
+			List<Utterance> utters;
+			try {
+				utters = re.getUtteranceList();
+				for (Utterance utter : utters) {
+					Sentence sentence = new Sentence(utter.getId(), utter.getString(), utter.getPosition().getX(), utter.getPosition().getY());					
+					List<Ev> validMappings = new ArrayList<Ev>();
+					List<Ev> invalidMappings = new ArrayList<Ev>();
+					
+					List<PCM> pcms = utter.getPCMList();
+					for (PCM pcm : pcms){
+						for (Mapping map : pcm.getMappingList()) {
+							for (Ev ev : map.getEvList()) {
+								if (isValidSource(ev)) {
+									if (exceptionalCUIS.contains(ev.getConceptId()) || 
+											(!erroneousCUIs.contains(ev.getConceptId()) && !isStopWord(ev))) {
+										if (isValidType(ev.getSemanticTypes()))
+											validMappings.add(ev);
+										else
+											invalidMappings.add(ev);
+									}
+								}
+							}
+						}
+					}
+					
+					validConceptMap.put(sentence, validMappings);
+					invalidConceptMap.put(sentence, invalidMappings);
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	/**

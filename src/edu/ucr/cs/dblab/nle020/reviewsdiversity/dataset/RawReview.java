@@ -45,11 +45,8 @@ public class RawReview {
 		body = null;
 	}
 	
-	public RawReview(int docID, String title, String body, int rate) {
-		this.docID = docID;
-		this.title = title;
-		this.body = body;
-		this.rate = rate;
+	public RawReview(int id) {
+		this.id = id;
 	}
 	
 	public RawReview(int id, int docID, String title, String body, int rate) {

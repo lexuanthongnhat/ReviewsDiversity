@@ -12,6 +12,12 @@ public class PairExtractorProgram {
 //		pairExtractor.outputExcelFile();
 		pairExtractor.outputExcelFileMultiThread();
 //		pairExtractor.testSentimentCalculation();
+		
+//		pairExtractor.updateExcelFileWithCorrelation();
+		
+//		TrainingDatasetCreator.buildTrainingDataset();
+//		TrainingDatasetCreator.addCuiRow();
+		
 	}
 
 }

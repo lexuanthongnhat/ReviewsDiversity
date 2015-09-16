@@ -2,27 +2,26 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.composite;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILPAlgorithm.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.RandomizedRounding;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsResult;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 
 public class RandomizedRoundingSet extends RandomizedRounding {
+	ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult = new ConcurrentHashMap<Integer, List<SentimentSet>>();
 
 	public RandomizedRoundingSet(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult) {
-		super(k, threshold, docToTopPairsResult);
+			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult) {
+		super(k, threshold, docToStatisticalResult);
+		this.docToTopKSetsResult = docToTopKSetsResult;
 	}
 
-	public RandomizedRoundingSet(int k, float threshold,
-			ConcurrentMap<Integer, TopPairsResult> docToTopPairsResult,
-			LPMethod method) {
-		super(k, threshold, docToTopPairsResult, method);
-	}
 	
 	/**
 	 * Run Integer Linear Programming for a doctor's data set
@@ -30,11 +29,11 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected TopPairsResult runRandomizedRoundingSetPerDoc(int docId, List<SentimentSet> sentimentSets) {
+	protected void runRandomizedRoundingSetPerDoc(int docId, List<SentimentSet> sentimentSets) {
 		long startTime = System.currentTimeMillis();
 		
-		TopPairsResult result = new TopPairsResult(docId, k, threshold);		
-		List<SentimentSet> topK = new ArrayList<SentimentSet>();
+		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
+		List<SentimentSet> topKSets = new ArrayList<SentimentSet>();
 		
 		List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
 		for (SentimentSet set : sentimentSets) {
@@ -47,14 +46,22 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 		}
 		
 		if (sentimentSets.size() <= k) {
-			topK = sentimentSets;
+			topKSets = sentimentSets;
 		} else {
-			int[][] distances = initDistances(sentimentSets, pairs, result);
-			doRandomizedRounding(distances, result, method);	
+			int[][] distances = initDistances(sentimentSets, pairs, statisticalResult);
+			
+			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
+					doRandomizedRounding(distances, statisticalResult, method);
+			
+			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
+			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
+				topKSets.add(sentimentSets.get(order));
+			}	
 		}		
 		
-		gatherFinalResult(System.currentTimeMillis() - startTime, sentimentSets.size() + 1, result);		
-		return result;
+		docToStatisticalResult.put(docId, statisticalResult);
+		docToTopKSetsResult.put(docId, topKSets);
+		gatherFinalResult(System.currentTimeMillis() - startTime, sentimentSets.size() + 1, statisticalResult);		
 	}
 	
 	
@@ -65,7 +72,8 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 	 * @return array of length [sentimentSets.size() + 1 ] * conceptSentimentPairs.size()
 	 * <br> +1 for the root, result[0] is the distance array of the root
 	 */
-	private int[][] initDistances(List<SentimentSet> sentimentSets, List<ConceptSentimentPair> conceptSentimentPairs, TopPairsResult result) {
+	private int[][] initDistances(List<SentimentSet> sentimentSets, List<ConceptSentimentPair> conceptSentimentPairs, 
+			StatisticalResult statisticalResult) {
 		int[][] distances = new int[sentimentSets.size() + 1][conceptSentimentPairs.size() + 1];
 		
 		conceptSentimentPairs.add(0, root);
@@ -78,7 +86,7 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 			distances[0][j] = pair.calculateRootDistance();
 			initialCost += distances[0][j]; 
 		}
-		result.setInitialCost(initialCost);		
+		statisticalResult.setInitialCost(initialCost);		
 		
 		// The sets
 		for (int s = 0; s < sentimentSets.size(); ++s) {
