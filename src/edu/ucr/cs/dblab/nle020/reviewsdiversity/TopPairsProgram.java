@@ -56,7 +56,7 @@ public class TopPairsProgram {
 	private static final int RR_INDEX = 2;
 
 	public final static String DOC_TO_REVIEWS_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned.txt";
-	private final static String OUTPUT_FOLDER = "D:\\UCR Google Drive\\GD - Review Diversity\\Experiment Output\\";
+	public final static String OUTPUT_FOLDER = "D:\\UCR Google Drive\\GD - Review Diversity\\Experiment Output\\";
 	private final static String DESKTOP_FOLDER;	
 	static {
 		if (Files.isDirectory(Paths.get("C:\\Users\\Thong Nhat\\Desktop")))
@@ -75,13 +75,6 @@ public class TopPairsProgram {
 			
 //		topSetsExperiment(SetOption.REVIEW);
 		topSetsExperiment(SetOption.SENTENCE);
-		
-		getTopSentencesBaseline();
-	}
-
-	private static void getTopSentencesBaseline() {
-		// TODO Auto-generated method stub
-		
 	}
 
 	@SuppressWarnings("unused")
@@ -564,9 +557,9 @@ public class TopPairsProgram {
 		Utils.printRunningTime(startTime, "Outputed " + docToStatisticalResult.size() + " results to " + outputPath);
 	}
 	
-	private static <T> void  outputTopKToJson(
+	public static <T> void  outputTopKToJson(
 			String outputPath,
-			ConcurrentMap<Integer, List<T>> docToTopKResult) {
+			Map<Integer, List<T>> docToTopKResult) {
 		long startTime = System.currentTimeMillis();
 		ObjectMapper mapper = new ObjectMapper();
 		
@@ -586,41 +579,6 @@ public class TopPairsProgram {
 		Utils.printRunningTime(startTime, "Outputed " + docToTopKResult.size() + " topK to " + outputPath);
 	}
 
-/*	private static void outputTopSetsToJson(String path, Map<Integer, List<SetResult>> docToTopKSetsResult) {
-		long startTime = System.currentTimeMillis();
-		ObjectMapper mapper = new ObjectMapper();
-		
-		try {
-			Files.deleteIfExists(Paths.get(path));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}		
-		
-		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(path),
-				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-			mapper.writeValue(writer, docToTopKSetsResult);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		boolean isFirstLine = true;
-		for (Integer docID : docToTopKSetsResult.keySet()) {
-			try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(path), 
-					StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-				
-					if (!isFirstLine) {
-						writer.newLine();						
-					}
-					writer.append(docID + "\t\t");										
-					mapper.writeValue(writer, docToTopKSetsResult.get(docID));				
-					
-					isFirstLine = false;					
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-		Utils.printRunningTime(startTime, "Outputed " + docToTopKSetsResult.size() + " topK sets to " + path);
-	}*/
-	
 	@SuppressWarnings("unused")
 	private static void importStatisticalResultFromJson(String path, Map<Integer, StatisticalResult> docToStatisticalResult) {
 		ObjectMapper mapper = new ObjectMapper();

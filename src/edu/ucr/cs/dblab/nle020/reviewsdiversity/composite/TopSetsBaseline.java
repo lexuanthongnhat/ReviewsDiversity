@@ -13,6 +13,7 @@ import java.util.Set;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram.SetOption;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utilities.Utils;
@@ -20,18 +21,30 @@ import edu.ucr.cs.dblab.nle020.utilities.Utils;
 public class TopSetsBaseline {
 	private static int k = Constants.K;
 	
-	private static void getTopKSentimentSet(String inputPath, TopPairsProgram.SetOption setOption) {
+	public static void main (String[] args) {
 		long startTime = System.currentTimeMillis();		
+
+		SetOption setOption = SetOption.SENTENCE;
+		Map<Integer, List<SentimentSet>> docToTopKSentences = 
+				getTopKSentimentSet(TopPairsProgram.DOC_TO_REVIEWS_PATH, setOption);
+		
+		String outputPath = TopPairsProgram.OUTPUT_FOLDER + "top_" + setOption + "_baseline_k" + k + ".txt";
+		TopPairsProgram.outputTopKToJson(outputPath, docToTopKSentences);
+		
+		System.out.println("Outputed to \"" + outputPath + "\"");
+		Utils.printRunningTime(startTime, "Finished topK baseline for " + setOption);
+	}
+	
+	private static Map<Integer, List<SentimentSet>> getTopKSentimentSet(String inputPath, TopPairsProgram.SetOption setOption) {
 			
 		Map<Integer, List<SentimentSet>> docToSentimentSets = importSentimentSets(inputPath, setOption);
 		
 		Map<Integer, List<SentimentSet>> docToTopKSets = new HashMap<Integer, List<SentimentSet>>();		
 		for (Integer docId : docToSentimentSets.keySet()) {
 			docToTopKSets.put(docId, extractTopKFromList(docToSentimentSets.get(docId)));
-		}
+		}		
 		
-		
-		Utils.printRunningTime(startTime, "Finished topK baseline for " + setOption);
+		return docToSentimentSets;
 	}
 	
 	
@@ -54,7 +67,40 @@ public class TopSetsBaseline {
 			}
 		}
 		
-		List<Integer> setSize = new ArrayList<Integer>();
+		List<PosNegConcept> posNegConcepts = new ArrayList<PosNegConcept>();
+		for (String concept : posNegConceptToSentimentSets.keySet()) {
+			posNegConcepts.add(new PosNegConcept(concept, posNegConceptToSentimentSets.get(concept)));
+		}
+		
+		PriorityQueue<PosNegConcept> sortedPosNegConcepts = new PriorityQueue<>(posNegConcepts);		
+		
+		Random random = new Random();
+		List<SentimentSet> randomKSets = new ArrayList<SentimentSet>();
+		int sizeAtLastRound = 0;						// to check if we can get a new set after each round 
+		while (randomKSets.size() < k) {
+			if (sortedPosNegConcepts.size() == 0) {
+				if (sizeAtLastRound == randomKSets.size()) {
+					System.out.println("Can't get more, # PosNegConcept is " + posNegConcepts.size());
+					break;
+				} else {
+					sortedPosNegConcepts.addAll(posNegConcepts);
+					sizeAtLastRound = randomKSets.size();
+				}
+			}
+			
+			PosNegConcept nextPosNegConcept = sortedPosNegConcepts.poll();
+			List<SentimentSet> unexistedSentimentSets = new ArrayList<SentimentSet>();
+			nextPosNegConcept.getContainingSets().stream().forEach(set -> {
+				if (!randomKSets.contains(set))
+					unexistedSentimentSets.add(set);
+			});
+			
+			if (unexistedSentimentSets.size() > 0)
+				randomKSets.add(unexistedSentimentSets.get(random.nextInt(unexistedSentimentSets.size())));
+		}
+		
+		
+/*		List<Integer> setSize = new ArrayList<Integer>();
 		for (String posNegConcept : posNegConceptToSentimentSets.keySet()) {
 			setSize.add(posNegConceptToSentimentSets.get(posNegConcept).size());
 		}
@@ -85,7 +131,7 @@ public class TopSetsBaseline {
 				break;
 		}
 		
-		List<SentimentSet> randomKSets = new ArrayList<SentimentSet>();
+
 		Random random = new Random();
 		while (randomKSets.size() < k) {
 			for (String posNegConcept : kPosNegConceptToSentimentSets.keySet()) {
@@ -100,7 +146,8 @@ public class TopSetsBaseline {
 				SentimentSet randomSet = currentSets.get(random.nextInt(currentSets.size()));
 				randomKSets.add(randomSet);
 			}
-		}
+		}*/
+		
 		return randomKSets;
 	}
 
@@ -164,12 +211,7 @@ public class TopSetsBaseline {
 		}
 		@Override
 		public int compareTo(PosNegConcept o) {
-			if (this.getContainingSets().size() > o.getContainingSets().size())
-				return 1;
-			else if (this.getContainingSets().size() < o.getContainingSets().size())
-				return -1;
-			else 
-				return 0;
+			return o.getContainingSets().size() - this.getContainingSets().size();
 		}
 
 	}

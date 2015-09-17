@@ -2,6 +2,9 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.units;
 
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class SentimentSentence extends SentimentSet {
 	
 	private String sentence;	
