@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
-import edu.ucr.cs.dblab.nle020.utilities.Utils;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class Greedy {
 	protected int k = 0;

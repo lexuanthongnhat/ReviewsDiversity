@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -25,17 +26,21 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
-import edu.ucr.cs.dblab.nle020.utilities.Utils;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class PreprocessingForDocumentVector {
 	public final static String DOC_TO_REVIEWS_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned.txt";
 	public final static String FULL_REVIEWS_PATH = "D:\\reviews.csv";
-	public final static String PYTHON_WORKSPACE = "D:\\UCR Google Drive\\python_workspace\\";
-	public final static int TRAINING_SIZE = 200000;
+	public final static String PYTHON_WORKSPACE = "D:\\UCR Google Drive\\python_workspace\\doc_reviews\\";
+	public final static int TRAINING_SIZE = 50000;
+	public final static int SAMPLE_SIZE = 100;
 
 	public static void main (String[] args) {
 		Map<Integer, List<SentimentReview>> docToSentimentReviews = 
-				importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+				importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, 1000);
+		
+		outputSampleSentenceToFile(docToSentimentReviews, PYTHON_WORKSPACE);
+		
 		Set<Integer> seenReviewIds = new HashSet<Integer>();
 		for (List<SentimentReview> reviews : docToSentimentReviews.values()) {
 			for (SentimentReview review : reviews){
@@ -43,26 +48,89 @@ public class PreprocessingForDocumentVector {
 			}
 		}
 		
-		List<RawReview> posRawReviews = new ArrayList<RawReview>();
-		List<RawReview> negRawReviews = new ArrayList<RawReview>();
-		int posCount = 0;
-		int negCount = 0;
+		List<RawReview> oneStarRawReviews = new ArrayList<RawReview>();
+		List<RawReview> twoStarRawReviews = new ArrayList<RawReview>();
+		List<RawReview> threeStarRawReviews = new ArrayList<RawReview>();
+		List<RawReview> fourStarRawReviews = new ArrayList<RawReview>();
+		
 		List<RawReview> rawReviews = getReviews(FULL_REVIEWS_PATH);
 		for (RawReview review : rawReviews) {
-			if (!seenReviewIds.contains(review.getId())) {
-				if (review.getRate() > 50 && posCount < TRAINING_SIZE) {
-					posRawReviews.add(review);
-					++posCount;
-				} else if (review.getRate() <= 50 && negCount < TRAINING_SIZE) {
-					negRawReviews.add(review);
-					++negCount;
-				}
+			if (!seenReviewIds.contains(review.getId())) {					
+				if (review.getRate() == 25 && oneStarRawReviews.size() < TRAINING_SIZE)
+					oneStarRawReviews.add(review);
+				else if (review.getRate() == 50 && twoStarRawReviews.size() < TRAINING_SIZE)
+					twoStarRawReviews.add(review);
+				else if (review.getRate() == 75 && threeStarRawReviews.size() < TRAINING_SIZE)
+					threeStarRawReviews.add(review);
+				else if (review.getRate() == 100 && fourStarRawReviews.size() < TRAINING_SIZE)
+					fourStarRawReviews.add(review);
 			}
 		};
 		
-		outputRawReviewToFile(posRawReviews, PYTHON_WORKSPACE + "train-pos-reviews.txt");
-		outputRawReviewToFile(negRawReviews, PYTHON_WORKSPACE + "train-neg-reviews.txt");
-		System.out.println("# reviews: " + rawReviews.size() + ", #pos: " + posCount + ", #neg: " + negCount);
+		outputRawReviewToFile(oneStarRawReviews, PYTHON_WORKSPACE + "train-one-star-reviews.txt");
+		outputRawReviewToFile(twoStarRawReviews, PYTHON_WORKSPACE + "train-two-star-reviews.txt");
+		outputRawReviewToFile(threeStarRawReviews, PYTHON_WORKSPACE + "train-three-star-reviews.txt");
+		outputRawReviewToFile(fourStarRawReviews, PYTHON_WORKSPACE + "train-four-star-reviews.txt");
+		System.out.println("# reviews: " + rawReviews.size() + ", " 
+				+ "#1-star: " + oneStarRawReviews.size() + ", #2-star: " + twoStarRawReviews.size()
+				+ ", #3-star: " + threeStarRawReviews.size() + ", #4-star: " + fourStarRawReviews.size());
+	}
+	
+	private static void outputSampleSentenceToFile(Map<Integer, List<SentimentReview>> docToSentimentReviews, String outputFolder) {
+		int samplePartSize = SAMPLE_SIZE / 4;
+		
+		List<SentimentSentence> sentences = new ArrayList<SentimentSentence>();
+		Map<Integer, SentimentSentence> orderToSentences = new HashMap<Integer, SentimentSentence>();
+		int sentenceCount = 0;
+		
+		List<SentimentReview> allReviews = new ArrayList<SentimentReview>();
+		docToSentimentReviews.values().stream().forEach(reviews -> allReviews.addAll(reviews));
+		
+		List<SentimentReview> sampleReviews = new ArrayList<SentimentReview>();
+		int oneStarCount = 0;
+		int twoStarCount = 0;
+		int threeStarCount = 0;
+		int fourStarCount = 0;
+		Random random = new Random();
+		Set<Integer> seenIndices = new HashSet<Integer>();
+		while ((oneStarCount + twoStarCount + threeStarCount + fourStarCount) < SAMPLE_SIZE) {
+			int randomIndex = random.nextInt(allReviews.size());
+			while (seenIndices.contains(randomIndex)) {
+				randomIndex = random.nextInt(allReviews.size());
+			}
+			
+			SentimentReview review = allReviews.get(randomIndex);
+			if (review.getSentences().size() == 0)
+				continue;
+			
+			if (review.getRawReview().getRate() == 25 && oneStarCount < samplePartSize) {
+				sampleReviews.add(review);
+				++oneStarCount;
+			} else if (review.getRawReview().getRate() == 50 && twoStarCount < samplePartSize) {
+				sampleReviews.add(review);
+				++twoStarCount;
+			} else if (review.getRawReview().getRate() == 75 && threeStarCount < samplePartSize) {
+				sampleReviews.add(review);
+				++threeStarCount;
+			} else if (review.getRawReview().getRate() == 100 && fourStarCount < samplePartSize) {
+				sampleReviews.add(review);
+				++fourStarCount;
+			}
+		}
+		
+	
+		for (SentimentReview review : sampleReviews) {
+			for (SentimentSentence sentence : review.getSentences()) {
+				if (sentence.getPairs().size() > 0) {
+					sentences.add(sentence);
+					orderToSentences.put(sentenceCount, sentence);
+					++sentenceCount;
+				}
+			}
+		}
+		
+		outputSentencesToFile(sentences, outputFolder + "test-sentences.txt");
+		outputOrderToSentence(orderToSentences, outputFolder + "order-to-sentence.txt");		
 	}
 	
 	private static void outputRawReviewToFile(List<RawReview> rawReviews, String outputPath) {
@@ -78,7 +146,7 @@ public class PreprocessingForDocumentVector {
 		}		
 	}
 
-	public static void outputingStandardReviews() {
+	private static void outputingStandardReviews() {
 		Map<Integer, List<SentimentReview>> docToSentimentReviews = new HashMap<Integer, List<SentimentReview>>();		
 		docToSentimentReviews = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, Constants.NUM_DOCTORS_TO_EXPERIMENT);
 		

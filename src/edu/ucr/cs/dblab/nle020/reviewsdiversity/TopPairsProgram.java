@@ -44,7 +44,7 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
-import edu.ucr.cs.dblab.nle020.utilities.Utils;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class TopPairsProgram {
 	

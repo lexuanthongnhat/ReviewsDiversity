@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import edu.ucr.cs.dblab.nle020.utilities.Utils;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class SnomedGraphBuilder {
 

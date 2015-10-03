@@ -16,10 +16,10 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram.SetOption;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
-import edu.ucr.cs.dblab.nle020.utilities.Utils;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class TopSetsBaseline {
-	private static int k = Constants.K;
+	private static int k = 5;
 	
 	public static void main (String[] args) {
 		long startTime = System.currentTimeMillis();		
@@ -44,7 +44,7 @@ public class TopSetsBaseline {
 			docToTopKSets.put(docId, extractTopKFromList(docToSentimentSets.get(docId)));
 		}		
 		
-		return docToSentimentSets;
+		return docToTopKSets;
 	}
 	
 	
@@ -98,56 +98,7 @@ public class TopSetsBaseline {
 			if (unexistedSentimentSets.size() > 0)
 				randomKSets.add(unexistedSentimentSets.get(random.nextInt(unexistedSentimentSets.size())));
 		}
-		
-		
-/*		List<Integer> setSize = new ArrayList<Integer>();
-		for (String posNegConcept : posNegConceptToSentimentSets.keySet()) {
-			setSize.add(posNegConceptToSentimentSets.get(posNegConcept).size());
-		}
-		Collections.sort(setSize, new Comparator<Integer>() {
-
-			@Override
-			public int compare(Integer o1, Integer o2) {
-				return o2 - o1;
-			}
-		});
-		
-		int kLargest = setSize.get(k);
-		int count = 0;
-		Map<String, Set<SentimentSet>> kPosNegConceptToSentimentSets = new HashMap<String, Set<SentimentSet>>();
-		for (String posNegConcept : posNegConceptToSentimentSets.keySet()) {
-			if (posNegConceptToSentimentSets.get(posNegConcept).size() > kLargest) {
-				kPosNegConceptToSentimentSets.put(posNegConcept, posNegConceptToSentimentSets.get(posNegConcept));
-				++ count;
-			}
-		}
-		for (String posNegConcept : posNegConceptToSentimentSets.keySet()) {
-			if (count < k) {
-				if (posNegConceptToSentimentSets.get(posNegConcept).size() == kLargest) {
-					kPosNegConceptToSentimentSets.put(posNegConcept, posNegConceptToSentimentSets.get(posNegConcept));
-					++ count;
-				}
-			} else
-				break;
-		}
-		
-
-		Random random = new Random();
-		while (randomKSets.size() < k) {
-			for (String posNegConcept : kPosNegConceptToSentimentSets.keySet()) {
-				List<SentimentSet> currentSets = new ArrayList<SentimentSet>(); 				
-				currentSets.addAll(kPosNegConceptToSentimentSets.get(posNegConcept));
 				
-				currentSets.stream().forEach(set -> {
-						if (randomKSets.contains(set))
-							currentSets.remove(set);
-					});
-				
-				SentimentSet randomSet = currentSets.get(random.nextInt(currentSets.size()));
-				randomKSets.add(randomSet);
-			}
-		}*/
-		
 		return randomKSets;
 	}
 

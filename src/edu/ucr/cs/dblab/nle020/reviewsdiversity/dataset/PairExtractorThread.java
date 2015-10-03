@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentMap;
 import edu.ucr.cs.dblab.nle020.metamap.MetaMapParser;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
-import edu.ucr.cs.dblab.nle020.utilities.Utils;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class PairExtractorThread implements Runnable {
 	private SentimentCalculator sentimentCalculator = new SentimentCalculator();

@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
-import edu.ucr.cs.dblab.nle020.utilities.Utils;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class ILPAlgorithm2 extends ILPAlgorithm implements Runnable {
 	

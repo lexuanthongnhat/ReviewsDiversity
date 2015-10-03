@@ -31,7 +31,7 @@ import edu.ucr.cs.dblab.nle020.metamap.SemanticGroups;
 import edu.ucr.cs.dblab.nle020.metamap.SemanticTypes;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
-import edu.ucr.cs.dblab.nle020.utilities.Utils;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class TrainingDatasetCreator {
 	
