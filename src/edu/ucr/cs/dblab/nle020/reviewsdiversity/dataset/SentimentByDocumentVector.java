@@ -50,6 +50,10 @@ public class SentimentByDocumentVector {
 		evaluateSurvey();
 	}
 	
+	public static void updateSentimentWithVectorMethod(String sentimentVectorPath, String sentenceToOrderPath) {
+		
+	}
+	
 	public static void evaluateSurvey() {
 		Map<Integer, Float> orderToSentimentSurvey = accumulateSentiments();
 		
