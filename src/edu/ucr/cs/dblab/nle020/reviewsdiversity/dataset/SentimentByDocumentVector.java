@@ -105,6 +105,8 @@ public class SentimentByDocumentVector {
 				PreprocessingForDocumentVector.PYTHON_WORKSPACE + "prediction.txt");
 		Map<Integer, Float> orderToSentimentRidge = importSentimentFromRidge(
 				PreprocessingForDocumentVector.PYTHON_WORKSPACE + "prediction_ridge.txt");
+		Map<Integer, Float> orderToSentimentLasso = importSentimentFromRidge(
+				PreprocessingForDocumentVector.PYTHON_WORKSPACE + "prediction_lasso.txt");
 		
 		Map<Integer, Float> orderToSentimentNormal = new HashMap<Integer, Float>();
 		for (Integer order : orderToSentence.keySet()) {
@@ -124,31 +126,41 @@ public class SentimentByDocumentVector {
 			orderToSentimentMultiLogistic.put(order, shortenSentiment(normalized));
 		}
 		
-		Map<Integer, Float> orderToSentimentCombination = new HashMap<Integer, Float>();
+		Map<Integer, Float> orderToSentimentCombinationWithRidge = new HashMap<Integer, Float>();
+		Map<Integer, Float> orderToSentimentCombinationWithLasso = new HashMap<Integer, Float>();
 		for (Integer order : orderToSentimentNormal.keySet()) {
-			float combination = (orderToSentimentBinaryLogistic.get(order) + orderToSentimentNormal.get(order)) / 2.0f;
-			orderToSentimentCombination.put(order, combination);
+			float combination = (orderToSentimentRidge.get(order) + orderToSentimentNormal.get(order)) / 2.0f;
+			orderToSentimentCombinationWithRidge.put(order, combination);
+			
+			combination = (orderToSentimentLasso.get(order) + orderToSentimentNormal.get(order)) / 2.0f;
+			orderToSentimentCombinationWithLasso.put(order, combination);
 		}
 		
 		
 		List<Float> errorOfNormalList = calculateError(orderToSentimentSurvey, orderToSentimentNormal); 
-		List<Float> errorOfCombinationList = calculateError(orderToSentimentSurvey, orderToSentimentCombination);
+		List<Float> errorOfCombinationWithRidgeList = calculateError(orderToSentimentSurvey, orderToSentimentCombinationWithRidge);
+		List<Float> errorOfCombinationWithLassoList = calculateError(orderToSentimentSurvey, orderToSentimentCombinationWithLasso);
 		List<Float> errorOfBinaryLogList = calculateError(orderToSentimentSurvey, orderToSentimentBinaryLogistic);
 		List<Float> errorOfMultiLogList = calculateError(orderToSentimentSurvey, orderToSentimentMultiLogistic);
 		List<Float> errorOfRidgeList = calculateError(orderToSentimentSurvey, orderToSentimentRidge);
+		List<Float> errorOfLassoList = calculateError(orderToSentimentSurvey, orderToSentimentLasso);
 		
 		ErrorStatistic errorOfNormal = new ErrorStatistic(errorOfNormalList);
-		ErrorStatistic errorOfCombination = new ErrorStatistic(errorOfCombinationList);
+		ErrorStatistic errorOfCombinationWithRidge = new ErrorStatistic(errorOfCombinationWithRidgeList);
+		ErrorStatistic errorOfCombinationWithLasso = new ErrorStatistic(errorOfCombinationWithLassoList);
 		ErrorStatistic errorOfBinaryLog = new ErrorStatistic(errorOfBinaryLogList);
 		ErrorStatistic errorOfMultiLog = new ErrorStatistic(errorOfMultiLogList);
 		ErrorStatistic errorOfRidge = new ErrorStatistic(errorOfRidgeList);
+		ErrorStatistic errorOfLasso = new ErrorStatistic(errorOfLassoList);
 		
 		System.err.println("Error Rate:\n");
 		System.out.println("Normal      \t--->\tmean: " + errorOfNormal.getMean() + ", \t\tsd: " + errorOfNormal.getSd());
-		System.out.println("Combination \t--->\tmean: " + errorOfCombination.getMean() + ", \t\tsd: " + errorOfCombination.getSd());
+		System.out.println("Combination-R \t--->\tmean: " + errorOfCombinationWithRidge.getMean() + ", \t\tsd: " + errorOfCombinationWithRidge.getSd());
+		System.out.println("Combination-L \t--->\tmean: " + errorOfCombinationWithLasso.getMean() + ", \t\tsd: " + errorOfCombinationWithLasso.getSd());
 		System.out.println("BinaryLog   \t--->\tmean: " + errorOfBinaryLog.getMean() + ", \t\tsd: " + errorOfBinaryLog.getSd());
 		System.out.println("MultiLog    \t--->\tmean: " + errorOfMultiLog.getMean() + ", \t\tsd: " + errorOfMultiLog.getSd());
 		System.out.println("Ridge       \t--->\tmean: " + errorOfRidge.getMean() + ", \t\tsd: " + errorOfRidge.getSd());
+		System.out.println("Lasso       \t--->\tmean: " + errorOfLasso.getMean() + ", \t\tsd: " + errorOfLasso.getSd());
 		
 		
 		List<Float> errorOfMeanList = calculateError(orderToSentimentSurvey, orderToSentimentMean);
@@ -179,7 +191,6 @@ public class SentimentByDocumentVector {
 				optimalSentiment = staticSentiment;
 			}
 		}
-		System.out.println();
 		System.out.println("Optimal " + shortenSentiment(optimalSentiment) + "   \t--->\tmean: " + optimalError.getMean() + ", \t\tsd: " + optimalError.getSd());
 	}
 	
