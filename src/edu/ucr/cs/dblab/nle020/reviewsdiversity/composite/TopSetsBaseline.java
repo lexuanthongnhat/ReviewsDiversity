@@ -109,13 +109,13 @@ public class TopSetsBaseline {
 		
 		switch (setOption) {
 		case REVIEW: 	
-			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath);
 			break;
 		case SENTENCE:  
-			docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(inputPath, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(inputPath);
 			break;
 		default: 		
-			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath);
 			break;
 		}
 		

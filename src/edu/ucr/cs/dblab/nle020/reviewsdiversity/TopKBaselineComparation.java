@@ -119,8 +119,7 @@ public class TopKBaselineComparation {
 
 	private static Map<Integer, List<ConceptSentimentPair>> importConceptSentimentPairDataset(String docToReviewsPath) {
 		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = new HashMap<Integer, List<ConceptSentimentPair>>();
-		Map<Integer, List<SentimentSet>> docToSentences = 
-				TopPairsProgram.importDocToSentimentSentences(docToReviewsPath, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+		Map<Integer, List<SentimentSet>> docToSentences = TopPairsProgram.importDocToSentimentSentences(docToReviewsPath);
 		
 		for (Integer docId : docToSentences.keySet()) {
 			docToConceptSentimentPairDataset.put(docId, new ArrayList<ConceptSentimentPair>());

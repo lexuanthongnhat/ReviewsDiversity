@@ -50,6 +50,8 @@ public class TopPairsProgram {
 	
 	private static int k = Constants.K;
 	private static float threshold = Constants.THRESHOLD;
+
+	private static Set<Integer> randomIndices = Utils.randomIndices(1000, Constants.NUM_DOCTORS_TO_EXPERIMENT);
 	
 	private static final int GREEDY_INDEX = 0;
 	private static final int ILP_INDEX = 1;
@@ -70,10 +72,10 @@ public class TopPairsProgram {
 	public static enum SetOption 		{REVIEW, SENTENCE }; 
 	
 	public static void main(String[] args) throws InterruptedException, ExecutionException {
-//		topPairsExperiment();
+		topPairsExperiment();
 //		topPairsSyntheticExperiment();
 			
-//		topSetsExperiment(SetOption.REVIEW);
+		topSetsExperiment(SetOption.REVIEW);
 		topSetsExperiment(SetOption.SENTENCE);
 	}
 
@@ -82,10 +84,10 @@ public class TopPairsProgram {
 		
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
-//		int[] ks = new int[] {3, 5, 10, 15, 20};
-		int[] ks = new int[] {5};
-//		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
-		float[] thresholds = new float[] {0.2f};
+		int[] ks = new int[] {3, 5, 10, 15, 20};
+//		int[] ks = new int[] {5};
+		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
+//		float[] thresholds = new float[] {0.2f};
 		for (int numChoosen : ks) {
 			k = numChoosen;
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
@@ -120,7 +122,7 @@ public class TopPairsProgram {
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultILP = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultRR = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 		
-		docToConceptSentimentPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+		docToConceptSentimentPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH);
 		printInitialization(docToConceptSentimentPairs);
 				
 		String outputPrefix = outputFolder + "top_pairs_result_" + Constants.NUM_DOCTORS_TO_EXPERIMENT;
@@ -195,7 +197,7 @@ public class TopPairsProgram {
 		int numDecimals = 1;
 
 		docToConceptSentimentPairs = createSyntheticDataset(
-				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, Constants.NUM_DOCTORS_TO_EXPERIMENT), 
+				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH), 
 				Constants.NUM_SYNTHETIC_DOCTORS, numDecimals);
 
 //		printInitialization(docToConceptSentimentPairs);
@@ -267,13 +269,13 @@ public class TopPairsProgram {
 		
 		switch (setOption) {
 		case REVIEW: 	
-			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH);
 			break;
 		case SENTENCE:  
-			docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+			docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH);
 			break;
 		default: 		
-			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH);
 			break;
 		}			
 
@@ -1064,129 +1066,108 @@ public class TopPairsProgram {
 	}
 		
 	// Make sure: each conceptSentimentPair of a doctor has an unique hashcode
-	private static Map<Integer, List<ConceptSentimentPair>> importDocToConceptSentimentPairs(String path, int numDoctorsToExperiment) {
+	private static Map<Integer, List<ConceptSentimentPair>> importDocToConceptSentimentPairs(String path) {
 		Map<Integer, List<ConceptSentimentPair>> result = new HashMap<Integer, List<ConceptSentimentPair>>();
 		
-		ObjectMapper mapper = new ObjectMapper();
-		
-		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {	
-			String line;
-			int count = 0;
-			while ((line = reader.readLine()) != null) {
-				DoctorSentimentReview doctorSentimentReview = mapper.readValue(line, DoctorSentimentReview.class);
-				
-				Integer docId = doctorSentimentReview.getDocId();
-				List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
-				
-				for (SentimentReview sentimentReview : doctorSentimentReview.getSentimentReviews()) {
-					for (SentimentSentence sentimentSentence : sentimentReview.getSentences()) {
-						for (ConceptSentimentPair csPair : sentimentSentence.getPairs()) {
-						
-							if (!pairs.contains(csPair))
-								pairs.add(csPair);
-							else {
-								ConceptSentimentPair currentPair = pairs.get(pairs.indexOf(csPair));
-								currentPair.incrementCount(csPair.getCount());
-							}
+		List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);
+
+		for (Integer index : randomIndices) {
+			DoctorSentimentReview doctorSentimentReview = doctorSentimentReviews.get(index);			
+			Integer docId = doctorSentimentReview.getDocId();
+			List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+			
+			for (SentimentReview sentimentReview : doctorSentimentReview.getSentimentReviews()) {
+				for (SentimentSentence sentimentSentence : sentimentReview.getSentences()) {
+					for (ConceptSentimentPair csPair : sentimentSentence.getPairs()) {
+					
+						if (!pairs.contains(csPair))
+							pairs.add(csPair);
+						else {
+							ConceptSentimentPair currentPair = pairs.get(pairs.indexOf(csPair));
+							currentPair.incrementCount(csPair.getCount());
 						}
 					}
 				}
-				
-				result.put(docId, pairs);
-				
-				++count;
-				if (count >= numDoctorsToExperiment)
-					break;				
 			}
-		} catch (IOException e) {
-			e.printStackTrace();			
-		}	
+			
+			result.put(docId, pairs);
+		}
 		
 		return result;
 	}	
 
 	// Make sure: each conceptSentimentPair of a SentimentReview has an unique hashcode
-	public static Map<Integer, List<SentimentSet>> importDocToSentimentReviews(String path, int numDoctorsToExperiment) {
+	public static Map<Integer, List<SentimentSet>> importDocToSentimentReviews(String path) {
 		Map<Integer, List<SentimentSet>> result = new HashMap<Integer, List<SentimentSet>>();
 		
-		ObjectMapper mapper = new ObjectMapper();
+		List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);
 		
-		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {	
-			String line;
-			int count = 0;
-			while ((line = reader.readLine()) != null) {
-				DoctorSentimentReview doctorSentimentReview = mapper.readValue(line, DoctorSentimentReview.class);
-				
-				Integer docId = doctorSentimentReview.getDocId();
-				List<SentimentSet> sentimentReviews = new ArrayList<SentimentSet>();
-				
-				for (SentimentReview sentimentReview : doctorSentimentReview.getSentimentReviews()) {
-					List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
-					for (SentimentSentence sentimentSentence : sentimentReview.getSentences()) {
-						for (ConceptSentimentPair csPair : sentimentSentence.getPairs()) {
-						
-							if (!pairs.contains(csPair))
-								pairs.add(csPair);
-							else {
-								ConceptSentimentPair currentPair = pairs.get(pairs.indexOf(csPair));
-								currentPair.incrementCount(csPair.getCount());
-							}
+		for (Integer index : randomIndices) {
+			DoctorSentimentReview doctorSentimentReview = doctorSentimentReviews.get(index);
+			Integer docId = doctorSentimentReview.getDocId();
+			List<SentimentSet> sentimentReviews = new ArrayList<SentimentSet>();
+			
+			for (SentimentReview sentimentReview : doctorSentimentReview.getSentimentReviews()) {
+				List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+				for (SentimentSentence sentimentSentence : sentimentReview.getSentences()) {
+					for (ConceptSentimentPair csPair : sentimentSentence.getPairs()) {
+					
+						if (!pairs.contains(csPair))
+							pairs.add(csPair);
+						else {
+							ConceptSentimentPair currentPair = pairs.get(pairs.indexOf(csPair));
+							currentPair.incrementCount(csPair.getCount());
 						}
 					}
-					
-					if (pairs.size() > 0)
-						sentimentReviews.add(new SentimentReview(sentimentReview.getId(), pairs, sentimentReview.getRawReview()));
 				}
 				
-				
-				result.put(docId, sentimentReviews);
-				
-				++count;
-				if (count >= numDoctorsToExperiment)
-					break;
+				if (pairs.size() > 0)
+					sentimentReviews.add(new SentimentReview(sentimentReview.getId(), pairs, sentimentReview.getRawReview()));
 			}
-		} catch (IOException e) {
-			e.printStackTrace();			
-		}	
+						
+			result.put(docId, sentimentReviews);
+		}
 		
 		return result;
 	}
 	
 	// Make sure: each conceptSentimentPair of a SentimentSentence has an unique hashcode
-	public static Map<Integer, List<SentimentSet>> importDocToSentimentSentences(String path, int numDoctorsToExperiment) {
+	public static Map<Integer, List<SentimentSet>> importDocToSentimentSentences(String path) {
 		Map<Integer, List<SentimentSet>> result = new HashMap<Integer, List<SentimentSet>>();
 
-		ObjectMapper mapper = new ObjectMapper();
+		List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);		
+		for (Integer index : randomIndices) {
+			DoctorSentimentReview doctorSentimentReview = doctorSentimentReviews.get(index);
 
+			Integer docId = doctorSentimentReview.getDocId();
+			List<SentimentSet> sentimentSentences = new ArrayList<SentimentSet>();
+
+			for (SentimentReview sentimentReview : doctorSentimentReview.getSentimentReviews()) {
+				for (SentimentSentence sentimentSentence : sentimentReview.getSentences()) {						
+					if (sentimentSentence.getPairs().size() > 0)
+						sentimentSentences.add(sentimentSentence);
+				}
+			}
+
+			result.put(docId, sentimentSentences);
+		}
+
+		return result;
+	}
+	
+	private static List<DoctorSentimentReview> importDoctorSentimentReviewsDataset(String path) {
+		List<DoctorSentimentReview> doctorSentimentReviews = new ArrayList<DoctorSentimentReview>();
+		ObjectMapper mapper = new ObjectMapper();
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {	
 			String line;
-			
-			int count = 0;
 			while ((line = reader.readLine()) != null) {
 				DoctorSentimentReview doctorSentimentReview = mapper.readValue(line, DoctorSentimentReview.class);
-
-				Integer docId = doctorSentimentReview.getDocId();
-				List<SentimentSet> sentimentSentences = new ArrayList<SentimentSet>();
-
-				for (SentimentReview sentimentReview : doctorSentimentReview.getSentimentReviews()) {
-					for (SentimentSentence sentimentSentence : sentimentReview.getSentences()) {						
-						if (sentimentSentence.getPairs().size() > 0)
-							sentimentSentences.add(sentimentSentence);
-					}
-				}
-
-
-				result.put(docId, sentimentSentences);
-				
-				++count;
-				if (count >= numDoctorsToExperiment)
-					break;
+				doctorSentimentReviews.add(doctorSentimentReview);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();			
-		}	
-
-		return result;
+		}
+		return doctorSentimentReviews;
 	}
 	
 	// Create synthetic dataset
