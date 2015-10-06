@@ -32,6 +32,7 @@ public class PreprocessingForDocumentVector {
 	public final static String DOC_TO_REVIEWS_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned.txt";
 	public final static String FULL_REVIEWS_PATH = "D:\\reviews.csv";
 	public final static String PYTHON_WORKSPACE = "D:\\UCR Google Drive\\python_workspace\\doc_reviews\\";
+	public final static String PYTHON_WORKSPACE_FULL = "D:\\UCR Google Drive\\python_workspace\\doc_reviews_full\\";
 	public final static int TRAINING_SIZE = 50000;
 	public final static int SAMPLE_SIZE = 100;
 

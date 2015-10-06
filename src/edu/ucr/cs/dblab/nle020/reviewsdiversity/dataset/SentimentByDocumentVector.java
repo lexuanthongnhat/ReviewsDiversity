@@ -1,6 +1,7 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -13,14 +14,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.apache.poi.poifs.filesystem.DirectoryEntry;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
@@ -47,11 +43,90 @@ public class SentimentByDocumentVector {
 	public static void main(String[] args) {
 		//comparingDifferentMethods();
 		//prepareSurvey();
-		evaluateSurvey();
+		//evaluateSurvey();
+		updateSentimentWithVectorMethod();
 	}
 	
-	public static void updateSentimentWithVectorMethod(String sentimentVectorPath, String sentenceToOrderPath) {
+	public static void updateSentimentWithVectorMethod() {
+		long startTime = System.currentTimeMillis();
+		Map<Integer, SentimentSentence> orderToSentence = 
+				importOrderToSentence(PreprocessingForDocumentVector.PYTHON_WORKSPACE_FULL + "order-to-sentence.txt");
+		Map<Integer, Float> orderToSentiment = importSentimentFromRidge(
+				PreprocessingForDocumentVector.PYTHON_WORKSPACE_FULL + "prediction_ridge_full.txt");
 		
+		Map<SentimentSentence, Float> sentenceToSentiment = new HashMap<SentimentSentence, Float>();
+		for (Integer order : orderToSentence.keySet()) {
+			sentenceToSentiment.put(orderToSentence.get(order), orderToSentiment.get(order));
+		}
+		
+		String originalDatasetPath = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned.txt";
+		Map<Integer, List<SentimentReview>> docToSentimentReviews = importDocToSentimentReviews(originalDatasetPath);
+		
+		// Re-assign sentiment of concept in sentence
+		for (Integer docId : docToSentimentReviews.keySet()) {
+			for (SentimentReview review : docToSentimentReviews.get(docId)) {
+				for (SentimentSentence sentence : review.getSentences()) {
+					if (sentenceToSentiment.containsKey(sentence)) {
+						float sentiment = sentenceToSentiment.get(sentence);
+						for (ConceptSentimentPair pair : sentence.getPairs()) {
+							pair.setSentiment(sentiment);
+						}
+					}
+				}
+			}
+		}
+		
+		String updatedDatasetPath = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned_vector.txt";
+		outputDoctorSentimentReviewsToJson(docToSentimentReviews, updatedDatasetPath);
+		System.out.println("Finish outputing JSON text file to \"" + updatedDatasetPath + "\" in " 
+				+ (System.currentTimeMillis() - startTime) + " ms");
+	}
+	
+	private static void outputDoctorSentimentReviewsToJson(
+			Map<Integer, List<SentimentReview>> docToSentimentReviews,
+			String updatedDatasetPath) {
+		
+		ObjectMapper mapper = new ObjectMapper();
+		try {
+			Files.deleteIfExists(Paths.get(updatedDatasetPath));
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		
+		int count = 1;
+		for (Integer docId : docToSentimentReviews.keySet()) {
+			try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(updatedDatasetPath), 
+				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+				if (count > 1)						
+					writer.newLine();				
+				DoctorSentimentReview doctorReview = new DoctorSentimentReview(docId, docToSentimentReviews.get(docId));
+				mapper.writeValue(writer, doctorReview);
+				
+				count++;
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		System.out.println("Num of Outputed docIDs " + count);	
+	}
+
+	public static Map<Integer, List<SentimentReview>> importDocToSentimentReviews(String path) {
+		Map<Integer, List<SentimentReview>> result = new HashMap<Integer, List<SentimentReview>>();
+
+		ObjectMapper mapper = new ObjectMapper();		
+		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {	
+			String line;
+			while ((line = reader.readLine()) != null) {
+				DoctorSentimentReview doctorSentimentReview = mapper.readValue(line, DoctorSentimentReview.class);
+
+				result.put(doctorSentimentReview.getDocId(), doctorSentimentReview.getSentimentReviews());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();			
+		}	
+
+		return result;
 	}
 	
 	public static void evaluateSurvey() {
