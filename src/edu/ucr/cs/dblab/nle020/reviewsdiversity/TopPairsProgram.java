@@ -57,9 +57,11 @@ public class TopPairsProgram {
 	private static final int ILP_INDEX = 1;
 	private static final int RR_INDEX = 2;
 
-	public final static String DOC_TO_REVIEWS_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned.txt";
-	public final static String OUTPUT_FOLDER = "D:\\UCR Google Drive\\GD - Review Diversity\\Experiment Output\\";
-	private final static String DESKTOP_FOLDER;	
+	public final static String DOC_TO_REVIEWS_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned_vector.txt";
+	//public final static String OUTPUT_FOLDER = "D:\\UCR Google Drive\\GD - Review Diversity\\Experiment Output\\";
+	public final static String OUTPUT_FOLDER = "D:\\Experiments\\";
+	private final static String DESKTOP_FOLDER;
+	
 	static {
 		if (Files.isDirectory(Paths.get("C:\\Users\\Thong Nhat\\Desktop")))
 			DESKTOP_FOLDER = "C:\\Users\\Thong Nhat\\Desktop\\";
@@ -72,11 +74,13 @@ public class TopPairsProgram {
 	public static enum SetOption 		{REVIEW, SENTENCE }; 
 	
 	public static void main(String[] args) throws InterruptedException, ExecutionException {
+		long startTime = System.currentTimeMillis();
 		topPairsExperiment();
 //		topPairsSyntheticExperiment();
 			
 		topSetsExperiment(SetOption.REVIEW);
 		topSetsExperiment(SetOption.SENTENCE);
+		Utils.printRunningTime(startTime, "Finished evaluation");
 	}
 
 	@SuppressWarnings("unused")
@@ -84,7 +88,8 @@ public class TopPairsProgram {
 		
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
-		int[] ks = new int[] {3, 5, 10, 15, 20};
+		// TODO - the first "3" is always slower than the other numbers 
+		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
 //		int[] ks = new int[] {5};
 		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
 //		float[] thresholds = new float[] {0.2f};
@@ -106,14 +111,15 @@ public class TopPairsProgram {
 			}
 		}
 		
-		String finalOutputExcelPath = OUTPUT_FOLDER + "Top Pairs.xlsx";
+		String finalOutputExcelPath = OUTPUT_FOLDER + "Top Pairs_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		outputSummaryStatisticsToExcel(statisticalResults, finalOutputExcelPath);
 	}
 
 	private static StatisticalResult[] topPairsExperiment(String outputFolder) throws InterruptedException, ExecutionException {
-		long startTime = System.currentTimeMillis();
+		long startTime = System.currentTimeMillis();		
+		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, true);
+		printInitialization(docToConceptSentimentPairs);
 		
-		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = new HashMap<Integer, List<ConceptSentimentPair>>();		
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedy = new ConcurrentHashMap<Integer, StatisticalResult>();
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILP = new ConcurrentHashMap<Integer, StatisticalResult>();
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultRR = new ConcurrentHashMap<Integer, StatisticalResult>();
@@ -122,8 +128,7 @@ public class TopPairsProgram {
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultILP = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultRR = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 		
-		docToConceptSentimentPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH);
-		printInitialization(docToConceptSentimentPairs);
+
 				
 		String outputPrefix = outputFolder + "top_pairs_result_" + Constants.NUM_DOCTORS_TO_EXPERIMENT;
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToTopPairsResultILP);
@@ -197,7 +202,7 @@ public class TopPairsProgram {
 		int numDecimals = 1;
 
 		docToConceptSentimentPairs = createSyntheticDataset(
-				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH), 
+				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, true), 
 				Constants.NUM_SYNTHETIC_DOCTORS, numDecimals);
 
 //		printInitialization(docToConceptSentimentPairs);
@@ -219,9 +224,11 @@ public class TopPairsProgram {
  * 				docToTopPairsResultRR, docToTopKPairsResultRR);
 		outputResultToJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);*/
 		
-		String outputPath = DESKTOP_FOLDER + "review_diversity_synthetic_k" + k + "_threshold" + threshold + "_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
+		String outputPath = DESKTOP_FOLDER + "review_diversity_synthetic_k" + k + "_threshold" + threshold 
+				+ "_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
-		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		outputStatisticalResultToExcel(outputPath, isSet, 
+				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 		
 		Utils.printRunningTime(startTime, "Finished Top Pairs Synthetic", true);
 	}
@@ -229,10 +236,10 @@ public class TopPairsProgram {
 	private static void topSetsExperiment(SetOption setOption) {
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
-//		int[] ks = new int[] {3, 5, 10, 15, 20};
-		int[] ks = new int[] {5};
-//		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
-		float[] thresholds = new float[] {0.2f};
+		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
+//		int[] ks = new int[] {5};
+		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
+//		float[] thresholds = new float[] {0.2f};
 		for (int numChoosen : ks) {
 			k = numChoosen;
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
@@ -251,7 +258,7 @@ public class TopPairsProgram {
 			}
 		}
 		
-		String finalOutputExcelPath = OUTPUT_FOLDER + "Top " + setOption + ".xlsx";
+		String finalOutputExcelPath = OUTPUT_FOLDER + "Top " + setOption + "_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		outputSummaryStatisticsToExcel(statisticalResults, finalOutputExcelPath);
 	}
 	
@@ -267,15 +274,16 @@ public class TopPairsProgram {
 		ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsILP = new ConcurrentHashMap<Integer, List<SentimentSet>>();
 		ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsRR = new ConcurrentHashMap<Integer, List<SentimentSet>>();
 		
+		boolean getSomeRandomItems = true;
 		switch (setOption) {
 		case REVIEW: 	
-			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH);
+			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, getSomeRandomItems);
 			break;
 		case SENTENCE:  
-			docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH);
+			docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH, getSomeRandomItems);
 			break;
 		default: 		
-			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH);
+			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, getSomeRandomItems);
 			break;
 		}			
 
@@ -1066,12 +1074,21 @@ public class TopPairsProgram {
 	}
 		
 	// Make sure: each conceptSentimentPair of a doctor has an unique hashcode
-	private static Map<Integer, List<ConceptSentimentPair>> importDocToConceptSentimentPairs(String path) {
+	private static Map<Integer, List<ConceptSentimentPair>> importDocToConceptSentimentPairs(String path, boolean getSomeRandomItems) {
 		Map<Integer, List<ConceptSentimentPair>> result = new HashMap<Integer, List<ConceptSentimentPair>>();
 		
 		List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);
 
-		for (Integer index : randomIndices) {
+		Set<Integer> indices = new HashSet<Integer>();
+		if (getSomeRandomItems)
+			indices = randomIndices;
+		else {
+			for (int index = 0; index < doctorSentimentReviews.size(); ++index) {
+				indices.add(index);
+			}
+		}
+		
+		for (Integer index : indices) {
 			DoctorSentimentReview doctorSentimentReview = doctorSentimentReviews.get(index);			
 			Integer docId = doctorSentimentReview.getDocId();
 			List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
@@ -1097,12 +1114,21 @@ public class TopPairsProgram {
 	}	
 
 	// Make sure: each conceptSentimentPair of a SentimentReview has an unique hashcode
-	public static Map<Integer, List<SentimentSet>> importDocToSentimentReviews(String path) {
+	public static Map<Integer, List<SentimentSet>> importDocToSentimentReviews(String path, boolean getSomeRandomItems) {
 		Map<Integer, List<SentimentSet>> result = new HashMap<Integer, List<SentimentSet>>();
 		
 		List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);
 		
-		for (Integer index : randomIndices) {
+		Set<Integer> indices = new HashSet<Integer>();
+		if (getSomeRandomItems)
+			indices = randomIndices;
+		else {
+			for (int index = 0; index < doctorSentimentReviews.size(); ++index) {
+				indices.add(index);
+			}
+		}
+		
+		for (Integer index : indices) {
 			DoctorSentimentReview doctorSentimentReview = doctorSentimentReviews.get(index);
 			Integer docId = doctorSentimentReview.getDocId();
 			List<SentimentSet> sentimentReviews = new ArrayList<SentimentSet>();
@@ -1132,11 +1158,20 @@ public class TopPairsProgram {
 	}
 	
 	// Make sure: each conceptSentimentPair of a SentimentSentence has an unique hashcode
-	public static Map<Integer, List<SentimentSet>> importDocToSentimentSentences(String path) {
+	public static Map<Integer, List<SentimentSet>> importDocToSentimentSentences(String path, boolean getSomeRandomItems) {
 		Map<Integer, List<SentimentSet>> result = new HashMap<Integer, List<SentimentSet>>();
 
 		List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);		
-		for (Integer index : randomIndices) {
+		Set<Integer> indices = new HashSet<Integer>();
+		if (getSomeRandomItems)
+			indices = randomIndices;
+		else {
+			for (int index = 0; index < doctorSentimentReviews.size(); ++index) {
+				indices.add(index);
+			}
+		}
+		
+		for (Integer index : indices) {
 			DoctorSentimentReview doctorSentimentReview = doctorSentimentReviews.get(index);
 
 			Integer docId = doctorSentimentReview.getDocId();

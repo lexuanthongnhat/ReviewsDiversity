@@ -43,8 +43,8 @@ public class SentimentByDocumentVector {
 	public static void main(String[] args) {
 		//comparingDifferentMethods();
 		//prepareSurvey();
-		//evaluateSurvey();
-		updateSentimentWithVectorMethod();
+		evaluateSurvey();
+		//updateSentimentWithVectorMethod();
 	}
 	
 	public static void updateSentimentWithVectorMethod() {

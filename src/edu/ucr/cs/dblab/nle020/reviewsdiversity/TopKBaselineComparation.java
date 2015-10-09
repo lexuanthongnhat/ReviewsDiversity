@@ -1,9 +1,11 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -18,41 +20,90 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class TopKBaselineComparation {
 	private static final int DISABLE_CONCEPT_DISTANCE = 1000;
 	
 	private static String sourceInputFolder = TopPairsProgram.OUTPUT_FOLDER; 
-	private static String topSentencesPath =  sourceInputFolder + "Top SENTENCE\\k5_threshold0.2\\top_SENTENCE_result_200_greedy_set.txt";
-	private static String topSentencesBaselinePath = sourceInputFolder + "top_SENTENCE_baseline_k5.txt";
-	
-	
+		
 	public static void main(String[] args) {
+		long startTime = System.currentTimeMillis();
 		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = 
 				importConceptSentimentPairDataset(TopPairsProgram.DOC_TO_REVIEWS_PATH);
+				
+		//int conceptDistanceThreshold = 3;
+		//float sentimentDistanceThreshold = 0.3f;
 		
-		Map<Integer, List<SentimentSentence>> docToTopSentences = importDocToSentimentSentencesFromJson(topSentencesPath);
-		Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline = importDocToSentimentSentencesFromJson(topSentencesBaselinePath);
+		int[] conceptDistanceThresholds = new int[] {1, 2, 3, 4};
+		float[] sentimentDistanceThresholds = new float[] {0.1f, 0.2f, 0.3f, 0.4f};
 		
-		int conceptDistanceThreshold = 3;
-		float sentimentDistanceThreshold = 0.3f;
-		double ourCoverage = 
-				evaluating(docToConceptSentimentPairDataset, conceptDistanceThreshold, sentimentDistanceThreshold, docToTopSentences);
-		double baselineCoverage = 
-				evaluating(docToConceptSentimentPairDataset, conceptDistanceThreshold, sentimentDistanceThreshold, docToTopSentencesBaseline);
-	
+		for (int conceptDistanceThreshold : conceptDistanceThresholds) {
+			for (float sentimentDistanceThreshold : sentimentDistanceThresholds) {
+				String outputString = "k,ilp,rr,greedy,baseline\n";		
+				int[] ks = new int[] {3, 5, 10, 15, 20};		
+				for (int k : ks) {
+					String topSentencesGreedyPath =  sourceInputFolder + "Top SENTENCE\\k" 
+							+ k + "_threshold0.2\\top_SENTENCE_result_200_greedy_set.txt";
+					String topSentencesILPPath =  sourceInputFolder + "Top SENTENCE\\k" 
+							+ k + "_threshold0.2\\top_SENTENCE_result_200_ilp_set.txt";
+					String topSentencesRRPath =  sourceInputFolder + "Top SENTENCE\\k" 
+							+ k + "_threshold0.2\\top_SENTENCE_result_200_rr_set.txt";
+					
+					String topSentencesBaselinePath = sourceInputFolder + "baseline\\top_SENTENCE_baseline_k" 
+							+ k + ".txt";
+					
+					Map<Integer, List<SentimentSentence>> docToTopSentencesGreedy = 
+							importDocToSentimentSentencesFromJson(topSentencesGreedyPath);
+					Map<Integer, List<SentimentSentence>> docToTopSentencesILP = 
+							importDocToSentimentSentencesFromJson(topSentencesILPPath);
+					Map<Integer, List<SentimentSentence>> docToTopSentencesRR = 
+							importDocToSentimentSentencesFromJson(topSentencesRRPath);
+					
+					Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline = 
+							importDocToSentimentSentencesFromJson(topSentencesBaselinePath);
+					
+					Set<Integer> docIds = docToTopSentencesGreedy.keySet();
+					double greedyCoverage =	evaluating(docToConceptSentimentPairDataset, docIds, 
+							conceptDistanceThreshold, sentimentDistanceThreshold, docToTopSentencesGreedy);
+					double ilpCoverage =	evaluating(docToConceptSentimentPairDataset, docIds, 
+							conceptDistanceThreshold, sentimentDistanceThreshold, docToTopSentencesILP);
+					double rrCoverage =	evaluating(docToConceptSentimentPairDataset, docIds, 
+							conceptDistanceThreshold, sentimentDistanceThreshold, docToTopSentencesRR);
+					
+					double baselineCoverage = evaluating(docToConceptSentimentPairDataset, docIds, 
+							conceptDistanceThreshold, sentimentDistanceThreshold, docToTopSentencesBaseline);
+					
+					outputString = outputString + k + "," + ilpCoverage + "," + rrCoverage + "," + greedyCoverage 
+							+ "," + baselineCoverage + "\n";
+				}
 
-		System.out.println("ourCoverage " + ourCoverage + ", \tbaselineCoverage: " + baselineCoverage);
+				String outputPath = sourceInputFolder + "baseline\\comparison_distance" 
+						+ conceptDistanceThreshold + "_sentiment" + sentimentDistanceThreshold + ".csv";
+				try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
+						StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+					writer.write(outputString);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				
+				System.out.println("Finished with distanceThreshold " + conceptDistanceThreshold 
+						+ ", sentimentThreshold " + sentimentDistanceThreshold);
+			}
+		}
+		
+		Utils.printRunningTime(startTime, "Finished comparing to baseline", true);
 	}
 	
 
 	private static double evaluating(
 			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset,
+			Set<Integer> docIds,
 			int conceptDistanceThreshold, float sentimentDistanceThreshold,
 			Map<Integer, List<SentimentSentence>> docToTopSentences) {
 
 		List<Double> coverages = new ArrayList<Double>();
-		for (Integer docId : docToConceptSentimentPairDataset.keySet()) {
+		for (Integer docId : docIds) {
 			double datasetSize = docToConceptSentimentPairDataset.get(docId).size();
 			
 			List<ConceptSentimentPair> uncoveredPairs = new ArrayList<ConceptSentimentPair>();
@@ -119,7 +170,7 @@ public class TopKBaselineComparation {
 
 	private static Map<Integer, List<ConceptSentimentPair>> importConceptSentimentPairDataset(String docToReviewsPath) {
 		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = new HashMap<Integer, List<ConceptSentimentPair>>();
-		Map<Integer, List<SentimentSet>> docToSentences = TopPairsProgram.importDocToSentimentSentences(docToReviewsPath);
+		Map<Integer, List<SentimentSet>> docToSentences = TopPairsProgram.importDocToSentimentSentences(docToReviewsPath, false);
 		
 		for (Integer docId : docToSentences.keySet()) {
 			docToConceptSentimentPairDataset.put(docId, new ArrayList<ConceptSentimentPair>());

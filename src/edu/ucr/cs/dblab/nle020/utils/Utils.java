@@ -22,12 +22,13 @@ public class Utils {
 			System.err.println(message + "\t" + Runtime.getRuntime().totalMemory()/Math.pow(2, 20) + " MB\t" + new Date());
 	}
 	
+	// bound is exclusive
 	public static Set<Integer> randomIndices(int bound, int numIndices) {
 		
 		Set<Integer> indices = new HashSet<Integer>();
 		Random random = new Random();
 		while (indices.size() < numIndices) {
-			indices.add(random.nextInt(bound -1));
+			indices.add(random.nextInt(bound));
 		}
 		
 		return indices;

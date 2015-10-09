@@ -32,9 +32,9 @@ public class GreedyAlgorithm2 extends Greedy implements Runnable{
 		
 		for (int i = index; i < docIDs.length; i += numThreadsAlgorithm) {
 			Integer docId = docIDs[i];
-			Utils.printTotalHeapSize("Heapsize before docID " + docId);
+//			Utils.printTotalHeapSize("Heapsize before docID " + docId);
 			runGreedyPerDoc(docId, docToConceptSentimentPairs.get(docId));
-			Utils.printTotalHeapSize("Heapsize after docID " + docId);
+//			Utils.printTotalHeapSize("Heapsize after docID " + docId);
 		}
 	}
 }

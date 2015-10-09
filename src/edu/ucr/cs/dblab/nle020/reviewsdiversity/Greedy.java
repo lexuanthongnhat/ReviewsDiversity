@@ -65,8 +65,6 @@ public class Greedy {
 			topK = pairs;
 		} else {
 			for (int i = 0; i < k; i++) {
-				if (System.currentTimeMillis() - startTime > 1000 * 60)
-					System.err.println("???");
 				chooseNextPair(heap, topK, statisticalResult);
 			}
 		}
@@ -98,8 +96,7 @@ public class Greedy {
 	}
 	
 	private void initPairs(List<ConceptSentimentPair> conceptSentimentPairs, List<FullPair> fullPairs, StatisticalResult statisticalResult) {
-		long startTime = System.currentTimeMillis();
-		
+	
 		for (int i = 0 ; i < conceptSentimentPairs.size() ; i++) {
 			
 			// TODO - note that fullPair is identified using hashcode of only id -> id must be unique
@@ -113,24 +110,6 @@ public class Greedy {
 			pair.getPotentialHosts().add(pair);
 			pair.setHost(root);			
 		}
-		
-		// Init the customers and potential hosts
-		/*InitPairs initPairsInstance= new InitPairs(conceptSentimentPairs, fullPairs, 0, fullPairs.size());
-		ForkJoinPool pool = new ForkJoinPool();
-		pool.invoke(initPairsInstance);*/
-		
-/*		ExecutorService pool = Executors.newFixedThreadPool(Constants.NUM_THREADS_INIT_PAIRS);
-		for (int i = 0; i < fullPairs.size(); i++) {
-			pool.submit(new InitPairsRunnable(conceptSentimentPairs, fullPairs, i, 1));
-		}
-		pool.shutdown();
-		
-		try {
-			pool.awaitTermination(2, TimeUnit.DAYS);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}*/
 		
 		for (int i = 0; i < fullPairs.size() - 1; i++) {
 //			Utils.printTotalHeapSize("Init customer, iteration " + i);
@@ -194,8 +173,6 @@ public class Greedy {
 		statisticalResult.setNumPairs(conceptSentimentPairs.size());
 //		initNumPotentialUsefulCover(result, conceptSentimentPairs);
 		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairs);
-		
-		Utils.printRunningTime(startTime, "Finished initPairs of docId " + statisticalResult.getDocID(), true);
 	}
 
 	private void initDistances(List<ConceptSentimentPair> conceptSentimentPairs, 
@@ -279,7 +256,7 @@ public class Greedy {
 	
 	// Choose the next pair on top of the heap, then update the RELATED pairs and the heap
 	private void chooseNextPair(PriorityQueue<FullPair> heap, List<FullPair> topK, StatisticalResult statisticalResult) {
-		long startTime = System.currentTimeMillis();
+		//long startTime = System.currentTimeMillis();
 		// Choose next pair
 		FullPair nextPair = heap.poll();
 		topK.add(nextPair);
@@ -335,7 +312,7 @@ public class Greedy {
 			}
 		}
 		
-		Utils.printRunningTime(startTime, "Finished a nextPair iteration");
+		//Utils.printRunningTime(startTime, "Finished a nextPair iteration");
 	}
 	
 	private void checkResult(List<FullPair> topK, Map<FullPair, Map<FullPair, Integer>> distances, StatisticalResult statisticalResult) {

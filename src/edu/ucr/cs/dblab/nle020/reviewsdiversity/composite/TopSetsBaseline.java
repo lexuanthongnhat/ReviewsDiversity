@@ -1,8 +1,6 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity.composite;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -11,7 +9,6 @@ import java.util.PriorityQueue;
 import java.util.Random;
 import java.util.Set;
 
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram.SetOption;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
@@ -23,15 +20,20 @@ public class TopSetsBaseline {
 	
 	public static void main (String[] args) {
 		long startTime = System.currentTimeMillis();		
-
 		SetOption setOption = SetOption.SENTENCE;
-		Map<Integer, List<SentimentSet>> docToTopKSentences = 
-				getTopKSentimentSet(TopPairsProgram.DOC_TO_REVIEWS_PATH, setOption);
 		
-		String outputPath = TopPairsProgram.OUTPUT_FOLDER + "top_" + setOption + "_baseline_k" + k + ".txt";
-		TopPairsProgram.outputTopKToJson(outputPath, docToTopKSentences);
-		
-		System.out.println("Outputed to \"" + outputPath + "\"");
+		int[] ks = new int[] {3, 5, 10, 15, 20};
+		for (int kValue : ks) {
+			k = kValue;			
+			
+			Map<Integer, List<SentimentSet>> docToTopKSentences = 
+					getTopKSentimentSet(TopPairsProgram.DOC_TO_REVIEWS_PATH, setOption);
+
+			String outputPath = TopPairsProgram.OUTPUT_FOLDER + "baseline\\top_" + setOption + "_baseline_k" + k + ".txt";
+			TopPairsProgram.outputTopKToJson(outputPath, docToTopKSentences);
+
+			System.out.println("Outputed to \"" + outputPath + "\"");
+		}
 		Utils.printRunningTime(startTime, "Finished topK baseline for " + setOption);
 	}
 	
@@ -107,15 +109,16 @@ public class TopSetsBaseline {
 	private static Map<Integer, List<SentimentSet>> importSentimentSets(String inputPath, TopPairsProgram.SetOption setOption) {
 		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<Integer, List<SentimentSet>>();	
 		
+		boolean getSomeRandomItems = false;
 		switch (setOption) {
 		case REVIEW: 	
-			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath, getSomeRandomItems);
 			break;
 		case SENTENCE:  
-			docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(inputPath);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(inputPath, getSomeRandomItems);
 			break;
 		default: 		
-			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath, getSomeRandomItems);
 			break;
 		}
 		

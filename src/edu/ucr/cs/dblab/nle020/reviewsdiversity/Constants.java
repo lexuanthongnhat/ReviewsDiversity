@@ -23,7 +23,7 @@ public class Constants {
 	
 	public final static String ROOT_CUI = "ROOT";
 	
-	public final static int NUM_DOCTORS_TO_EXPERIMENT = 200;
+	public final static int NUM_DOCTORS_TO_EXPERIMENT = 1000;
 //	public final static int NUM_DOCS = 100;
 	public final static int NUM_SYNTHETIC_DOCTORS = 100;
 	
