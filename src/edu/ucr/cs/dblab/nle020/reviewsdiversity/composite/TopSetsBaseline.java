@@ -51,7 +51,15 @@ public class TopSetsBaseline {
 	
 	
 	
-	private static List<SentimentSet> extractTopKFromList(List<SentimentSet> sentimentSets) {
+	public static int getK() {
+		return k;
+	}
+
+	public static void setK(int k) {
+		TopSetsBaseline.k = k;
+	}
+
+	public static List<SentimentSet> extractTopKFromList(List<SentimentSet> sentimentSets) {
 		
 		Map<String, Set<SentimentSet>> posNegConceptToSentimentSets = new HashMap<String, Set<SentimentSet>>();
 		for (SentimentSet sentimentSet : sentimentSets) {

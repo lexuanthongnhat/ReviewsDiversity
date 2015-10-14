@@ -22,6 +22,8 @@
         <configuration>
           <source>1.8</source>
           <target>1.8</target>
+          <downloadSources>true</downloadSources>
+          <downloadJavadocs>true</downloadJavadocs>
         </configuration>
       </plugin>
     </plugins>
@@ -36,21 +38,6 @@
   		<groupId>org.apache.commons</groupId>
   		<artifactId>commons-csv</artifactId>
   		<version>1.2</version>
-  	</dependency>
-  	<dependency>
-  		<groupId>org.apache.poi</groupId>
-  		<artifactId>poi</artifactId>
-  		<version>3.13</version>
-  	</dependency>
-  	<dependency>
-  		<groupId>org.apache.poi</groupId>
-  		<artifactId>poi-ooxml</artifactId>
-  		<version>3.13</version>
-  	</dependency>
-  	<dependency>
-  		<groupId>org.apache.poi</groupId>
-  		<artifactId>poi-ooxml-schemas</artifactId>
-  		<version>3.13</version>
   	</dependency>
   	<dependency>
 	    <groupId>com.fasterxml.jackson.core</groupId>
@@ -86,6 +73,16 @@
 		<groupId>edu.stanford.nlp</groupId>
 		<artifactId>stanford-corenlp</artifactId>
 		<version>3.5.2</version>
+	</dependency>
+	<dependency>
+		<groupId>org.apache.poi</groupId>
+		<artifactId>poi</artifactId>
+		<version>3.13</version>
+	</dependency>
+	<dependency>
+		<groupId>org.apache.poi</groupId>
+		<artifactId>poi-ooxml</artifactId>
+		<version>3.13</version>
 	</dependency>
   </dependencies>
 </project>

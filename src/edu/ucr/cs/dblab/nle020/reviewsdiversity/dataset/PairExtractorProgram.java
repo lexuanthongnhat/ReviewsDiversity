@@ -6,10 +6,8 @@ public class PairExtractorProgram {
 		
 		PairExtractor pairExtractor = PairExtractor.getInstance();
 
-//		pairExtractor.buildDataset();
 //		pairExtractor.buildDatasetMultiThreads();		
 		
-//		pairExtractor.outputExcelFile();
 		pairExtractor.outputExcelFileMultiThread();
 //		pairExtractor.testSentimentCalculation();
 		

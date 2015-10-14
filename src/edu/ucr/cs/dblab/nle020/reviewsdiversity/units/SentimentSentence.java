@@ -1,3 +1,6 @@
+/**
+ * Nhat: should have the position (offset) in its review parent too
+ */
 package edu.ucr.cs.dblab.nle020.reviewsdiversity.units;
 
 import java.util.List;

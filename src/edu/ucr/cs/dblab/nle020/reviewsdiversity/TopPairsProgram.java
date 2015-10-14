@@ -1190,7 +1190,7 @@ public class TopPairsProgram {
 		return result;
 	}
 	
-	private static List<DoctorSentimentReview> importDoctorSentimentReviewsDataset(String path) {
+	public static List<DoctorSentimentReview> importDoctorSentimentReviewsDataset(String path) {
 		List<DoctorSentimentReview> doctorSentimentReviews = new ArrayList<DoctorSentimentReview>();
 		ObjectMapper mapper = new ObjectMapper();
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {	

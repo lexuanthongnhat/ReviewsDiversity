@@ -70,7 +70,7 @@ public class SentimentCalculator {
 		Utils.printTotalHeapSize("Heapsize AFTER importing CUIToDeweys map");
 	}
 
-	private static List<String> breakingIntoSentences(String paragraph, boolean useAdvancedMethod) {
+	public static List<String> breakingIntoSentences(String paragraph, boolean useAdvancedMethod) {
 		List<String> result = new ArrayList<String>();
 
 		String sentences = paragraph;
