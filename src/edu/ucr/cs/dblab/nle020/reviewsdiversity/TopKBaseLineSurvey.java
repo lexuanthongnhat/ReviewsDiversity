@@ -201,6 +201,14 @@ public class TopKBaseLineSurvey {
 					docToTopSentencesOurMethod.get(docId), 
 					docToTopSentencesBaseline.get(docId),
 					reviewToRichText, sentenceToRichText);
+			
+			sheet.setColumnWidth(ColumnIndex.REVIEW_ID.index, 256 * 12);
+			sheet.setColumnWidth(ColumnIndex.REVIEW_RATE.index, 256 * 12);
+			sheet.setColumnWidth(ColumnIndex.REVIEW_BODY.index, 256 * 90);
+			sheet.setColumnWidth(ColumnIndex.SENTENCE.index, 256 * 90);
+			sheet.setColumnWidth(ColumnIndex.CONCEPT_SENTIMENT.index, 256 * 30);
+			sheet.setColumnWidth(ColumnIndex.SENTENCE_ID.index, 256 * 12);
+			sheet.setColumnWidth(ColumnIndex.CHOOSE.index, 256 * 10);						
 		}
 		
 		try {
@@ -216,7 +224,7 @@ public class TopKBaseLineSurvey {
 			Map<SentimentReview, XSSFRichTextString> reviewToRichText,
 			Map<SentimentSentence, XSSFRichTextString> sentenceToRichText) {
 		
-		sheet.createFreezePane(7, 1);
+		sheet.createFreezePane(ColumnIndex.CHOOSE.index + 1, 1);
 		Row headingRow = sheet.createRow(0);
 		fillHeader(headingRow);
 				
@@ -227,13 +235,13 @@ public class TopKBaseLineSurvey {
 			int startRowId = rowId;
 			for (SentimentSentence sentence : review.getSentences()) {
 				Row row = sheet.createRow(rowId);
-				Cell cellReviewId = row.createCell(0);
-				Cell cellReviewRate = row.createCell(1);
-				Cell cellReviewBody = row.createCell(2);
-				Cell cellSentence = row.createCell(3);
-				Cell cellConceptSentiment = row.createCell(4);
-				Cell cellSentenceId = row.createCell(5);
-				Cell cellChoosing = row.createCell(6);
+				Cell cellReviewId = row.createCell(ColumnIndex.REVIEW_ID.index);
+				Cell cellReviewRate = row.createCell(ColumnIndex.REVIEW_RATE.index);
+				Cell cellReviewBody = row.createCell(ColumnIndex.REVIEW_BODY.index);
+				Cell cellSentence = row.createCell(ColumnIndex.SENTENCE.index);
+				Cell cellConceptSentiment = row.createCell(ColumnIndex.CONCEPT_SENTIMENT.index);
+				Cell cellSentenceId = row.createCell(ColumnIndex.SENTENCE_ID.index);
+				Cell cellChoosing = row.createCell(ColumnIndex.CHOOSE.index);
 
 				cellReviewId.setCellStyle(normalCs);
 				cellReviewRate.setCellStyle(normalCs);
@@ -262,9 +270,9 @@ public class TopKBaseLineSurvey {
 				++rowId;
 			}
 
-			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, 0, 0));
-			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, 1, 1));
-			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, 2, 2));
+			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, ColumnIndex.REVIEW_ID.index, ColumnIndex.REVIEW_ID.index));
+			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, ColumnIndex.REVIEW_RATE.index, ColumnIndex.REVIEW_RATE.index));
+			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, ColumnIndex.REVIEW_BODY.index, ColumnIndex.REVIEW_BODY.index));
 		}
 
 
@@ -292,13 +300,13 @@ public class TopKBaseLineSurvey {
 		
 		for (SentimentSentence sentence : topKOurMethod){
 			Row row = sheet.createRow(index);
-			Cell cellReviewId = row.createCell(0);
-			Cell cellReviewRate = row.createCell(1);
-			Cell cellReviewBody = row.createCell(2);
-			Cell cellSentence = row.createCell(3);
-			Cell cellConceptSentiment = row.createCell(4);
-			Cell cellSentenceId = row.createCell(5);
-			Cell cellChoosing = row.createCell(6);
+			Cell cellReviewId = row.createCell(ColumnIndex.REVIEW_ID.index);
+			Cell cellReviewRate = row.createCell(ColumnIndex.REVIEW_RATE.index);
+			Cell cellReviewBody = row.createCell(ColumnIndex.REVIEW_BODY.index);
+			Cell cellSentence = row.createCell(ColumnIndex.SENTENCE.index);
+			Cell cellConceptSentiment = row.createCell(ColumnIndex.CONCEPT_SENTIMENT.index);
+			Cell cellSentenceId = row.createCell(ColumnIndex.SENTENCE_ID.index);
+			Cell cellChoosing = row.createCell(ColumnIndex.CHOOSE.index);
 
 			cellReviewId.setCellStyle(normalCs);
 			cellReviewRate.setCellStyle(normalCs);
@@ -313,7 +321,7 @@ public class TopKBaseLineSurvey {
 						
 			++index;
 		}
-		sheet.addMergedRegion(new CellRangeAddress(rowId, index - 1, 2, 2));
+		sheet.addMergedRegion(new CellRangeAddress(rowId, index - 1, ColumnIndex.REVIEW_BODY.index, ColumnIndex.REVIEW_BODY.index));
 	}
 
 
@@ -500,5 +508,20 @@ public class TopKBaseLineSurvey {
 	
 	private static boolean isIgnoreCui(String cui) {
 		return ignoreCuis.contains(cui);
+	}
+	
+	private static enum ColumnIndex {
+		REVIEW_ID			(0),
+		REVIEW_RATE			(1),
+		REVIEW_BODY			(2),
+		SENTENCE			(3),
+		CONCEPT_SENTIMENT	(4),
+		SENTENCE_ID			(5),
+		CHOOSE				(6);
+		
+		private final int index;
+		ColumnIndex(int index) {
+			this.index = index;
+		}
 	}
 }
