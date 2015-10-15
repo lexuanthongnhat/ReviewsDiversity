@@ -13,14 +13,13 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import javax.xml.transform.stream.StreamSource;
-
 import org.apache.poi.hssf.util.HSSFColor;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFDataValidation;
@@ -48,9 +47,10 @@ public class TopKBaseLineSurvey {
 	private static final int K = 3;
 	private static final float THRESHOLD = 0.3f;
 	
-	private static int NUM_DOCS_TO_SURVEY = 2;
+	private static int NUM_DOCS_TO_SURVEY = 10;
 	private static int NUM_REVIEWS_PER_DOC = 6;
 	private static int THRESHOLD_ON_NUM_SENTENCE_PER_REVIEW = 30;
+	private static final int SENTENCE_COLUMN_WIDTH = 36;
 	private static XSSFWorkbook wb = new XSSFWorkbook();
 	private static Font highlightFont = wb.createFont();
 	private static Font headingFont = wb.createFont();
@@ -67,9 +67,9 @@ public class TopKBaseLineSurvey {
 		highlightFont.setUnderline((byte) 1);
 		highlightFont.setBold(true);
 		
-		headingFont.setBold(true);
+		//headingFont.setBold(true);
 		headingFont.setFontName("Calibri");
-		headingFont.setFontHeightInPoints((short) 15);
+		headingFont.setFontHeightInPoints((short) 13);
 		headingFont.setColor(IndexedColors.BLUE_GREY.index);
 	}
 	
@@ -80,15 +80,32 @@ public class TopKBaseLineSurvey {
 		Map<Integer, List<SentimentSentence>> docToSentimentSentences = convertToDocToSentimentSentences(docToSentimentReviews);
 		Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod = getKSentencesOurMethod(docToSentimentSentences);
 		Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline = getKSentencesBaseline(docToSentimentSentences);
+		Map<Integer, List<SentimentSentence>> docToTopSentences = new HashMap<Integer, List<SentimentSentence>>();
+		for (Integer docId : docToTopSentencesOurMethod.keySet()) {
+			docToTopSentences.put(docId, new ArrayList<SentimentSentence>());
+			docToTopSentences.get(docId).addAll(docToTopSentencesOurMethod.get(docId));
+			docToTopSentencesBaseline.get(docId).stream().forEach(sentence -> {
+					if (!docToTopSentences.get(docId).contains(sentence))
+						docToTopSentences.get(docId).add(sentence);
+			});
+		}
 		
-		String outputExcelPath = "D:\\survey.xlsx";
-		outputToExcel(docToSentimentReviews, docToTopSentencesOurMethod, docToTopSentencesBaseline, outputExcelPath);
+		String outputFolder = "D:\\";
+		String outputExcelPath = outputFolder + "survey.xlsx";
+		outputToExcel(docToSentimentSentences, docToTopSentences, outputExcelPath);
+		outputToJson(docToTopSentencesOurMethod, outputFolder + "our-method.txt");
+		outputToJson(docToTopSentencesBaseline, outputFolder + "baseline.txt");
 		
 		Utils.printRunningTime(startTime, "Finished outputing survey to \"" + outputExcelPath + "\"");
 	}
+	
+	private static void outputToJson(
+			Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod,
+			String outputPath) {
+		// TODO Auto-generated method stub
+		
+	}
 
-	
-	
 	private static Map<Integer, List<SentimentSentence>> convertToDocToSentimentSentences(
 			Map<Integer, List<SentimentReview>> docToSentimentReviews) {
 		Map<Integer, List<SentimentSentence>> docToSentimentSentences = new HashMap<Integer, List<SentimentSentence>>();
@@ -100,8 +117,6 @@ public class TopKBaseLineSurvey {
 		
 		return docToSentimentSentences;
 	}
-
-
 
 	private static Map<Integer, List<SentimentSentence>> getKSentencesOurMethod(Map<Integer, List<SentimentSentence>> docToSentimentSentences) {
 		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<Integer, List<SentimentSet>>();
@@ -151,64 +166,31 @@ public class TopKBaseLineSurvey {
 	}
 	
 	private static void outputToExcel(
-			Map<Integer, List<SentimentReview>> docToSentimentReviews, 
-			Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod, 
-			Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline, 
+			Map<Integer, List<SentimentSentence>> docToSentimentSentences,
+			Map<Integer, List<SentimentSentence>> docToTopSentences,			 
 			String outputExcelPath) {
 				
 		Map<SentimentSentence, XSSFRichTextString> sentenceToRichText = new HashMap<SentimentSentence, XSSFRichTextString>();
-		for (Integer reviewId : docToSentimentReviews.keySet()) {
-			for (SentimentReview review : docToSentimentReviews.get(reviewId)) {
-				for (SentimentSentence sentence : review.getSentences()) {					
-					sentenceToRichText.put(sentence, prepareColoredRichTextSentence(sentence.getSentence()));
-				}
-			}
+		for (Integer docId : docToSentimentSentences.keySet()) {
+			docToSentimentSentences.get(docId).stream().forEach( sentence ->
+				sentenceToRichText.put(sentence, prepareColoredRichTextSentence(sentence.getSentence()))
+				);
 		}
 		
 		Map<SentimentReview, Set<String>> reviewToCuis = new HashMap<SentimentReview, Set<String>>();
-		for (Integer docId : docToSentimentReviews.keySet()) {
-			for (SentimentReview review : docToSentimentReviews.get(docId)) {
-				Set<String> cuis = new HashSet<String>();
-				review.getPairs().forEach(pair -> cuis.add(pair.getCui()));
-				reviewToCuis.put(review, cuis);
-			}
-		}
 		
-		Map<SentimentReview, XSSFRichTextString> reviewToRichText = new HashMap<SentimentReview, XSSFRichTextString>();
-		for (Integer docId : docToSentimentReviews.keySet()) {
-			for (SentimentReview review : docToSentimentReviews.get(docId)) {
-				reviewToRichText.put(review, 
-						prepareColoredRichTextReview(review.getRawReview().getBody(), reviewToCuis.get(review)) );
-			}
-		}
-		
-		
-		outputToExcel(docToSentimentReviews, docToTopSentencesOurMethod, docToTopSentencesBaseline, outputExcelPath, 
-				reviewToRichText, sentenceToRichText);
+		outputToExcel(docToSentimentSentences, docToTopSentences, outputExcelPath, sentenceToRichText);
 	}
 
 	private static void outputToExcel(
-			Map<Integer, List<SentimentReview>> docToSentimentReviews,
-			Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod, 
-			Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline, 
+			Map<Integer, List<SentimentSentence>> docToSentimentSentences, 
+			Map<Integer, List<SentimentSentence>> docToTopSentences, 
 			String outputExcelPath,
-			Map<SentimentReview, XSSFRichTextString> reviewToRichText,
 			Map<SentimentSentence, XSSFRichTextString> sentenceToRichText) {
 		
-		for (Integer docId : docToSentimentReviews.keySet()) {
+		for (Integer docId : docToSentimentSentences.keySet()) {
 			XSSFSheet sheet = wb.createSheet(docId + "");
-			fillSheet(sheet, docToSentimentReviews.get(docId),
-					docToTopSentencesOurMethod.get(docId), 
-					docToTopSentencesBaseline.get(docId),
-					reviewToRichText, sentenceToRichText);
-			
-			sheet.setColumnWidth(ColumnIndex.REVIEW_ID.index, 256 * 12);
-			sheet.setColumnWidth(ColumnIndex.REVIEW_RATE.index, 256 * 12);
-			sheet.setColumnWidth(ColumnIndex.REVIEW_BODY.index, 256 * 90);
-			sheet.setColumnWidth(ColumnIndex.SENTENCE.index, 256 * 90);
-			sheet.setColumnWidth(ColumnIndex.CONCEPT_SENTIMENT.index, 256 * 30);
-			sheet.setColumnWidth(ColumnIndex.SENTENCE_ID.index, 256 * 12);
-			sheet.setColumnWidth(ColumnIndex.CHOOSE.index, 256 * 10);						
+			fillSheet(sheet, docToSentimentSentences.get(docId), docToTopSentences.get(docId), sentenceToRichText);			
 		}
 		
 		try {
@@ -219,167 +201,61 @@ public class TopKBaseLineSurvey {
 		}
 	}
 
-	private static void fillSheet(XSSFSheet sheet, List<SentimentReview> reviews,
-			List<SentimentSentence> topKOurMethod, List<SentimentSentence> topKBaseline, 
-			Map<SentimentReview, XSSFRichTextString> reviewToRichText,
+	private static void fillSheet(XSSFSheet sheet, 
+			List<SentimentSentence> sentimentSentences, 
+			List<SentimentSentence> topSentences, 
 			Map<SentimentSentence, XSSFRichTextString> sentenceToRichText) {
 		
-		sheet.createFreezePane(ColumnIndex.CHOOSE.index + 1, 1);
-		Row headingRow = sheet.createRow(0);
-		fillHeader(headingRow);
-				
-		CellStyle normalCs = sheet.getWorkbook().createCellStyle();		
-		normalCs.setWrapText(true);
-		int rowId = 1;
-		for (SentimentReview review : reviews) {
-			int startRowId = rowId;
-			for (SentimentSentence sentence : review.getSentences()) {
-				Row row = sheet.createRow(rowId);
-				Cell cellReviewId = row.createCell(ColumnIndex.REVIEW_ID.index);
-				Cell cellReviewRate = row.createCell(ColumnIndex.REVIEW_RATE.index);
-				Cell cellReviewBody = row.createCell(ColumnIndex.REVIEW_BODY.index);
-				Cell cellSentence = row.createCell(ColumnIndex.SENTENCE.index);
-				Cell cellConceptSentiment = row.createCell(ColumnIndex.CONCEPT_SENTIMENT.index);
-				Cell cellSentenceId = row.createCell(ColumnIndex.SENTENCE_ID.index);
-				Cell cellChoosing = row.createCell(ColumnIndex.CHOOSE.index);
-
-				cellReviewId.setCellStyle(normalCs);
-				cellReviewRate.setCellStyle(normalCs);
-				cellReviewBody.setCellStyle(normalCs);
-				cellSentence.setCellStyle(normalCs);
-				cellConceptSentiment.setCellStyle(normalCs);
-				cellSentenceId.setCellStyle(normalCs);
-				cellChoosing.setCellStyle(normalCs);
-
-				if (rowId == startRowId) {
-					cellReviewRate.setCellValue(review.getRawReview().getRate());
-					cellReviewId.setCellValue(review.getId());
-					cellReviewBody.setCellValue(reviewToRichText.get(review));		
-				}
-
-				cellSentence.setCellValue(sentenceToRichText.get(sentence));						
-				cellSentenceId.setCellValue(sentence.getId());
-
-				StringBuilder conceptSentimentBuilder = new StringBuilder();
-				sentence.getPairs().forEach(pair -> 
-				conceptSentimentBuilder.append("* " + pair.getName() + ":  " + pair.getSentiment() + "\n"));
-				if (conceptSentimentBuilder.length() > 0)
-					conceptSentimentBuilder.delete(conceptSentimentBuilder.length() - 2, conceptSentimentBuilder.length());
-
-				cellConceptSentiment.setCellValue(conceptSentimentBuilder.toString());
-				++rowId;
-			}
-
-			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, ColumnIndex.REVIEW_ID.index, ColumnIndex.REVIEW_ID.index));
-			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, ColumnIndex.REVIEW_RATE.index, ColumnIndex.REVIEW_RATE.index));
-			sheet.addMergedRegion(new CellRangeAddress(startRowId, rowId - 1, ColumnIndex.REVIEW_BODY.index, ColumnIndex.REVIEW_BODY.index));
+		int numColumns = topSentences.size() + 1;
+		sheet.createFreezePane(numColumns + 1, 1);
+		for (int i = 0; i < numColumns + 1; ++i){
+			sheet.setColumnWidth(i, SENTENCE_COLUMN_WIDTH * 256);
 		}
-
-
-		// Create drop-down list
-		XSSFDataValidationHelper dvHelper = new XSSFDataValidationHelper(sheet);
-		XSSFDataValidationConstraint dvConstraint = (XSSFDataValidationConstraint) dvHelper.createExplicitListConstraint(
-				new String[]{"0", "1"});
-		CellRangeAddressList addressList = new CellRangeAddressList(1, rowId - 1, 6, 6);
-		XSSFDataValidation validation = (XSSFDataValidation) dvHelper.createValidation(
-				dvConstraint, addressList);
-		validation.setShowErrorBox(true);
-		sheet.addValidationData(validation);	
 		
-		addRowsOfTopK(sheet, rowId + 2, "Our Method", topKOurMethod, sentenceToRichText);
-		addRowsOfTopK(sheet, rowId + 4 + K, "Baseline", topKBaseline, sentenceToRichText);
+		fillHeader(sheet, topSentences, sentenceToRichText);
+		fillBodyRows(sheet, sentimentSentences, sentenceToRichText);
+		
 	}
 	
-	private static void addRowsOfTopK(XSSFSheet sheet, int rowId, String methodName,
-			List<SentimentSentence> topKOurMethod,
+	private static void fillBodyRows(XSSFSheet sheet,
+			List<SentimentSentence> sentimentSentences,
 			Map<SentimentSentence, XSSFRichTextString> sentenceToRichText) {
+		
 		CellStyle normalCs = sheet.getWorkbook().createCellStyle();		
 		normalCs.setWrapText(true);
 		
-		int index = rowId;
-		
-		for (SentimentSentence sentence : topKOurMethod){
-			Row row = sheet.createRow(index);
-			Cell cellReviewId = row.createCell(ColumnIndex.REVIEW_ID.index);
-			Cell cellReviewRate = row.createCell(ColumnIndex.REVIEW_RATE.index);
-			Cell cellReviewBody = row.createCell(ColumnIndex.REVIEW_BODY.index);
-			Cell cellSentence = row.createCell(ColumnIndex.SENTENCE.index);
-			Cell cellConceptSentiment = row.createCell(ColumnIndex.CONCEPT_SENTIMENT.index);
-			Cell cellSentenceId = row.createCell(ColumnIndex.SENTENCE_ID.index);
-			Cell cellChoosing = row.createCell(ColumnIndex.CHOOSE.index);
-
-			cellReviewId.setCellStyle(normalCs);
-			cellReviewRate.setCellStyle(normalCs);
-			cellReviewBody.setCellStyle(normalCs);
+		for (int rowId = 1; rowId <= sentimentSentences.size(); ++rowId) {
+			Row row = sheet.createRow(rowId);
+			Cell cellSentence = row.createCell(0);
 			cellSentence.setCellStyle(normalCs);
-			cellConceptSentiment.setCellStyle(normalCs);
-			cellSentenceId.setCellStyle(normalCs);
-			cellChoosing.setCellStyle(normalCs);
-			
-			cellReviewBody.setCellValue(methodName);
-			cellSentence.setCellValue(sentenceToRichText.get(sentence));
-						
-			++index;
+			cellSentence.setCellValue(sentenceToRichText.get(sentimentSentences.get(rowId - 1)));
 		}
-		sheet.addMergedRegion(new CellRangeAddress(rowId, index - 1, ColumnIndex.REVIEW_BODY.index, ColumnIndex.REVIEW_BODY.index));
 	}
 
-
-
-	private static void fillHeader(Row row) {
-		CellStyle headingCs = row.getSheet().getWorkbook().createCellStyle();		
+	private static void fillHeader(
+			Sheet sheet, 
+			List<SentimentSentence> topSentences, 
+			Map<SentimentSentence, XSSFRichTextString> sentenceToRichText) {
+		
+		Row row = sheet.createRow(0);
+		
+		CellStyle headingCs = sheet.getWorkbook().createCellStyle();		
 		headingCs.setWrapText(true);
 		headingCs.setFont(headingFont);	
 		
-		Cell cellReviewId = row.createCell(0);
-		Cell cellReviewRate = row.createCell(1);
-		Cell cellReviewBody = row.createCell(2);
-		Cell cellSentence = row.createCell(3);
-		Cell cellConceptSentiment = row.createCell(4);
-		Cell cellSentenceId = row.createCell(5);
-		Cell cellChoosing = row.createCell(6);
-
-		cellReviewId.setCellValue("Review ID");
-		cellReviewRate.setCellValue("Review Rate");
-		cellReviewBody.setCellValue("Review");
-		cellSentence.setCellValue("Sentence");
-		cellConceptSentiment.setCellValue("Concept-Sentiment");
-		cellSentenceId.setCellValue("Sentence ID");
-		cellChoosing.setCellValue("Choose?");
-
-		cellReviewId.setCellStyle(headingCs);
-		cellReviewRate.setCellStyle(headingCs);
-		cellReviewBody.setCellStyle(headingCs);
+		CellStyle wrapTextCs = sheet.getWorkbook().createCellStyle();
+		wrapTextCs.setWrapText(true);
+		
+		Cell cellSentence = row.createCell(0);
+		cellSentence.setCellValue("Type \"x\" for covering sentences");
 		cellSentence.setCellStyle(headingCs);
-		cellConceptSentiment.setCellStyle(headingCs);
-		cellSentenceId.setCellStyle(headingCs);
-		cellChoosing.setCellStyle(headingCs);	
-	}
-
-	private static XSSFRichTextString prepareColoredRichTextReview(String reviewBody, Set<String> cuis) {
-		XSSFRichTextString richText = new XSSFRichTextString(reviewBody);
-		List<Ev> mappings = mmParser.getValidMappings(reviewBody);
-		for (Ev ev : mappings) {
-			try {
-				if (!cuis.contains(ev.getConceptId()))
-					continue;
-			} catch (Exception e1) {
-				e1.printStackTrace();
-			}
-			
-			List<Position> positions;
-			try {
-				positions = ev.getPositionalInfo();					
-				for (int i = 0; i < positions.size(); i++) {
-					Position pos = positions.get(i);
-				
-					richText.applyFont(pos.getX(), pos.getX() + pos.getY(), highlightFont);
-				}
-			} catch (Exception e) {					
-				e.printStackTrace();
-			}
+		
+		Cell[] cellTopSentences = new Cell[topSentences.size()];
+		for (int i = 0; i < topSentences.size(); ++i) {
+			cellTopSentences[i] = row.createCell(i + 1);
+			cellTopSentences[i].setCellStyle(wrapTextCs);
+			cellTopSentences[i].setCellValue(sentenceToRichText.get(topSentences.get(i)));
 		}
-		return richText;
 	}
 
 	private static XSSFRichTextString prepareColoredRichTextSentence(String sentence) {
@@ -508,20 +384,5 @@ public class TopKBaseLineSurvey {
 	
 	private static boolean isIgnoreCui(String cui) {
 		return ignoreCuis.contains(cui);
-	}
-	
-	private static enum ColumnIndex {
-		REVIEW_ID			(0),
-		REVIEW_RATE			(1),
-		REVIEW_BODY			(2),
-		SENTENCE			(3),
-		CONCEPT_SENTIMENT	(4),
-		SENTENCE_ID			(5),
-		CHOOSE				(6);
-		
-		private final int index;
-		ColumnIndex(int index) {
-			this.index = index;
-		}
 	}
 }
