@@ -3,8 +3,11 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.units;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.FullPair;
 
+@JsonIgnoreProperties(ignoreUnknown=true)
 public abstract class SentimentSet {
 	private String id;
 	private int benefit;

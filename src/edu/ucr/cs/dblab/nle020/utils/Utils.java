@@ -1,9 +1,18 @@
 package edu.ucr.cs.dblab.nle020.utils;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Random;
 import java.util.Set;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class Utils {
 	
@@ -32,5 +41,44 @@ public class Utils {
 		}
 		
 		return indices;
+	}
+	
+	public static <T> void writeToJson(T object, String outputPath) {
+			
+		ObjectMapper mapper = new ObjectMapper();
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath),
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+			
+			mapper.writeValue(writer, object);
+		} catch (IOException e) {
+			System.err.println("Can't write to file \"" + outputPath + "\" or error with the object");
+			System.err.println(e.getMessage());
+		} 
+	}
+	
+	public static <T> T readCollectionFromJson(String filePath, TypeReference<T> typeReference) {
+		
+		ObjectMapper mapper = new ObjectMapper();
+		try (BufferedReader reader = Files.newBufferedReader(Paths.get(filePath))) {
+			T collection = mapper.readValue(reader, typeReference);
+			
+			return collection;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+	
+	public static <T> T readValueFromJson(String filePath, Class<T> type) {
+		
+		ObjectMapper mapper = new ObjectMapper();
+		try (BufferedReader reader = Files.newBufferedReader(Paths.get(filePath))) {
+			T value = mapper.readValue(reader, type);
+
+			return value;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 }

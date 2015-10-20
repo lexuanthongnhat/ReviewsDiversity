@@ -8,8 +8,11 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 
+@JsonIgnoreProperties(ignoreUnknown=true)
 public class FullPair implements Comparable<FullPair> {
 	private String id;
 	

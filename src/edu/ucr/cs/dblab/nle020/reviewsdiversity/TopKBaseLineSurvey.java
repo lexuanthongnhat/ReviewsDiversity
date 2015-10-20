@@ -1,12 +1,17 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
 import java.io.IOException;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,14 +25,12 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.IndexedColors;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.util.CellRangeAddress;
-import org.apache.poi.ss.util.CellRangeAddressList;
-import org.apache.poi.xssf.usermodel.XSSFDataValidation;
-import org.apache.poi.xssf.usermodel.XSSFDataValidationConstraint;
-import org.apache.poi.xssf.usermodel.XSSFDataValidationHelper;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFRichTextString;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import com.fasterxml.jackson.core.type.TypeReference;
 
 import edu.ucr.cs.dblab.nle020.metamap.MetaMapParser;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetAlgorithm2;
@@ -56,7 +59,7 @@ public class TopKBaseLineSurvey {
 	private static Font headingFont = wb.createFont();
 	private static MetaMapParser mmParser = new MetaMapParser();
 	
-	private static Integer[] indices = new Integer[] {106, 109, 110, 111};
+	private static Integer[] indices = new Integer[] {106, 109, 110, 111, 120, 130, 140, 150, 160, 170};
 	// Discard "dr" concept - C0031831
 	private static Set<String> ignoreCuis = new HashSet<String>(Arrays.asList(
 			new String[]{"C0031831"}
@@ -74,6 +77,132 @@ public class TopKBaseLineSurvey {
 	}
 	
 	public static void main(String[] args) {
+		String surveyFolder = "src/main/resources/survey/topsentences/";
+		prepareSurvey(surveyFolder);
+		
+//		collectSurveys(surveyFolder);
+	}
+	
+	private static void collectSurveys(String surveyFolder) {
+		List<Path> surveys = new ArrayList<Path>();
+		
+		try {
+			Files.walkFileTree(Paths.get(surveyFolder), new SimpleFileVisitor<Path>(){
+				
+				@Override
+				public FileVisitResult visitFile(Path file,
+						BasicFileAttributes attrs) throws IOException {
+					
+					if  (file.toString().endsWith(".xlsx"))
+						surveys.add(file);
+					return FileVisitResult.CONTINUE;
+				}
+			});
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod = Utils.readCollectionFromJson(surveyFolder + "our-method.txt", 
+				new TypeReference<Map<Integer, List<SentimentSentence>>>() {});	
+		Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline = Utils.readCollectionFromJson(surveyFolder + "baseline.txt", 
+				new TypeReference<Map<Integer, List<SentimentSentence>>>() {});	
+		
+		
+		Map<Integer, List<Double>> docToCoveragesOurMethod = new HashMap<Integer, List<Double>>();
+		Map<Integer, List<Double>> docToCoveragesBaseline = new HashMap<Integer, List<Double>>();
+		surveys.stream().forEach(file -> collectSurvey(file, 
+				docToTopSentencesOurMethod,
+				docToTopSentencesBaseline,
+				docToCoveragesOurMethod,
+				docToCoveragesBaseline));
+		
+		System.out.println();
+	}
+	
+	private static void collectSurvey(Path file,
+			Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod,
+			Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline,
+			Map<Integer, List<Double>> docToCoveragesOurMethod,
+			Map<Integer, List<Double>> docToCoveragesBaseline) {
+		
+		try {
+			Workbook wb = new XSSFWorkbook(file.toString());
+			
+			Iterator<Sheet> sheetIterator = wb.iterator();
+			while (sheetIterator.hasNext()) {
+				Sheet sheet = sheetIterator.next(); 
+				Integer docId = Integer.parseInt(sheet.getSheetName());
+								
+				if (!docToTopSentencesBaseline.containsKey(docId))
+					System.err.println("This docId doesn't exist in survey dataset???");		
+				
+				List<Integer> cellIndicesOurMethod = new ArrayList<Integer>();
+				List<Integer> cellIndicesBaseline = new ArrayList<Integer>();
+				
+				Row row = sheet.getRow(0); 
+				
+				for (int i = row.getFirstCellNum() + 1; i < row.getLastCellNum(); ++i) {
+					String cellString = row.getCell(i).getStringCellValue();
+						if (containSentence(docToTopSentencesOurMethod.get(docId), cellString))
+							cellIndicesOurMethod.add(i);
+						
+						if (containSentence(docToTopSentencesBaseline.get(docId), cellString))
+							cellIndicesBaseline.add(i);
+				}
+				
+				int count = 0;
+				int countOurMethod = 0;
+				int countBaseline = 0;
+				
+				for (int rowIndex = sheet.getFirstRowNum() + 1; rowIndex < sheet.getLastRowNum(); ++rowIndex) {
+					row = sheet.getRow(rowIndex);
+					boolean coveredByOurMethod = false;
+					boolean coveredBaseline = false;
+					
+					for (int cellIndex = row.getFirstCellNum() + 1; cellIndex < row.getLastCellNum(); ++cellIndex) {
+						String cellString = row.getCell(cellIndex).getStringCellValue();
+												
+						if (cellString.equalsIgnoreCase("x")) {
+							if (cellIndicesOurMethod.contains(cellIndex))
+								coveredByOurMethod = true;
+							if (cellIndicesBaseline.contains(cellIndex))
+								coveredBaseline = true;
+						}
+					}
+					
+					if (coveredByOurMethod)
+						++countOurMethod;
+					if (coveredBaseline)
+						++countBaseline;
+					++count;
+				}
+				
+				if (count != 0) {
+					if (!docToCoveragesOurMethod.containsKey(docId))
+						docToCoveragesOurMethod.put(docId, new ArrayList<Double>());
+					docToCoveragesOurMethod.get(docId).add((double) countOurMethod / (double) count);
+					
+					if (!docToCoveragesBaseline.containsKey(docId))
+						docToCoveragesBaseline.put(docId, new ArrayList<Double>());
+					docToCoveragesBaseline.get(docId).add((double) countBaseline / (double) count);
+				}
+			}
+			
+			wb.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private static boolean containSentence(List<SentimentSentence> sentences, String sentenceString) {
+		Set<String> sentenceBodies = new HashSet<String>();
+		sentences.stream().forEach(sentence -> sentenceBodies.add(sentence.getSentence()));
+		
+		return sentenceBodies.contains(sentenceString);
+	}
+	
+	@SuppressWarnings("unused")
+	private static void prepareSurvey(String surveyFolder) {
 		long startTime = System.currentTimeMillis();
 		Map<Integer, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews();
 				
@@ -90,22 +219,15 @@ public class TopKBaseLineSurvey {
 			});
 		}
 		
-		String outputFolder = "D:\\";
-		String outputExcelPath = outputFolder + "survey.xlsx";
+
+		String outputExcelPath = surveyFolder + "survey.xlsx";
 		outputToExcel(docToSentimentSentences, docToTopSentences, outputExcelPath);
-		outputToJson(docToTopSentencesOurMethod, outputFolder + "our-method.txt");
-		outputToJson(docToTopSentencesBaseline, outputFolder + "baseline.txt");
+		Utils.writeToJson(docToTopSentencesOurMethod, surveyFolder + "our-method.txt");
+		Utils.writeToJson(docToTopSentencesBaseline, surveyFolder + "baseline.txt");
 		
 		Utils.printRunningTime(startTime, "Finished outputing survey to \"" + outputExcelPath + "\"");
 	}
-	
-	private static void outputToJson(
-			Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod,
-			String outputPath) {
-		// TODO Auto-generated method stub
 		
-	}
-
 	private static Map<Integer, List<SentimentSentence>> convertToDocToSentimentSentences(
 			Map<Integer, List<SentimentReview>> docToSentimentReviews) {
 		Map<Integer, List<SentimentSentence>> docToSentimentSentences = new HashMap<Integer, List<SentimentSentence>>();
@@ -138,7 +260,10 @@ public class TopKBaseLineSurvey {
 		
 		for (Integer docId : docToTopKSets.keySet()) {
 			List<SentimentSentence> sentences = new ArrayList<SentimentSentence>();
-			docToTopKSets.get(docId).stream().forEach(set -> sentences.add((SentimentSentence) set));
+			docToTopKSets.get(docId).stream().forEach(set -> {
+				set.setFullPairs(new ArrayList<FullPair>());  			// To avoid error when writing to Json (recursive FullPair)
+				sentences.add((SentimentSentence) set);
+			});
 			docToTopKSentences.put(docId, sentences);
 		}		
 		
@@ -158,7 +283,10 @@ public class TopKBaseLineSurvey {
 		for (Integer docId : docToSentimentSets.keySet()) {
 			List<SentimentSet> sets = TopSetsBaseline.extractTopKFromList(docToSentimentSets.get(docId));
 			List<SentimentSentence> sentences = new ArrayList<SentimentSentence>();
-			sets.stream().forEach(set -> sentences.add((SentimentSentence) set));
+			sets.stream().forEach(set -> {
+				set.setFullPairs(new ArrayList<FullPair>());  			// To avoid error when writing to Json (recursive FullPair)
+				sentences.add((SentimentSentence) set);
+			});
 			docToTopKSentences.put(docId, sentences);
 		}
 		
@@ -176,9 +304,7 @@ public class TopKBaseLineSurvey {
 				sentenceToRichText.put(sentence, prepareColoredRichTextSentence(sentence.getSentence()))
 				);
 		}
-		
-		Map<SentimentReview, Set<String>> reviewToCuis = new HashMap<SentimentReview, Set<String>>();
-		
+	
 		outputToExcel(docToSentimentSentences, docToTopSentences, outputExcelPath, sentenceToRichText);
 	}
 
