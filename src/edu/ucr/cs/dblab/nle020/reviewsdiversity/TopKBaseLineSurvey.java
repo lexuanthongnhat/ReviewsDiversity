@@ -50,7 +50,7 @@ public class TopKBaseLineSurvey {
 	private static final int K = 3;
 	private static final float THRESHOLD = 0.3f;
 	
-	private static int NUM_DOCS_TO_SURVEY = 10;
+	private static int NUM_DOCS_TO_SURVEY = 20;
 	private static int NUM_REVIEWS_PER_DOC = 6;
 	private static int THRESHOLD_ON_NUM_SENTENCE_PER_REVIEW = 30;
 	private static final int SENTENCE_COLUMN_WIDTH = 36;
@@ -59,7 +59,8 @@ public class TopKBaseLineSurvey {
 	private static Font headingFont = wb.createFont();
 	private static MetaMapParser mmParser = new MetaMapParser();
 	
-	private static Integer[] indices = new Integer[] {106, 109, 110, 111, 120, 130, 140, 150, 160, 170};
+	//private static Integer[] indices = new Integer[] {106, 109, 110, 111, 120, 130, 140, 150, 160, 170};
+	private static Set<Integer> indices = Utils.randomIndices(1000, NUM_DOCS_TO_SURVEY);
 	// Discard "dr" concept - C0031831
 	private static Set<String> ignoreCuis = new HashSet<String>(Arrays.asList(
 			new String[]{"C0031831"}
@@ -211,23 +212,42 @@ public class TopKBaseLineSurvey {
 		Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline = getKSentencesBaseline(docToSentimentSentences);
 		Map<Integer, List<SentimentSentence>> docToTopSentences = new HashMap<Integer, List<SentimentSentence>>();
 		for (Integer docId : docToTopSentencesOurMethod.keySet()) {
-			docToTopSentences.put(docId, new ArrayList<SentimentSentence>());
-			docToTopSentences.get(docId).addAll(docToTopSentencesOurMethod.get(docId));
-			docToTopSentencesBaseline.get(docId).stream().forEach(sentence -> {
-					if (!docToTopSentences.get(docId).contains(sentence))
-						docToTopSentences.get(docId).add(sentence);
-			});
+			docToTopSentences.put(docId, reorderTopSentences(docToTopSentencesOurMethod.get(docId), docToTopSentencesBaseline.get(docId)));
 		}
 		
 
 		String outputExcelPath = surveyFolder + "survey.xlsx";
 		outputToExcel(docToSentimentSentences, docToTopSentences, outputExcelPath);
-		Utils.writeToJson(docToTopSentencesOurMethod, surveyFolder + "our-method.txt");
-		Utils.writeToJson(docToTopSentencesBaseline, surveyFolder + "baseline.txt");
+//		Utils.writeToJson(docToTopSentencesOurMethod, surveyFolder + "our-method.txt");
+//		Utils.writeToJson(docToTopSentencesBaseline, surveyFolder + "baseline.txt");
 		
 		Utils.printRunningTime(startTime, "Finished outputing survey to \"" + outputExcelPath + "\"");
 	}
 		
+	// our method sentences only first, then shared sentences of our method and baseline, end by baseline only
+	private static List<SentimentSentence> reorderTopSentences(
+			List<SentimentSentence> ourMethodSentences, List<SentimentSentence> baselineSentences) {
+		List<SentimentSentence> reorderedSentences = new ArrayList<SentimentSentence>();
+		
+		ourMethodSentences.stream().forEach(sentence -> {		
+				if (!baselineSentences.contains(sentence))
+					reorderedSentences.add(sentence);
+				});
+		ourMethodSentences.stream().forEach(sentence -> {		
+			if (baselineSentences.contains(sentence))
+				reorderedSentences.add(sentence);
+			});
+		
+		baselineSentences.stream().forEach(sentence -> {		
+			if (!ourMethodSentences.contains(sentence))
+				reorderedSentences.add(sentence);
+			});
+		if (reorderedSentences.size() > 2 * K)
+			System.err.println("Wrong reorder of top sentences");
+		
+		return reorderedSentences;
+	}
+
 	private static Map<Integer, List<SentimentSentence>> convertToDocToSentimentSentences(
 			Map<Integer, List<SentimentReview>> docToSentimentReviews) {
 		Map<Integer, List<SentimentSentence>> docToSentimentSentences = new HashMap<Integer, List<SentimentSentence>>();
