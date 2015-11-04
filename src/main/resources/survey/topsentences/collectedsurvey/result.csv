@@ -1,0 +1,20 @@
+docId, #sentences, our method (1), baseline (1), diff (1), 
+784091, 13, 8, 5, 3, 
+303476, 7, 7, 5, 2, 
+1088737, 19, 11, 10, 1, 
+796942, 19, 9, 6, 3, 
+1052723, 9, 4, 5, -1, 
+250230, 17, 6, 6, 0, 
+378031, 30, 10, 6, 4, 
+149560, 8, 5, 5, 0, 
+1106190, 18, 7, 5, 2, 
+893234, 12, 5, 5, 0, 
+
+Summary ('equal' when different = 0)
+participants, our method is better, equal, worse
+participant (0), 6, 3, 1
+
+Summary ('equal' when different = 1)
+participants, our method is better, equal, worse
+participant (0), 5, 5, 0
+

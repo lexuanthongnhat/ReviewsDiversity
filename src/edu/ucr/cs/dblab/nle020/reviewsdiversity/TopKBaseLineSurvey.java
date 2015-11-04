@@ -1,11 +1,13 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -79,9 +81,9 @@ public class TopKBaseLineSurvey {
 	
 	public static void main(String[] args) {
 		String surveyFolder = "src/main/resources/survey/topsentences/";
-		prepareSurvey(surveyFolder);
+//		prepareSurvey(surveyFolder);
 		
-//		collectSurveys(surveyFolder);
+		collectSurveys(surveyFolder + "collectedsurvey/");
 	}
 	
 	private static void collectSurveys(String surveyFolder) {
@@ -102,59 +104,116 @@ public class TopKBaseLineSurvey {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
-		Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod = Utils.readCollectionFromJson(surveyFolder + "our-method.txt", 
-				new TypeReference<Map<Integer, List<SentimentSentence>>>() {});	
-		Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline = Utils.readCollectionFromJson(surveyFolder + "baseline.txt", 
-				new TypeReference<Map<Integer, List<SentimentSentence>>>() {});	
-		
-		
-		Map<Integer, List<Double>> docToCoveragesOurMethod = new HashMap<Integer, List<Double>>();
-		Map<Integer, List<Double>> docToCoveragesBaseline = new HashMap<Integer, List<Double>>();
+					
+		Map<Integer, List<Integer>> docToCoveragesOurMethod = new HashMap<Integer, List<Integer>>();
+		Map<Integer, List<Integer>> docToCoveragesBaseline = new HashMap<Integer, List<Integer>>();
+		Map<Integer, Integer> docToRowUnitNum = new HashMap<Integer, Integer>();
 		surveys.stream().forEach(file -> collectSurvey(file, 
-				docToTopSentencesOurMethod,
-				docToTopSentencesBaseline,
 				docToCoveragesOurMethod,
-				docToCoveragesBaseline));
+				docToCoveragesBaseline,
+				docToRowUnitNum));
 		
-		System.out.println();
+		surveyStatistics(docToRowUnitNum, docToCoveragesOurMethod, docToCoveragesBaseline, surveyFolder + "result.csv");
 	}
 	
+	private static void surveyStatistics(
+			Map<Integer, Integer> docToRowUnitNum,
+			Map<Integer, List<Integer>> docToCoveragesOurMethod, 
+			Map<Integer, List<Integer>> docToCoveragesBaseline,
+			String outputPath) {
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+			
+			int numParticipants = 0;
+			Map<Integer, List<Integer>> docToDiffs = new HashMap<Integer, List<Integer>>();
+			
+			for (Integer docId : docToCoveragesBaseline.keySet()){
+				numParticipants = docToCoveragesBaseline.get(docId).size();
+				break;
+			}
+			
+			// heading line
+			writer.write("docId, #sentences, ");
+			for (int i = 0; i < numParticipants; ++i)
+				writer.write("our method (" + (i + 1) + "), baseline (" + (i + 1) + "), diff (" + (i + 1) + "), ");
+			writer.newLine();
+			
+			// real data
+			for (Integer docId : docToRowUnitNum.keySet()) {
+				writer.write(docId + ", " + docToRowUnitNum.get(docId) + ", ");
+				
+				List<Integer> ourMethod = docToCoveragesOurMethod.get(docId);
+				List<Integer> baseline = docToCoveragesBaseline.get(docId);
+				if (!docToDiffs.containsKey(docId))
+					docToDiffs.put(docId, new ArrayList<Integer>());
+				
+				for (int i = 0; i < numParticipants; ++i) {
+					int diff = ourMethod.get(i) - baseline.get(i);
+					docToDiffs.get(docId).add(diff);
+					writer.write(ourMethod.get(i) + ", " + baseline.get(i) + ", " + diff + ", ");
+				}
+				writer.newLine();
+			}
+			writer.newLine();
+			
+			// summary
+			summarize(writer, numParticipants, docToDiffs, 0);
+			summarize(writer, numParticipants, docToDiffs, 1);
+			
+			writer.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		System.out.println("Find the result in \"" + outputPath + "\"");
+	}
+
+	private static void summarize(BufferedWriter writer, int numParticipants, Map<Integer, List<Integer>> docToDiffs,
+			int differenceToBeConsideredAsEqual)
+			throws IOException {
+		writer.write("Summary ('equal' when difference = " + differenceToBeConsideredAsEqual + ")"); writer.newLine();			
+		
+		writer.write("participants, our method is better, equal, worse"); writer.newLine();
+		for (int i = 0; i < numParticipants; ++i) {
+			writer.write("participant (" + i + "), ");
+		
+			int numBetter = 0, numEqual = 0, numWorse = 0;
+			for (List<Integer> diffs : docToDiffs.values()) {
+				if (diffs.get(i) > differenceToBeConsideredAsEqual)
+					++numBetter;
+				else if (Math.abs(diffs.get(i)) <= differenceToBeConsideredAsEqual)
+					++numEqual;
+				else 
+					++numWorse;
+			}
+			writer.write(numBetter + ", " + numEqual + ", " + numWorse); writer.newLine();
+		}
+		writer.newLine();
+	}
+
 	private static void collectSurvey(Path file,
-			Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod,
-			Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline,
-			Map<Integer, List<Double>> docToCoveragesOurMethod,
-			Map<Integer, List<Double>> docToCoveragesBaseline) {
+			Map<Integer, List<Integer>> docToCoveragesOurMethod,
+			Map<Integer, List<Integer>> docToCoveragesBaseline,
+			Map<Integer, Integer> docToRowUnitNum) {
 		
 		try {
-			Workbook wb = new XSSFWorkbook(file.toString());
-			
+			Workbook wb = new XSSFWorkbook(file.toString());			
 			Iterator<Sheet> sheetIterator = wb.iterator();
 			while (sheetIterator.hasNext()) {
 				Sheet sheet = sheetIterator.next(); 
 				Integer docId = Integer.parseInt(sheet.getSheetName());
-								
-				if (!docToTopSentencesBaseline.containsKey(docId))
-					System.err.println("This docId doesn't exist in survey dataset???");		
-				
+											
 				List<Integer> cellIndicesOurMethod = new ArrayList<Integer>();
 				List<Integer> cellIndicesBaseline = new ArrayList<Integer>();
 				
-				Row row = sheet.getRow(0); 
-				
-				for (int i = row.getFirstCellNum() + 1; i < row.getLastCellNum(); ++i) {
-					String cellString = row.getCell(i).getStringCellValue();
-						if (containSentence(docToTopSentencesOurMethod.get(docId), cellString))
-							cellIndicesOurMethod.add(i);
-						
-						if (containSentence(docToTopSentencesBaseline.get(docId), cellString))
-							cellIndicesBaseline.add(i);
-				}
+				Row row = sheet.getRow(0);				
+				for (int i = row.getFirstCellNum() + 1; i < row.getFirstCellNum() + 4; ++i)			
+					cellIndicesOurMethod.add(i);					
+				for (int i = row.getLastCellNum() - 3; i < row.getLastCellNum(); ++i)	
+					cellIndicesBaseline.add(i);				
 				
 				int count = 0;
 				int countOurMethod = 0;
-				int countBaseline = 0;
-				
+				int countBaseline = 0;				
 				for (int rowIndex = sheet.getFirstRowNum() + 1; rowIndex < sheet.getLastRowNum(); ++rowIndex) {
 					row = sheet.getRow(rowIndex);
 					boolean coveredByOurMethod = false;
@@ -179,13 +238,14 @@ public class TopKBaseLineSurvey {
 				}
 				
 				if (count != 0) {
-					if (!docToCoveragesOurMethod.containsKey(docId))
-						docToCoveragesOurMethod.put(docId, new ArrayList<Double>());
-					docToCoveragesOurMethod.get(docId).add((double) countOurMethod / (double) count);
+					if (!docToRowUnitNum.containsKey(docId)) {
+						docToRowUnitNum.put(docId, count);
+						docToCoveragesOurMethod.put(docId, new ArrayList<Integer>());
+						docToCoveragesBaseline.put(docId, new ArrayList<Integer>());
+					} 
 					
-					if (!docToCoveragesBaseline.containsKey(docId))
-						docToCoveragesBaseline.put(docId, new ArrayList<Double>());
-					docToCoveragesBaseline.get(docId).add((double) countBaseline / (double) count);
+					docToCoveragesOurMethod.get(docId).add(countOurMethod);					
+					docToCoveragesBaseline.get(docId).add(countBaseline);								
 				}
 			}
 			
@@ -193,13 +253,6 @@ public class TopKBaseLineSurvey {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-
-	private static boolean containSentence(List<SentimentSentence> sentences, String sentenceString) {
-		Set<String> sentenceBodies = new HashSet<String>();
-		sentences.stream().forEach(sentence -> sentenceBodies.add(sentence.getSentence()));
-		
-		return sentenceBodies.contains(sentenceString);
 	}
 	
 	@SuppressWarnings("unused")
