@@ -113,7 +113,7 @@ public class TopKBaseLineSurvey {
 				docToCoveragesBaseline,
 				docToRowUnitNum));
 		
-		surveyStatistics(docToRowUnitNum, docToCoveragesOurMethod, docToCoveragesBaseline, surveyFolder + "result.csv");
+		surveyStatistics(docToRowUnitNum, docToCoveragesOurMethod, docToCoveragesBaseline, surveyFolder + "survey-result.csv");
 	}
 	
 	private static void surveyStatistics(
@@ -220,7 +220,9 @@ public class TopKBaseLineSurvey {
 					boolean coveredBaseline = false;
 					
 					for (int cellIndex = row.getFirstCellNum() + 1; cellIndex < row.getLastCellNum(); ++cellIndex) {
-						String cellString = row.getCell(cellIndex).getStringCellValue();
+						String cellString = "";
+						if (row.getCell(cellIndex) != null)
+							cellString = row.getCell(cellIndex).getStringCellValue();
 												
 						if (cellString.equalsIgnoreCase("x")) {
 							if (cellIndicesOurMethod.contains(cellIndex))
