@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 
 import org.apache.poi.hssf.util.HSSFColor;
 import org.apache.poi.ss.usermodel.Cell;
@@ -114,51 +115,41 @@ public class TopKBaseLineSurvey {
 				docToRowUnitNum));
 		
 		surveyStatistics(docToRowUnitNum, docToCoveragesOurMethod, docToCoveragesBaseline, surveyFolder + "survey-result.csv");
+		surveySummary(docToRowUnitNum, docToCoveragesOurMethod, docToCoveragesBaseline, surveyFolder + "survey-summary.csv");
 	}
 	
 	private static void surveyStatistics(
 			Map<Integer, Integer> docToRowUnitNum,
 			Map<Integer, List<Integer>> docToCoveragesOurMethod, 
 			Map<Integer, List<Integer>> docToCoveragesBaseline,
-			String outputPath) {
+			String outputPath) {		
+		
+		Map<Integer, Double> docToAverageOurMethod = new HashMap<Integer, Double>(); 
+		Map<Integer, Double> docToAverageBaseline  = new HashMap<Integer, Double>();
+		
+		
+		for (Integer docId : docToRowUnitNum.keySet()) {
+			double averageOurMethod = docToCoveragesOurMethod.get(docId).stream()
+					.collect(Collectors.averagingDouble(coverage -> (double) coverage));
+			double averageBaseline = docToCoveragesBaseline.get(docId).stream()
+					.collect(Collectors.averagingDouble(coverage -> (double) coverage));
+			docToAverageOurMethod.put(docId, averageOurMethod);
+			docToAverageBaseline.put(docId, averageBaseline);			
+			
+
+		}
+		
 		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
 				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-			
-			int numParticipants = 0;
-			Map<Integer, List<Integer>> docToDiffs = new HashMap<Integer, List<Integer>>();
-			
-			for (Integer docId : docToCoveragesBaseline.keySet()){
-				numParticipants = docToCoveragesBaseline.get(docId).size();
-				break;
-			}
-			
-			// heading line
-			writer.write("docId, #sentences, ");
-			for (int i = 0; i < numParticipants; ++i)
-				writer.write("our method (" + (i + 1) + "), baseline (" + (i + 1) + "), diff (" + (i + 1) + "), ");
+
+			writer.write("docId, #sentences, our method, baseline"); 
 			writer.newLine();
 			
-			// real data
 			for (Integer docId : docToRowUnitNum.keySet()) {
-				writer.write(docId + ", " + docToRowUnitNum.get(docId) + ", ");
-				
-				List<Integer> ourMethod = docToCoveragesOurMethod.get(docId);
-				List<Integer> baseline = docToCoveragesBaseline.get(docId);
-				if (!docToDiffs.containsKey(docId))
-					docToDiffs.put(docId, new ArrayList<Integer>());
-				
-				for (int i = 0; i < numParticipants; ++i) {
-					int diff = ourMethod.get(i) - baseline.get(i);
-					docToDiffs.get(docId).add(diff);
-					writer.write(ourMethod.get(i) + ", " + baseline.get(i) + ", " + diff + ", ");
-				}
+				writer.write(docId + ", " + docToRowUnitNum.get(docId) + ", " 
+						+ docToAverageOurMethod.get(docId) + ", " + docToAverageBaseline.get(docId));
 				writer.newLine();
 			}
-			writer.newLine();
-			
-			// summary
-			summarize(writer, numParticipants, docToDiffs, 0);
-			summarize(writer, numParticipants, docToDiffs, 1);
 			
 			writer.flush();
 		} catch (IOException e) {
@@ -167,27 +158,54 @@ public class TopKBaseLineSurvey {
 		System.out.println("Find the result in \"" + outputPath + "\"");
 	}
 
-	private static void summarize(BufferedWriter writer, int numParticipants, Map<Integer, List<Integer>> docToDiffs,
-			int differenceToBeConsideredAsEqual)
-			throws IOException {
-		writer.write("Summary ('equal' when difference = " + differenceToBeConsideredAsEqual + ")"); writer.newLine();			
+	private static void surveySummary(Map<Integer, Integer> docToRowUnitNum,
+			Map<Integer, List<Integer>> docToCoveragesOurMethod,
+			Map<Integer, List<Integer>> docToCoveragesBaseline, String outputPath) {
 		
-		writer.write("participants, our method is better, equal, worse"); writer.newLine();
-		for (int i = 0; i < numParticipants; ++i) {
-			writer.write("participant (" + i + "), ");
-		
-			int numBetter = 0, numEqual = 0, numWorse = 0;
-			for (List<Integer> diffs : docToDiffs.values()) {
-				if (diffs.get(i) > differenceToBeConsideredAsEqual)
-					++numBetter;
-				else if (Math.abs(diffs.get(i)) <= differenceToBeConsideredAsEqual)
-					++numEqual;
-				else 
-					++numWorse;
-			}
-			writer.write(numBetter + ", " + numEqual + ", " + numWorse); writer.newLine();
+		Map<Integer, List<Integer>> docToDiffs = new HashMap<Integer, List<Integer>>();
+		int numParticipants = 0;			
+		for (Integer docId : docToCoveragesBaseline.keySet()){
+			numParticipants = docToCoveragesBaseline.get(docId).size();
+			break;
 		}
-		writer.newLine();
+		
+		for (Integer docId : docToRowUnitNum.keySet()) {			
+			List<Integer> ourMethod = docToCoveragesOurMethod.get(docId);
+			List<Integer> baseline = docToCoveragesBaseline.get(docId);
+			if (!docToDiffs.containsKey(docId))
+				docToDiffs.put(docId, new ArrayList<Integer>());
+			for (int i = 0; i < numParticipants; ++i) {
+				int diff = ourMethod.get(i) - baseline.get(i);
+				docToDiffs.get(docId).add(diff);
+			}
+		}
+		
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+			writer.write("Summary"); 
+			writer.newLine();			
+			
+			writer.write("participants, our method is better, equal, worse"); writer.newLine();
+			for (int i = 0; i < numParticipants; ++i) {
+				writer.write("participant (" + i + "), ");
+			
+				int numBetter = 0, numEqual = 0, numWorse = 0;
+				for (List<Integer> diffs : docToDiffs.values()) {
+					if (diffs.get(i) > 0)
+						++numBetter;
+					else if (diffs.get(i) == 0)
+						++numEqual;
+					else 
+						++numWorse;
+				}
+				writer.write(numBetter + ", " + numEqual + ", " + numWorse); writer.newLine();
+			}
+			writer.newLine();			
+			writer.flush();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		System.out.println("Find the survey summary in \"" + outputPath + "\"");
 	}
 
 	private static void collectSurvey(Path file,
