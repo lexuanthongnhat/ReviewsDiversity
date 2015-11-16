@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -40,6 +42,9 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.ILPSetAlgorithm2;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.RandomizedRoundingSet1;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.RandomizedRoundingSet2;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.DoctorSentimentReview;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.PairExtractor;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.RawReview;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.SentimentCalculator;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
@@ -60,14 +65,6 @@ public class TopPairsProgram {
 	public final static String DOC_TO_REVIEWS_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned_vector.txt";
 	//public final static String OUTPUT_FOLDER = "D:\\UCR Google Drive\\GD - Review Diversity\\Experiment Output\\";
 	public final static String OUTPUT_FOLDER = "D:\\Experiments\\";
-	private final static String DESKTOP_FOLDER;
-	
-	static {
-		if (Files.isDirectory(Paths.get("C:\\Users\\Thong Nhat\\Desktop")))
-			DESKTOP_FOLDER = "C:\\Users\\Thong Nhat\\Desktop\\";
-		 else 
-			DESKTOP_FOLDER = "C:\\Users\\Nhat XT Le\\Desktop\\";
-	}
 	
 	private enum Algorithm 		{GREEDY, ILP, RANDOMIZED_ROUDNING};
 	private enum SetAlgorithm 	{GREEDY_SET, ILP_SET, RANDOMIZED_ROUNDING_SET};
@@ -75,12 +72,93 @@ public class TopPairsProgram {
 	
 	public static void main(String[] args) throws InterruptedException, ExecutionException {
 		long startTime = System.currentTimeMillis();
-		topPairsExperiment();
+		getDatasetStatistics();
+//		topPairsExperiment();
 //		topPairsSyntheticExperiment();
 			
-		topSetsExperiment(SetOption.REVIEW);
-		topSetsExperiment(SetOption.SENTENCE);
+//		topSetsExperiment(SetOption.REVIEW);
+//		topSetsExperiment(SetOption.SENTENCE);
 		Utils.printRunningTime(startTime, "Finished evaluation");
+	}
+	
+	public static void getDatasetStatistics() {
+		String outputPath = "src/main/resources/dataset-statistics.txt";
+		String output = "";
+				
+		Map<Integer, List<SentimentSet>> docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, false);
+		List<Integer> counts = new ArrayList<Integer>();
+		for (List<SentimentSet> reviews : docToSentimentSets.values()) 
+			counts.add(reviews.size());
+		output = output + updateStatistics(counts, "#reviews");
+		
+		docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH, false);
+		counts = new ArrayList<Integer>();
+		for (List<SentimentSet> sentences : docToSentimentSets.values()) 
+			counts.add(sentences.size());
+		output = output + updateStatistics(counts, "#sentences");
+		docToSentimentSets = null;
+		
+		Map<Integer, List<ConceptSentimentPair>> docToPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, false);
+		counts = new ArrayList<Integer>();
+		for (List<ConceptSentimentPair> pairs : docToPairs.values()) 
+			counts.add(pairs.size());
+		output = output + updateStatistics(counts, "#pairs");
+		docToPairs = null;
+		
+		// Raw data
+		List<RawReview> rawReviews = PairExtractor.getReviews(Constants.REVIEWS_PATH);
+		Map<Integer, List<RawReview>> docToRawReviews = new HashMap<Integer, List<RawReview>>();
+		for (RawReview rawReview : rawReviews) {
+			if (!docToRawReviews.containsKey(rawReview.getDocID()))
+				docToRawReviews.put(rawReview.getDocID(), new ArrayList<RawReview>());
+			docToRawReviews.get(rawReview.getDocID()).add(rawReview);
+		}
+		counts = new ArrayList<Integer>();
+		for (List<RawReview> reviews : docToRawReviews.values()) 
+			counts.add(reviews.size());
+		output = output + updateStatistics(counts, "#raw reviews");
+		
+		Map<RawReview, Integer> rawReviewToSentenceCount = new HashMap<RawReview, Integer>();
+		for (RawReview rawReview : rawReviews) {
+			int sentenceCount = SentimentCalculator.breakingIntoSentences(rawReview.getBody(), true).size();
+			rawReviewToSentenceCount.put(rawReview, sentenceCount);
+		}
+		counts = new ArrayList<Integer>();
+		for (RawReview rawReview : rawReviews) 
+			counts.add(rawReviewToSentenceCount.get(rawReview));
+		output = output + updateStatistics(counts, "#raw setences/raw review");
+		
+		Map<Integer, Integer> docToSentenceCount = new HashMap<Integer, Integer>();
+		for (RawReview rawReview : rawReviews) {
+			int docId = rawReview.getDocID();
+			if (!docToSentenceCount.containsKey(docId))
+				docToSentenceCount.put(docId, 0);
+			docToSentenceCount.put(docId, docToSentenceCount.get(docId) + rawReviewToSentenceCount.get(rawReview));
+		}
+		counts = new ArrayList<Integer>();
+		counts.addAll(docToSentenceCount.values());
+		output = output + updateStatistics(counts, "#raw sentences");
+		
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+			writer.write(output);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("Find the output at \"" + outputPath + "\"");
+	}
+	
+	public static String updateStatistics(List<Integer> counts, String heading) {
+		double min = 0;
+		double max = 0;
+		double average = 0;
+		
+		average = counts.stream().collect(Collectors.averagingDouble(count -> (double) count));
+		Collections.sort(counts);
+		min = counts.get(0);
+		max = counts.get(counts.size() - 1);
+		return heading + ": min " + min + ", max " + max + ", average " + average + "\n";		
 	}
 
 	@SuppressWarnings("unused")
@@ -207,7 +285,7 @@ public class TopPairsProgram {
 
 //		printInitialization(docToConceptSentimentPairs);
 		
-		String outputPrefix = DESKTOP_FOLDER + "top_pairs_synthetic_result_" + Constants.NUM_DOCTORS_TO_EXPERIMENT;
+		String outputPrefix = OUTPUT_FOLDER + "top_pairs_synthetic_result_" + Constants.NUM_DOCTORS_TO_EXPERIMENT;
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToTopPairsResultILP);
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToTopPairsResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);
@@ -224,7 +302,7 @@ public class TopPairsProgram {
  * 				docToTopPairsResultRR, docToTopKPairsResultRR);
 		outputResultToJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);*/
 		
-		String outputPath = DESKTOP_FOLDER + "review_diversity_synthetic_k" + k + "_threshold" + threshold 
+		String outputPath = OUTPUT_FOLDER + "review_diversity_synthetic_k" + k + "_threshold" + threshold 
 				+ "_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
 		outputStatisticalResultToExcel(outputPath, isSet, 

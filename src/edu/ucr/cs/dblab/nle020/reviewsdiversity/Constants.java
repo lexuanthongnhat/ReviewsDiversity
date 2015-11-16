@@ -29,6 +29,7 @@ public class Constants {
 	
 	public final static boolean DEBUG_MODE = false; 
 	
+	public final static String REVIEWS_PATH = "D:\\Dropbox\\Reviews Diversity\\most_reviewed_providers.csv";
 	public final static String CUI_TO_DEWEYS_PATH = "src/edu/ucr/cs/dblab/nle020/ontology/cui_deweys.txt";
 	public final static String SOURCE_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\Immediate Results\\";
 	

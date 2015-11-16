@@ -30,7 +30,7 @@ public class POSTagger {
 	private Map<String, String> toSimplePOS = new HashMap<String, String>();
 	
 	private MaxentTagger tagger;
-	private String modelPath = "src/edu/ucr/cs/dblab/nle020/reviewsdiversity.dataset/english-left3words-distsim.tagger";
+	private String modelPath = "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/english-left3words-distsim.tagger";
 	private TokenizerFactory<CoreLabel> ptbTokenizerFactory = PTBTokenizer.factory(new CoreLabelTokenFactory(), 
 														"untokenizable=noneKeep");
 	

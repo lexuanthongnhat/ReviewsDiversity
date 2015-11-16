@@ -58,7 +58,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class PairExtractor {
 	private SentimentCalculator sentimentCalculator = new SentimentCalculator();
 	
-	private final static String REVIEWS_PATH = "D:\\Dropbox\\Reviews Diversity\\most_reviewed_providers.csv";
 	private final static String DESKTOP_FOLDER;	
 	static {
 		if (Files.isDirectory(Paths.get("C:\\Users\\Thong Nhat\\Desktop")))
@@ -94,7 +93,7 @@ public class PairExtractor {
 	private void init() {
 
 		rawReviews = new CopyOnWriteArrayList<RawReview>();
-		rawReviews.addAll(getReviews(REVIEWS_PATH));
+		rawReviews.addAll(getReviews(Constants.REVIEWS_PATH));
 		//rawReviews = getReviews(REVIEWS_PATH);
 		
 		initExcelColor();
@@ -500,7 +499,7 @@ public class PairExtractor {
 
 	}
 	
-	private List<RawReview> getReviews(String file) {
+	public static List<RawReview> getReviews(String file) {
 		long startTime = System.currentTimeMillis();	
 
 		List<RawReview> results = new ArrayList<RawReview>();

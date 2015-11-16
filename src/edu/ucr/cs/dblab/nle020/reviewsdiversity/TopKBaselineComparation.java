@@ -79,7 +79,7 @@ public class TopKBaselineComparation {
 				}
 
 				String outputPath = sourceInputFolder + "baseline\\comparison_distance" 
-						+ conceptDistanceThreshold + "_sentiment" + sentimentDistanceThreshold + ".csv";
+						+ conceptDistanceThreshold + "_sentiment" + ((int) 10*sentimentDistanceThreshold) + ".csv";
 				try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
 						StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 					writer.write(outputString);
