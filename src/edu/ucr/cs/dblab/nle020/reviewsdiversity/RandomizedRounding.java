@@ -6,10 +6,13 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -116,7 +119,8 @@ public class RandomizedRounding {
 			GRBVar[][] connecting = new GRBVar[numFacilities][numCustomers];
 			for (int f = 0; f < numFacilities; ++f) {
 				for (int c = 0; c < numCustomers; ++c) {
-					connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.CONTINUOUS, "connecting" + f + "to" + c);
+					if (distances[f][c] != Constants.INVALID_DISTANCE)
+						connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.CONTINUOUS, "connecting" + f + "to" + c);
 				}
 			}
 			
@@ -136,7 +140,7 @@ public class RandomizedRounding {
 			for (int f = 0; f < numFacilities; ++f) {
 				kFacilities.addTerm(1.0, open[f]);
 			}
-			model.addConstr(kFacilities, GRB.LESS_EQUAL, k + 1, "kFacilities");
+			model.addConstr(kFacilities, GRB.EQUAL, k + 1, "kFacilities");
 			
 			/* 
 			 * Constraint: connecting each customer to only one facility
@@ -146,7 +150,8 @@ public class RandomizedRounding {
 			for (int c = 0; c < numCustomers; ++c) {
 				connectingToOneFacility = new GRBLinExpr();
 				for (int f = 0; f < numFacilities; ++f) {
-					connectingToOneFacility.addTerm(1.0, connecting[f][c]);
+					if (distances[f][c] != Constants.INVALID_DISTANCE)
+						connectingToOneFacility.addTerm(1.0, connecting[f][c]);
 				}
 				model.addConstr(connectingToOneFacility, GRB.EQUAL, 1.0, "connectingToOneFacility" + c);
 			}
@@ -157,7 +162,8 @@ public class RandomizedRounding {
 			 */
 			for (int f = 0; f < numFacilities; ++f) {
 				for (int c = 0; c < numCustomers; ++c) {
-					model.addConstr(connecting[f][c], GRB.LESS_EQUAL, open[f], "onlyToOpenedFacility_f" + f + "_c" + "c");
+					if (distances[f][c] != Constants.INVALID_DISTANCE)
+						model.addConstr(connecting[f][c], GRB.LESS_EQUAL, open[f], "onlyToOpenedFacility_f" + f + "_c" + "c");
 				}
 			}						
 			
@@ -183,31 +189,40 @@ public class RandomizedRounding {
 			if (open[0].get(GRB.DoubleAttr.X) < 1)
 				System.err.println("Root is not choosen completely, facilityOpen[0] = " + open[0].get(GRB.DoubleAttr.X));
 				
-			boolean needRandomizedRounding = false;
 			for (int f = 0; f < numFacilities; ++f) {
 				facilityOpen[f] = open[f].get(GRB.DoubleAttr.X);
-				
-				if (facilityOpen[f] > 0 && facilityOpen[f] < 1) {
-//					System.err.println("facilityOpen[" + f + "] " + facilityOpen[f]);
-					needRandomizedRounding = true;
+				for (int c = 0; c < numCustomers; ++c) {
+					if (distances[f][c] != Constants.INVALID_DISTANCE) {
+						facilityConnect[f][c] = connecting[f][c].get(GRB.DoubleAttr.X);
+					}
 				}
 			}
+			if (Arrays.stream(facilityOpen).sum() != (k + 1))
+				System.out.println("Not k+1");
 			
-			for (int f = 0; f < numFacilities; ++f) {			
-				for (int c = 0; c < numCustomers; ++c) {
-					facilityConnect[f][c] = connecting[f][c].get(GRB.DoubleAttr.X);
-					if (facilityConnect[f][c] > 0 && facilityConnect[f][c] < 1) {
-//						System.err.println("facilityConnect[" + f + "][" + c + "] " + facilityConnect[f][c]);
-						needRandomizedRounding = true;
-					}
-						
+			boolean needRandomizedRounding = false;
+			for (int f = 0; f < numFacilities; ++f) {
+				if (facilityOpen[f] > 0 && facilityOpen[f] < 1) { 
+					needRandomizedRounding = true;
+					break;
 				}
-			}			
+				
+				for (int c = 0; c < numCustomers; ++c) {
+					if (distances[f][c] != Constants.INVALID_DISTANCE) {
+						if (facilityConnect[f][c] > 0 && facilityConnect[f][c] < 1) {
+							needRandomizedRounding = true;
+							break;
+						}
+					}
+				}
+				if (needRandomizedRounding)
+					break;
+			}				
 
 			if (needRandomizedRounding) {
 //				outputToFileForDebug(distances, facilityOpen, facilityConnect, result, DESKTOP_FOLDER + "rr_debug.txt");
 				roundingRandomly(distances, facilityOpen, facilityConnect, 
-						model.get(GRB.DoubleAttr.ObjVal), statisticalResult, Constants.RR_TERMINATED_BY_K);
+						model.get(GRB.DoubleAttr.ObjVal), statisticalResult);
 			}
 			
 			
@@ -255,21 +270,21 @@ public class RandomizedRounding {
 	}
 	
 	// Output: update facilityOpen, facilityConnect, statisticalResult
-	private void roundingRandomly(int[][] distances, double[] facilityOpen, double[][] facilityConnect, double fractionalOptimalCost,
-									StatisticalResult statisticalResult, boolean terminatedByK) {
+	private void roundingRandomly(int[][] distances, double[] facilityOpen, double[][] facilityConnect, 
+			double fractionalOptimalCost,
+			StatisticalResult statisticalResult) {
+		System.out.println("Doing RR");
 		int numFacilities = facilityOpen.length;
 		int numCustomers = facilityConnect[0].length;
 		
 		double[] originalOpen = facilityOpen.clone();
 		double[][] originalConnect = new double[numFacilities][];
-		for (int f = 0; f < numFacilities; ++f) {
+		for (int f = 0; f < numFacilities; ++f)
 			originalConnect[f] = facilityConnect[f].clone();
-		}
 		
-		double originalFacilityCost = 0;						// can be < k, always <= k, = k most of time
-		for (double open : originalOpen) {
-			originalFacilityCost += open;
-		}
+		/*double originalFacilityCost = 0;						// can be < k, always <= k, = k most of time
+		for (double open : originalOpen)
+			originalFacilityCost += open;*/
 		
 		for (int f = 0; f < numFacilities; ++f) {
 			facilityOpen[f] = 0;
@@ -279,158 +294,76 @@ public class RandomizedRounding {
 		}
 		facilityOpen[0] = 1;
 		
+		
+		/*List<Unit> customers = new ArrayList<Unit>(); 
+		for (int c = 0; c < numCustomers; ++c) {
+			Unit customer = new Unit(c);
+			for (int f = 0; f < numFacilities; ++f) {
+				if (distances[f][c] != Constants.INVALID_DISTANCE)
+					customer.addAncestor(new Unit(f, distances[f][c]));
+			}
+			customers.add(customer);
+		}*/
+		
 		// TODO - re-check these threshold if you want to get optimal cost (with more than k facilities)
-		double epsilon = 1.0f / (double) numCustomers;
-		double facilityCostThreshold = k * Math.log(numCustomers + (double) numCustomers / epsilon);
-		double assignmentCostThreshold = fractionalOptimalCost * (1 + epsilon);
-		
-		
-		int unChosen = numCustomers;
 		double facilityCost = 0.0f;
 		double assignmentCost = 0.0f;
-		Map<Integer, Integer> customerToFacility = new HashMap<Integer, Integer>();
-		Map<Integer, Set<Integer>> facilityToCustomers = new HashMap<Integer, Set<Integer>>();
-		facilityToCustomers.put(0, new HashSet<Integer>());
 
-		double termination = Math.floor(originalFacilityCost) < k ? Math.floor(originalFacilityCost) : k; 
-		// root is opened by default
-		if (terminatedByK) {
-			while (facilityCost <= termination) {
-								
-				for (int f = 0; f < numFacilities; ++f) {
-					// Rounding with probability x(f)/|x|				
-					if (rollTheDice(originalOpen[f] / originalFacilityCost)) {	
-						if (facilityOpen[f] == 0) {
-							facilityOpen[f] = 1;
-
-							facilityToCustomers.put(f, new HashSet<Integer>());
-						}
-					}			
-				}
-								
-				for (int f = 0; f < numFacilities; ++f) {
-					if (facilityOpen[f] > 0) {					
-						// Rounding with probability x(f, c)/x(f)
-						for (int c = 0; c < numCustomers; ++c) {
-							/**
-							 *  Note: an iteration of facilityConnect can increase the facilityCost more than 1
-							 *  	==> need this "if" as a safeguard
-							 */
-							if (facilityCost >= k + 1)
-								break;
-							
-							if (rollTheDice(originalConnect[f][c] / originalOpen[f]) 
-									&& facilityConnect[f][c] == 0.0f) {
-
-								facilityConnect[f][c] = 1;
-								assignmentCost += distances[f][c];
-								
-								if (facilityToCustomers.get(f).size() == 0) 
-									++facilityCost;
-								facilityToCustomers.get(f).add(c);								
-
-								if (customerToFacility.containsKey(c)) {
-									int previous = customerToFacility.get(c);
-									assignmentCost -= distances[previous][c];
-									facilityConnect[previous][c] = 0;
-									
-									facilityToCustomers.get(previous).remove(c);
-									if (facilityToCustomers.get(previous).size() == 0)
-										--facilityCost;
-								}
-								customerToFacility.put(c, f);
-							}
-						}
+		// sampling once per iteration
+		while (facilityCost < k) {			
+			for (int f = 1; f < numFacilities; ++f) {
+				// Rounding with probability x(f)/|x|				
+				if (rollTheDice(originalOpen[f] / k)) {	
+					if (facilityOpen[f] == 0) {
+						facilityOpen[f] = 1;
+						facilityCost++;
+						break;
 					}
-				}
-			}				
-						
-			Set<Integer> chosenFacilities = new HashSet<Integer>();
-			chosenFacilities.addAll(customerToFacility.values());
-			
-			Set<Integer> maxPossibleCustomers = new HashSet<Integer>();
-			for (Integer f : chosenFacilities) {
-				for (int c = 0; c < numCustomers; ++c) {
-					if (originalConnect[f][c] > 0)
-						maxPossibleCustomers.add(c);
-				}
-			} 
-			
-			// Randomly assign customers to chosen facilities as much as possible
-			while (customerToFacility.size() < maxPossibleCustomers.size()) {
-				for (Integer f : chosenFacilities) {
-					// Rounding with probability x(f, c)/x(f)
-					for (int c = 0; c < numCustomers; ++c) {				
-						if (rollTheDice(originalConnect[f][c] / originalOpen[f]) 
-								&& facilityConnect[f][c] == 0.0f) {
-
-							facilityConnect[f][c] = 1;
-							assignmentCost += distances[f][c];
-							
-							if (facilityToCustomers.get(f).size() == 0) 
-								++facilityCost;
-							facilityToCustomers.get(f).add(c);								
-
-							if (customerToFacility.containsKey(c)) {
-								int previous = customerToFacility.get(c);
-								assignmentCost -= distances[previous][c];
-								facilityConnect[previous][c] = 0;
-								
-								facilityToCustomers.get(previous).remove(c);
-								if (facilityToCustomers.get(previous).size() == 0)
-									--facilityCost;
-							}
-							customerToFacility.put(c, f);
-						}
-					}
+				}			
+			}								
+		}				
+					
+		/*// assign customer to the closest selected facility
+		Set<Integer> unassignedCustomers = new HashSet<Integer>();
+		for (Unit customer : customers) {
+			boolean isAssigned = false;
+			while (!customer.getAncestors().isEmpty()) {
+				Unit facility = customer.getAncestors().poll();
+				if (facilityOpen[facility.id] == 1) {
+					facilityConnect[facility.id][customer.id] = 1;
+					assignmentCost += distances[facility.id][customer.id];
+					isAssigned = true;
+					break;
 				}
 			}
 			
-			// Assign the remaining customers to the root
-			if (customerToFacility.size() < numCustomers) {
-				for (int c = 0; c < numCustomers; ++c) {
-					if (!customerToFacility.containsKey(c)) {
-						facilityConnect[0][c] = 1.0f;
-						assignmentCost += distances[0][c];
-					}					
-				}
-			}
-		} else {
-			while (facilityCost < facilityCostThreshold - 1 && (unChosen > 0 || assignmentCost > assignmentCostThreshold)) {
-				for (int f = 0; f < numFacilities; ++f) {
-
-					// Rounding with probability x(f)/|x|				
-					if (f != 0 && rollTheDice(originalOpen[f] / originalFacilityCost)) {	
-						if (facilityOpen[f] == 0) {
-							facilityOpen[f] = 1;
-							++facilityCost;
-						}
-					}		
-
-					if (facilityOpen[f] > 0) {					
-						// Rounding with probability x(f, c)/x(f)
-						for (int c = 0; c < numCustomers; ++c) {
-							if (rollTheDice(originalConnect[f][c] / originalOpen[f])) {
-								if (facilityConnect[f][c] == 0) {
-									facilityConnect[f][c] = 1;
-									--unChosen;
-									assignmentCost += distances[f][c];
-
-									// When c was assigned before
-									for (int previous = 0; previous < originalOpen.length; ++previous) {
-										if (previous != f && facilityConnect[previous][c] == 1) {
-											facilityConnect[previous][c] = 0;
-											++unChosen;
-											assignmentCost -= distances[previous][c];
-										}
-									}
-								} 
-							}
-						}
-					}
-				}
+			if (!isAssigned)
+				unassignedCustomers.add(customer.id);
+		}		
+		
+		// Assign the remaining customers to the root
+		if (unassignedCustomers.size() > 0) {
+			for (Integer c : unassignedCustomers) {
+				facilityConnect[0][c] = 1.0f;
+				assignmentCost += distances[0][c];									
 			}
 		}
+		*/
+		
+		for (int c = 0; c < numCustomers; ++c) {
+			int facility = 0;
+			int minD = distances[0][c];
+			for (int f = 0; f < numFacilities; ++f) {
+				if (distances[f][c] != Constants.INVALID_DISTANCE && facilityOpen[f] == 1 && distances[f][c] < minD) {
+					facility = f;
+					minD = distances[f][c];
+				}
+			}
+			assignmentCost += minD;
+			facilityConnect[facility][c] = 1;
+		}		
+
+
 		
 		int numFacilitiesOpened = 0;
 		int numUncovered = 0;
@@ -460,6 +393,37 @@ public class RandomizedRounding {
 		statisticalResult.setNumUncovered(numUncovered);
 	}
 
+	private static class Unit {
+		int id = 0;
+		int distance = 0;
+		PriorityQueue<Unit> ancestors = new PriorityQueue<Unit>(new Comparator<Unit>(){
+			@Override
+			public int compare(Unit o1, Unit o2) {			
+				return o1.distance - o2.distance;
+			}
+		});
+		
+		public Unit(int id) {
+			super();
+			this.id = id;
+		}
+			
+		public Unit(int id, int distance) {
+			super();
+			this.id = id;
+			this.distance = distance;
+		}
+
+		public PriorityQueue<Unit> getAncestors() {
+			return ancestors;
+		}
+				
+		public void addAncestor(Unit ancestor) {
+			ancestors.add(ancestor);
+		}
+	}
+	
+	
 	private boolean rollTheDice(double probability) {
 		if (Math.random() < probability)
 			return true;

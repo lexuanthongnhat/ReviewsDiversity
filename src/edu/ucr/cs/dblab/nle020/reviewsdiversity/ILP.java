@@ -165,7 +165,6 @@ public class ILP {
 				}
 			}
 			
-			
 			//////////////////////////////////////////////////////////////////////////////
 			// For testing
 			if (Constants.DEBUG_MODE) {
@@ -219,6 +218,7 @@ public class ILP {
 		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
 	
+	// TODO - this method is probably out-dated
 	private void checkResult(int[][] distances, int[] facilityOpen, int[][] facilityConnect, StatisticalResult statisticalResult) {
 		int numFacilities = facilityOpen.length;
 		int numCustomers = facilityConnect[0].length;

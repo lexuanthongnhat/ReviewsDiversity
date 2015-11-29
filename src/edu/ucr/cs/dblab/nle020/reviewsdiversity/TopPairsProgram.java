@@ -164,7 +164,7 @@ public class TopPairsProgram {
 		
 		// TODO - the first "3" is always slower than the other numbers 
 //		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-		int[] ks = new int[] {5, 10, 20};
+		int[] ks = new int[] {5};
 //		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
 		float[] thresholds = new float[] {0.2f};
 		for (int numChoosen : ks) {

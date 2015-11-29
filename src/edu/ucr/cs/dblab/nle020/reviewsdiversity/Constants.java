@@ -11,10 +11,10 @@ public class Constants {
 	
 	public final static int INTERVAL_TO_SAMPLE_REVIEW = 1;
 	public final static int NUM_DIGIT_PRECISION_OF_SENTIMENT = 2;
-	public final static int TRAINING_SIZE = 200;
-	
 	public final static int INVALID_DISTANCE = Integer.MAX_VALUE;
 
+	public final static int TRAINING_SIZE = 200;
+	
 	public final static int K = 10;
 	public final static float THRESHOLD = 0.2f;
 	
@@ -29,8 +29,6 @@ public class Constants {
 	public final static String CUI_TO_DEWEYS_PATH = "src/edu/ucr/cs/dblab/nle020/ontology/cui_deweys.txt";
 	public final static String SOURCE_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\Immediate Results\\";
 	
-	
-	public final static boolean RR_TERMINATED_BY_K = true;
 	public final static boolean FIND_BEST_LP_METHOD = false;
 	public final static LPMethod MY_DEFAULT_LP_METHOD = LPMethod.DUAL_SIMPLEX;
 	public static enum LPMethod {
