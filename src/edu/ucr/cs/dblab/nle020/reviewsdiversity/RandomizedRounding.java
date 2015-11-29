@@ -75,7 +75,7 @@ public class RandomizedRounding {
 		if (pairs.size() <= k + 1) {
 			topKPairs = pairs;
 		} else {
-			int[][] distances = initDistances(pairs);
+			int[][] distances = ILP.initDistances(pairs, threshold);
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
 					doRandomizedRounding(distances, statisticalResult, method);	
 			
@@ -585,7 +585,7 @@ public class RandomizedRounding {
 		// Test 2
 		verifyingCost = 0;
 		for (int c = 0; c < numCustomers; ++c) {
-			int min = Constants.INVALID_DISTANCE_FOR_ILP;
+			int min = Constants.INVALID_DISTANCE;
 			for (int f = 0; f < numFacilities; ++f) {
 				if (facilityOpen[f] == 1) {
 					if (distances[f][c] < min)
@@ -598,58 +598,5 @@ public class RandomizedRounding {
 		if (verifyingCost != result.getFinalCost())
 			System.err.println("RR TEST 2 -  Error 2 at docID " + result.getDocID() + 
 					":\tCost: " + result.getFinalCost() + " - Verifying Cost 2: " + verifyingCost);
-	}
-	
-
-	private int[][] initDistances(List<ConceptSentimentPair> conceptSentimentPairs) {
-		int[][] distances = new int[conceptSentimentPairs.size()][conceptSentimentPairs.size()];
-		
-		// The root
-		distances[0][0] = 0;
-		for (int j = 1; j < conceptSentimentPairs.size(); ++j) {
-			ConceptSentimentPair normalUnit = conceptSentimentPairs.get(j);				
-				
-			distances[0][j] = normalUnit.calculateRootDistance();
-			distances[j][0] = Constants.INVALID_DISTANCE_FOR_ILP;
-		}
-		
-		// Normal pairs
-		for (int i = 1; i < conceptSentimentPairs.size(); ++i) {
-			ConceptSentimentPair pair1 = conceptSentimentPairs.get(i);
-			
-			for (int j = i + 1; j < conceptSentimentPairs.size(); ++j) {
-				ConceptSentimentPair pair2 = conceptSentimentPairs.get(j);				
-				int distance = Constants.INVALID_DISTANCE_FOR_ILP;	
-
-				if (Constants.DEBUG_MODE) {
-					pair1.testDistance(pair2);
-					pair2.testDistance(pair1);
-				}
-				
-				
-				int temp = pair1.calculateDistance(pair2, threshold);
-				if (temp != Constants.INVALID_DISTANCE) {
-					distance = temp;
-				}
-				
-				
-				if (distance == Constants.INVALID_DISTANCE_FOR_ILP) {
-					distances[i][j] = Constants.INVALID_DISTANCE_FOR_ILP;
-					distances[j][i] = Constants.INVALID_DISTANCE_FOR_ILP;
-				} else if (distance > 0) {
-					distances[i][j] = distance;
-					distances[j][i] = Constants.INVALID_DISTANCE_FOR_ILP;
-				} else if (distance < 0) {
-					distances[i][j] = Constants.INVALID_DISTANCE_FOR_ILP;
-					distances[j][i] = -distance;
-				} else if (distance == 0) {
-					distances[i][j] = 0;
-					distances[j][i] = 0;
-				}
-			}
-		}
-		
-		
-		return distances;
 	}
 }

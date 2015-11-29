@@ -14,16 +14,13 @@ public class Constants {
 	public final static int TRAINING_SIZE = 200;
 	
 	public final static int INVALID_DISTANCE = Integer.MAX_VALUE;
-	public final static int INVALID_DISTANCE_FOR_ILP = Integer.MAX_VALUE;	
-	//public final static int INVALID_DISTANCE_FOR_ILP = 10000;	
 
 	public final static int K = 10;
 	public final static float THRESHOLD = 0.2f;
 	
 	public final static String ROOT_CUI = "ROOT";
 	
-	public final static int NUM_DOCTORS_TO_EXPERIMENT = 1000;
-//	public final static int NUM_DOCS = 100;
+	public final static int NUM_DOCTORS_TO_EXPERIMENT = 200;
 	public final static int NUM_SYNTHETIC_DOCTORS = 100;
 	
 	public final static boolean DEBUG_MODE = false; 

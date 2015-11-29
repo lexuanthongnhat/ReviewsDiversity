@@ -46,7 +46,7 @@ public class ILPSet extends ILP {
 		if (sentimentSets.size() <= k) {
 			topKSets = sentimentSets;
 		} else {
-			int[][] distances = initDistances(sentimentSets, pairs, statisticalResult);
+			int[][] distances = initDistances(threshold, sentimentSets, pairs, statisticalResult);
 			
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult);
 			
@@ -68,7 +68,10 @@ public class ILPSet extends ILP {
 	 * @return array of length [sentimentSets.size() + 1 ] * conceptSentimentPairs.size()
 	 * <br> +1 for the root, result[0] is the distance array of the root
 	 */
-	private int[][] initDistances(List<SentimentSet> sentimentSets, List<ConceptSentimentPair> conceptSentimentPairs, 
+	protected static int[][] initDistances(
+			float sentimentThreshold, 
+			List<SentimentSet> sentimentSets, 
+			List<ConceptSentimentPair> conceptSentimentPairs, 
 			StatisticalResult statisticalResult) {
 		int[][] distances = new int[sentimentSets.size() + 1][conceptSentimentPairs.size() + 1];
 		
@@ -98,7 +101,7 @@ public class ILPSet extends ILP {
 				} else {
 					int min = Constants.INVALID_DISTANCE;
 					for (ConceptSentimentPair pairInSet : set.getPairs()) {
-						int distance = pairInSet.calculateDistance(pair, threshold);
+						int distance = pairInSet.calculateDistance(pair, sentimentThreshold);
 						
 						if (distance >= 0 && distance < min) 
 							min = distance;

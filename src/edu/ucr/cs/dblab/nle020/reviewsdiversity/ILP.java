@@ -22,7 +22,7 @@ public class ILP {
 	protected int k = 0;
 	protected float threshold = 0.0f;
 
-	protected ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
+	protected static ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
 	
 	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
 	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
@@ -68,7 +68,7 @@ public class ILP {
 		if (pairs.size() <= k + 1) {
 			topKPairs = pairs;
 		} else {
-			int[][] distances = initDistances(pairs);
+			int[][] distances = initDistances(pairs, threshold);
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult);
 			
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
@@ -107,7 +107,8 @@ public class ILP {
 			GRBVar[][] connecting = new GRBVar[numFacilities][numCustomers];
 			for (int f = 0; f < numFacilities; ++f) {
 				for (int c = 0; c < numCustomers; ++c) {
-					connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.BINARY, "connecting" + f + "to" + c);
+					if (distances[f][c] != Constants.INVALID_DISTANCE)
+						connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.BINARY, "connecting" + f + "to" + c);
 				}
 			}
 			
@@ -129,7 +130,8 @@ public class ILP {
 			for (int c = 0; c < numCustomers; ++c) {
 				connectingToOneFacility = new GRBLinExpr();
 				for (int f = 0; f < numFacilities; ++f) {
-					connectingToOneFacility.addTerm(1.0, connecting[f][c]);
+					if (distances[f][c] != Constants.INVALID_DISTANCE)
+						connectingToOneFacility.addTerm(1.0, connecting[f][c]);
 				}
 				model.addConstr(connectingToOneFacility, GRB.EQUAL, 1.0, "connectingToOneFacility" + c);
 			}
@@ -137,7 +139,8 @@ public class ILP {
 			// Constraint: only connect customer to opened facility
 			for (int f = 0; f < numFacilities; ++f) {
 				for (int c = 0; c < numCustomers; ++c) {
-					model.addConstr(connecting[f][c], GRB.LESS_EQUAL, open[f], "onlyToOpenedFacility_f" + f + "_c" + "c");
+					if (distances[f][c] != Constants.INVALID_DISTANCE)
+						model.addConstr(connecting[f][c], GRB.LESS_EQUAL, open[f], "onlyToOpenedFacility_f" + f + "_c" + "c");
 				}
 			}
 						
@@ -263,7 +266,7 @@ public class ILP {
 		// Test 2
 		verifyingCost = 0;
 		for (int c = 0; c < numCustomers; ++c) {
-			int min = Constants.INVALID_DISTANCE_FOR_ILP;
+			int min = Constants.INVALID_DISTANCE;
 			for (int f = 0; f < numFacilities; ++f) {
 				if (facilityOpen[f] == 1) {
 					if (distances[f][c] < min)
@@ -279,7 +282,7 @@ public class ILP {
 	}
 	
 
-	private int[][] initDistances(List<ConceptSentimentPair> conceptSentimentPairs) {
+	protected static int[][] initDistances(List<ConceptSentimentPair> conceptSentimentPairs, float sentimentThreshold) {
 		int[][] distances = new int[conceptSentimentPairs.size()][conceptSentimentPairs.size()];
 		
 		// The root
@@ -288,7 +291,7 @@ public class ILP {
 			ConceptSentimentPair normalPair = conceptSentimentPairs.get(j);				
 				
 			distances[0][j] = normalPair.calculateRootDistance();
-			distances[j][0] = Constants.INVALID_DISTANCE_FOR_ILP;
+			distances[j][0] = Constants.INVALID_DISTANCE;
 		}
 		
 		// Normal pairs
@@ -297,7 +300,7 @@ public class ILP {
 			
 			for (int j = i + 1; j < conceptSentimentPairs.size(); ++j) {
 				ConceptSentimentPair pair2 = conceptSentimentPairs.get(j);				
-				int distance = Constants.INVALID_DISTANCE_FOR_ILP;	
+				int distance = Constants.INVALID_DISTANCE;	
 
 				if (Constants.DEBUG_MODE) {
 					pair1.testDistance(pair2);
@@ -305,20 +308,20 @@ public class ILP {
 				}
 				
 				
-				int temp = pair1.calculateDistance(pair2, threshold);
+				int temp = pair1.calculateDistance(pair2, sentimentThreshold);
 				if (temp != Constants.INVALID_DISTANCE) {
 					distance = temp;
 				}
 				
 				
-				if (distance == Constants.INVALID_DISTANCE_FOR_ILP) {
-					distances[i][j] = Constants.INVALID_DISTANCE_FOR_ILP;
-					distances[j][i] = Constants.INVALID_DISTANCE_FOR_ILP;
+				if (distance == Constants.INVALID_DISTANCE) {
+					distances[i][j] = Constants.INVALID_DISTANCE;
+					distances[j][i] = Constants.INVALID_DISTANCE;
 				} else if (distance > 0) {
 					distances[i][j] = distance;
-					distances[j][i] = Constants.INVALID_DISTANCE_FOR_ILP;
+					distances[j][i] = Constants.INVALID_DISTANCE;
 				} else if (distance < 0) {
-					distances[i][j] = Constants.INVALID_DISTANCE_FOR_ILP;
+					distances[i][j] = Constants.INVALID_DISTANCE;
 					distances[j][i] = -distance;
 				} else if (distance == 0) {
 					distances[i][j] = 0;

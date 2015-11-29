@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.RandomizedRounding;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
@@ -21,7 +20,6 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 		super(k, threshold, docToStatisticalResult);
 		this.docToTopKSetsResult = docToTopKSetsResult;
 	}
-
 	
 	/**
 	 * Run Integer Linear Programming for a doctor's data set
@@ -48,7 +46,7 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 		if (sentimentSets.size() <= k) {
 			topKSets = sentimentSets;
 		} else {
-			int[][] distances = initDistances(sentimentSets, pairs, statisticalResult);
+			int[][] distances = ILPSet.initDistances(threshold, sentimentSets, pairs, statisticalResult);
 			
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
 					doRandomizedRounding(distances, statisticalResult, method);
@@ -62,57 +60,5 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKSetsResult.put(docId, topKSets);
 		gatherFinalResult(System.currentTimeMillis() - startTime, sentimentSets.size() + 1, statisticalResult);		
-	}
-	
-	
-	/**
-	 * init the distances between the sets, root and the concept sentiment pairs
-	 * @param sentimentSets
-	 * @param conceptSentimentPairs
-	 * @return array of length [sentimentSets.size() + 1 ] * conceptSentimentPairs.size()
-	 * <br> +1 for the root, result[0] is the distance array of the root
-	 */
-	private int[][] initDistances(List<SentimentSet> sentimentSets, List<ConceptSentimentPair> conceptSentimentPairs, 
-			StatisticalResult statisticalResult) {
-		int[][] distances = new int[sentimentSets.size() + 1][conceptSentimentPairs.size() + 1];
-		
-		conceptSentimentPairs.add(0, root);
-		// The root
-		int initialCost = 0;
-		distances[0][0] = 0;
-		for (int j = 1; j < conceptSentimentPairs.size(); ++j) {
-			ConceptSentimentPair pair = conceptSentimentPairs.get(j);				
-				
-			distances[0][j] = pair.calculateRootDistance();
-			initialCost += distances[0][j]; 
-		}
-		statisticalResult.setInitialCost(initialCost);		
-		
-		// The sets
-		for (int s = 0; s < sentimentSets.size(); ++s) {
-			int sIndex = s + 1;
-			distances[sIndex][0] = Constants.INVALID_DISTANCE;
-			
-			SentimentSet set = sentimentSets.get(s);
-			for (int p = 1; p < conceptSentimentPairs.size(); ++p) {
-				ConceptSentimentPair pair = conceptSentimentPairs.get(p);
-				
-				if (set.getPairs().contains(pair)) {
-					distances[sIndex][p] = 0;
-				} else {
-					int min = Constants.INVALID_DISTANCE;
-					for (ConceptSentimentPair pairInSet : set.getPairs()) {
-						int distance = pairInSet.calculateDistance(pair, threshold);
-						
-						if (distance >= 0 && distance < min) 
-							min = distance;
-					}
-					distances[sIndex][p] = min;
-				}
-			}
-		}
-		
-		
-		return distances;
 	}
 }

@@ -67,7 +67,7 @@ public class TopPairsProgram {
 	private enum SetAlgorithm 	{GREEDY_SET, ILP_SET, RANDOMIZED_ROUNDING_SET};
 	public static enum SetOption 		{REVIEW, SENTENCE }; 
 	
-	public static void main(String[] args) throws InterruptedException, ExecutionException {
+	public static void main(String[] args) throws InterruptedException, ExecutionException, IOException {
 		long startTime = System.currentTimeMillis();
 //		getDatasetStatistics();
 		topPairsExperiment();
@@ -158,13 +158,13 @@ public class TopPairsProgram {
 		return heading + ": min " + min + ", max " + max + ", average " + average + "\n";		
 	}
 
-	private static void topPairsExperiment() throws InterruptedException, ExecutionException {
+	private static void topPairsExperiment() throws InterruptedException, ExecutionException, IOException {
 		
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
 		// TODO - the first "3" is always slower than the other numbers 
 //		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-		int[] ks = new int[] {5};
+		int[] ks = new int[] {5, 10, 20};
 //		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
 		float[] thresholds = new float[] {0.2f};
 		for (int numChoosen : ks) {
@@ -172,15 +172,10 @@ public class TopPairsProgram {
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
 				threshold = thresholds[thresh];
 				
-				String subFolder = "Top Pairs\\k" + k + "_threshold" + threshold + "\\";
+				String subFolder = "Top Pairs\\k" + k + "_threshold" + threshold + "\\";				
+				if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder)))
+					Files.createDirectories(Paths.get(OUTPUT_FOLDER + subFolder));
 				
-				if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder))) {
-					try {
-						Files.createDirectories(Paths.get(OUTPUT_FOLDER + subFolder));
-					} catch (IOException e) {				
-						e.printStackTrace();
-					}
-				}
 				statisticalResults.add(topPairsExperiment(OUTPUT_FOLDER + subFolder));
 			}
 		}
@@ -201,9 +196,7 @@ public class TopPairsProgram {
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultGreedy = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultILP = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultRR = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
-		
-
-				
+						
 		String outputPrefix = outputFolder + "top_pairs_result_" + Constants.NUM_DOCTORS_TO_EXPERIMENT;
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToTopPairsResultILP);
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToTopPairsResultGreedy);
@@ -307,7 +300,7 @@ public class TopPairsProgram {
 		Utils.printRunningTime(startTime, "Finished Top Pairs Synthetic", true);
 	}
 	
-	private static void topSetsExperiment(SetOption setOption) {
+	private static void topSetsExperiment(SetOption setOption) throws IOException {
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
 		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
@@ -321,13 +314,9 @@ public class TopPairsProgram {
 				
 				String subFolder = "Top " + setOption + "\\k" + k + "_threshold" + threshold + "\\";
 				
-				if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder))) {
-					try {
-						Files.createDirectories(Paths.get(OUTPUT_FOLDER + subFolder));
-					} catch (IOException e) {				
-						e.printStackTrace();
-					}
-				}
+				if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder)))
+					Files.createDirectories(Paths.get(OUTPUT_FOLDER + subFolder));
+
 				statisticalResults.add(topSetsExperiment(setOption, OUTPUT_FOLDER + subFolder));
 			}
 		}
@@ -674,96 +663,6 @@ public class TopPairsProgram {
 		System.err.println("Outputed top pairs to \"" + outputPath + "\"");
 	}
 	
-	private static void addRow(Row row, StatisticalResult ilpResult, StatisticalResult greedyResult) {
-		
-		Font regularFont = row.getSheet().getWorkbook().createFont();
-		regularFont.setFontName("Calibri");
-		regularFont.setFontHeightInPoints((short) 13);
-		
-		CellStyle cs = row.getSheet().getWorkbook().createCellStyle();
-		cs.setWrapText(true);
-		cs.setFont(regularFont);
-		
-		
-		CellStyle csRed = row.getSheet().getWorkbook().createCellStyle();
-		csRed.setWrapText(true);
-//		csRed.setFillBackgroundColor(IndexedColors.RED.getIndex());
-		csRed.setFillForegroundColor(IndexedColors.RED.getIndex());
-		csRed.setFillPattern(CellStyle.SOLID_FOREGROUND);
-		csRed.setFont(regularFont);
-		
-		Cell docCell = row.createCell(0);
-		Cell numPairsCell = row.createCell(1);
-		Cell numPotentialUsefulCoverCell = row.createCell(2);
-		Cell numPotentialUsefulCoverWithThresholdCell = row.createCell(3);
-		
-		Cell numUsefulCoverILPCell = row.createCell(4);
-		Cell numUsefulCoverGreedyCell = row.createCell(5);
-		
-		Cell numUncoveredILPCell = row.createCell(6);
-		Cell numUncoveredGreedyCell = row.createCell(7);
-		
-		Cell ilpTimeCell = row.createCell(8);
-		Cell greedyTimeCell = row.createCell(9);
-
-		Cell initialCostCell = row.createCell(10);
-		Cell ilpCostCell = row.createCell(11);
-		Cell greedyCostCell = row.createCell(12);
-		Cell greedyRatioCell = row.createCell(13);
-		
-		docCell.setCellStyle(cs);
-		numPairsCell.setCellStyle(cs);
-		
-		numPotentialUsefulCoverCell.setCellStyle(cs);
-		numPotentialUsefulCoverWithThresholdCell.setCellStyle(cs);
-		numUsefulCoverGreedyCell.setCellStyle(cs);
-		numUsefulCoverILPCell.setCellStyle(cs);
-		
-		numUncoveredILPCell.setCellStyle(cs);
-		numUncoveredGreedyCell.setCellStyle(cs);
-		ilpTimeCell.setCellStyle(cs);
-		greedyTimeCell.setCellStyle(cs);
-		initialCostCell.setCellStyle(cs);
-		ilpCostCell.setCellStyle(cs);
-		greedyCostCell.setCellStyle(cs);
-		greedyRatioCell.setCellStyle(cs);		
-		
-		docCell.setCellValue(ilpResult.getDocID());
-		numPairsCell.setCellValue(ilpResult.getNumPairs());
-		
-		numPotentialUsefulCoverCell.setCellValue(greedyResult.getNumPotentialUsefulCover());
-		numPotentialUsefulCoverWithThresholdCell.setCellValue(greedyResult.getNumPotentialUsefulCoverWithThreshold());
-		numUsefulCoverGreedyCell.setCellValue(greedyResult.getNumUsefulCover());
-		numUsefulCoverILPCell.setCellValue(ilpResult.getNumUsefulCover());
-		
-		numUncoveredILPCell.setCellValue(ilpResult.getNumUncovered());
-		numUncoveredGreedyCell.setCellValue(greedyResult.getNumUncovered());
-		if (ilpResult.getNumUncovered() > greedyResult.getNumUncovered())
-			numUncoveredGreedyCell.setCellStyle(csRed);
-		
-		ilpTimeCell.setCellValue(ilpResult.getRunningTime());
-		greedyTimeCell.setCellValue(greedyResult.getRunningTime());
-		if (ilpResult.getRunningTime() < greedyResult.getRunningTime())
-			greedyTimeCell.setCellStyle(csRed);
-		
-		initialCostCell.setCellValue(greedyResult.getInitialCost());
-		ilpCostCell.setCellValue(ilpResult.getFinalCost());
-		
-		greedyCostCell.setCellValue(greedyResult.getFinalCost());
-		
-		if (ilpResult.getFinalCost() > 0) {
-			double greedyRatio = greedyResult.getFinalCost()/ilpResult.getFinalCost() - 1;
-			
-			greedyRatioCell.setCellValue(String.format("%1$.2f", greedyRatio * 100) + "%");
-			if (greedyRatio < 0) {
-				greedyRatioCell.setCellStyle(csRed);
-			}
-		} else if (ilpResult.getFinalCost() == 0 && greedyResult.getFinalCost() == 0) {
-			greedyRatioCell.setCellValue("0%");
-		}
-		
-	}
-
 	private static void addRow(Row row, boolean isSet, StatisticalResult ilpResult,
 			StatisticalResult greedyResult, StatisticalResult rrResult) {
 		
@@ -1020,83 +919,6 @@ public class TopPairsProgram {
 		infoCell.setCellValue("K = " + k + ", Threshold = " + threshold);
 	}
 	
-	private static void addHeader(Sheet sheet) {
-		Font headingFont = sheet.getWorkbook().createFont();
-		headingFont.setBold(true);
-		headingFont.setFontName("Calibri");
-		headingFont.setFontHeightInPoints((short) 14);
-		headingFont.setColor(IndexedColors.BLUE_GREY.index);
-		
-		CellStyle cs = sheet.getWorkbook().createCellStyle();
-		cs.setWrapText(true);
-		cs.setFont(headingFont);
-		cs.setAlignment(CellStyle.ALIGN_CENTER);
-		
-		Row row = sheet.createRow(0);
-		sheet.createFreezePane(14, 1);
-		
-		Cell docCell = row.createCell(0);
-		Cell numPairsCell = row.createCell(1);
-		Cell numPotentialUsefulCoverCell = row.createCell(2);
-		Cell numPotentialUsefulCoverWithThresholdCell = row.createCell(3);
-		
-		Cell numUsefulCoverILPCell = row.createCell(4);
-		Cell numUsefulCoverGreedyCell = row.createCell(5);
-		
-		Cell numUncoveredILPCell = row.createCell(6);
-		Cell numUncoveredGreedyCell = row.createCell(7);
-		
-		Cell ilpTimeCell = row.createCell(8);
-		Cell greedyTimeCell = row.createCell(9);
-
-		Cell initialCostCell = row.createCell(10);
-		Cell ilpCostCell = row.createCell(11);
-		Cell greedyCostCell = row.createCell(12);
-		Cell greedyRatioCell = row.createCell(13);
-		
-		docCell.setCellStyle(cs);
-		numPairsCell.setCellStyle(cs);
-		
-		numPotentialUsefulCoverCell.setCellStyle(cs);
-		numPotentialUsefulCoverWithThresholdCell.setCellStyle(cs);
-		numUsefulCoverGreedyCell.setCellStyle(cs);
-		numUsefulCoverILPCell.setCellStyle(cs);
-		
-		numUncoveredILPCell.setCellStyle(cs);
-		numUncoveredGreedyCell.setCellStyle(cs);
-		ilpTimeCell.setCellStyle(cs);
-		greedyTimeCell.setCellStyle(cs);
-		initialCostCell.setCellStyle(cs);
-		ilpCostCell.setCellStyle(cs);
-		greedyCostCell.setCellStyle(cs);
-		greedyRatioCell.setCellStyle(cs);	
-		
-		
-		docCell.setCellValue("DocID");
-		numPairsCell.setCellValue("# Pairs");
-		
-		numPotentialUsefulCoverCell.setCellValue("# Potential Useful Cover");
-		numPotentialUsefulCoverWithThresholdCell.setCellValue("# Potential Useful Cover With Threshold");
-		numUsefulCoverILPCell.setCellValue("# Useful Cover ILP");
-		numUsefulCoverGreedyCell.setCellValue("# Useful Cover Greedy");
-		
-		numUncoveredILPCell.setCellValue("# Uncovered ILP");
-		numUncoveredGreedyCell.setCellValue("# Uncovered Greedy");
-		
-		ilpTimeCell.setCellValue("ILP Time (ms)");
-		greedyTimeCell.setCellValue("Greedy Time (ms)");
-		
-		initialCostCell.setCellValue("Initial Cost");
-		ilpCostCell.setCellValue("ILP Cost");
-		greedyCostCell.setCellValue("Greedy Cost");
-		greedyRatioCell.setCellValue("Greedy Increased Ratio");		
-
-		
-		Cell infoCell = row.createCell(14);
-		infoCell.setCellStyle(cs);
-		infoCell.setCellValue("K = " + k + ", Threshold = " + threshold);
-	}
-		
 	// Make sure: each conceptSentimentPair of a doctor has an unique hashcode
 	private static Map<Integer, List<ConceptSentimentPair>> importDocToConceptSentimentPairs(String path, boolean getSomeRandomItems) {
 		Map<Integer, List<ConceptSentimentPair>> result = new HashMap<Integer, List<ConceptSentimentPair>>();
