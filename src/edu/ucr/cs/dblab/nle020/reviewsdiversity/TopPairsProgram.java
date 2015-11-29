@@ -35,12 +35,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetAlgorithm1;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetAlgorithm2;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.ILPSetAlgorithm1;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.ILPSetAlgorithm2;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.RandomizedRoundingSet1;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.RandomizedRoundingSet2;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetThreadImpl;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.ILPSetThreadImpl;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.RandomizedRoundingSetThreadImpl;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.DoctorSentimentReview;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.PairExtractor;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.RawReview;
@@ -62,9 +59,9 @@ public class TopPairsProgram {
 	private static final int ILP_INDEX = 1;
 	private static final int RR_INDEX = 2;
 
-	public final static String DOC_TO_REVIEWS_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned_vector.txt";
-	//public final static String OUTPUT_FOLDER = "D:\\UCR Google Drive\\GD - Review Diversity\\Experiment Output\\";
-	public final static String OUTPUT_FOLDER = "D:\\Experiments\\";
+	public final static String DOC_TO_REVIEWS_PATH = "src/main/resources/doc_pairs_1_prunned_vector.txt";
+//	public final static String OUTPUT_FOLDER = "D:\\Experiments\\";
+	public final static String OUTPUT_FOLDER = "src/main/resources/performance/";
 	
 	private enum Algorithm 		{GREEDY, ILP, RANDOMIZED_ROUDNING};
 	private enum SetAlgorithm 	{GREEDY_SET, ILP_SET, RANDOMIZED_ROUNDING_SET};
@@ -72,8 +69,8 @@ public class TopPairsProgram {
 	
 	public static void main(String[] args) throws InterruptedException, ExecutionException {
 		long startTime = System.currentTimeMillis();
-		getDatasetStatistics();
-//		topPairsExperiment();
+//		getDatasetStatistics();
+		topPairsExperiment();
 //		topPairsSyntheticExperiment();
 			
 //		topSetsExperiment(SetOption.REVIEW);
@@ -161,16 +158,15 @@ public class TopPairsProgram {
 		return heading + ": min " + min + ", max " + max + ", average " + average + "\n";		
 	}
 
-	@SuppressWarnings("unused")
 	private static void topPairsExperiment() throws InterruptedException, ExecutionException {
 		
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
 		// TODO - the first "3" is always slower than the other numbers 
-		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-//		int[] ks = new int[] {5};
-		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
-//		float[] thresholds = new float[] {0.2f};
+//		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
+		int[] ks = new int[] {5};
+//		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
+		float[] thresholds = new float[] {0.2f};
 		for (int numChoosen : ks) {
 			k = numChoosen;
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
@@ -449,53 +445,28 @@ public class TopPairsProgram {
 		ExecutorService fixedPool = Executors.newFixedThreadPool(numThreadsAlgorithm);
 		List<Future<String>> futures = new ArrayList<Future<String>>();
 		
-		if (!Constants.USE_SECOND_MULTI_THREAD) {
-			for (Integer docID : docToConceptSentimentPairs.keySet()) {
-				Future<String> future;				
-				switch (algorithm) {
-				case GREEDY:
-					future = fixedPool.submit(new GreedyAlgorithm1(k, threshold, docToStatisticalResult, docToTopKPairsResult,
-							docID, docToConceptSentimentPairs.get(docID)), "DONE!");
-					break;
-				case ILP:
-					future = fixedPool.submit(new ILPAlgorithm1(k, threshold, docToStatisticalResult, docToTopKPairsResult,
-							docID, docToConceptSentimentPairs.get(docID)), "DONE!");
-					break;					
-				case RANDOMIZED_ROUDNING:
-					future = fixedPool.submit(new RandomizedRounding1(k, threshold, docToStatisticalResult, docToTopKPairsResult,
-							docID, docToConceptSentimentPairs.get(docID), method), "DONE!");
-					break;
-				default:
-					future = fixedPool.submit(new GreedyAlgorithm1(k, threshold, docToStatisticalResult, docToTopKPairsResult,
-							docID, docToConceptSentimentPairs.get(docID)), "DONE!");
-					break;
-				}				
-				futures.add(future);
+		for (int index = 0; index < numThreadsAlgorithm; ++index) {				
+			Future<String> future;
+			switch (algorithm) {
+			case GREEDY:
+				future = fixedPool.submit(new GreedyThreadImpl(k, threshold, docToStatisticalResult, docToTopKPairsResult,
+						index, numThreadsAlgorithm, docToConceptSentimentPairs), "DONE!");
+				break;
+			case ILP:
+				future = fixedPool.submit(new ILPThreadImpl(k, threshold, docToStatisticalResult, docToTopKPairsResult,
+						index, numThreadsAlgorithm, docToConceptSentimentPairs), "DONE!");
+				break;
+			case RANDOMIZED_ROUDNING:
+				future = fixedPool.submit(new RandomizedRoundingThreadImpl(k, threshold, docToStatisticalResult, docToTopKPairsResult, 
+						index, numThreadsAlgorithm, docToConceptSentimentPairs, method), "DONE!");
+				break;
+			default:
+				future = fixedPool.submit(new GreedyThreadImpl(k, threshold, docToStatisticalResult, docToTopKPairsResult,
+						index, numThreadsAlgorithm, docToConceptSentimentPairs), "DONE!");
+				break;
 			}
-		} else {
-			for (int index = 0; index < numThreadsAlgorithm; ++index) {				
-				Future<String> future;
-				switch (algorithm) {
-				case GREEDY:
-					future = fixedPool.submit(new GreedyAlgorithm2(k, threshold, docToStatisticalResult, docToTopKPairsResult,
-							index, numThreadsAlgorithm, docToConceptSentimentPairs), "DONE!");
-					break;
-				case ILP:
-					future = fixedPool.submit(new ILPAlgorithm2(k, threshold, docToStatisticalResult, docToTopKPairsResult,
-							index, numThreadsAlgorithm, docToConceptSentimentPairs), "DONE!");
-					break;
-				case RANDOMIZED_ROUDNING:
-					future = fixedPool.submit(new RandomizedRounding2(k, threshold, docToStatisticalResult, docToTopKPairsResult, 
-							index, numThreadsAlgorithm, docToConceptSentimentPairs, method), "DONE!");
-					break;
-				default:
-					future = fixedPool.submit(new GreedyAlgorithm2(k, threshold, docToStatisticalResult, docToTopKPairsResult,
-							index, numThreadsAlgorithm, docToConceptSentimentPairs), "DONE!");
-					break;
-				}
-				futures.add(future);
-			}
-		}
+			futures.add(future);
+		}		
 
 		fixedPool.shutdown();		
 		try {
@@ -540,52 +511,27 @@ public class TopPairsProgram {
 		ExecutorService fixedPool = Executors.newFixedThreadPool(numThreadsAlgorithm);
 		List<Future<String>> futures = new ArrayList<Future<String>>();
 
-		if (!Constants.USE_SECOND_MULTI_THREAD) {
-			for (Integer docID : docToSentimentSets.keySet()) {
-				Future<String> future;				
-				switch (setAlgorithm) {
-				case GREEDY_SET: 	
-					future = fixedPool.submit(new GreedySetAlgorithm1(k, threshold, docToStatisticalResult, docToTopKSetsResult,
-							docID, docToSentimentSets.get(docID)), "DONE!");
-					break;
-				case ILP_SET: 		
-					future = fixedPool.submit(new ILPSetAlgorithm1(k, threshold, docToStatisticalResult, docToTopKSetsResult,
-							docID, docToSentimentSets.get(docID)), "DONE!");
-					break;
-				case RANDOMIZED_ROUNDING_SET: 
-					future = fixedPool.submit(new RandomizedRoundingSet1(k, threshold, docToStatisticalResult, docToTopKSetsResult, 
-							docID, docToSentimentSets.get(docID)), "DONE!");
-					break;
-				default:		
-					future = fixedPool.submit(new GreedySetAlgorithm1(k, threshold, docToStatisticalResult, docToTopKSetsResult,
-							docID, docToSentimentSets.get(docID)), "DONE!");
-					break;
-				}				
-				futures.add(future);
-			}
-		} else {
-			for (int index = 0; index < numThreadsAlgorithm; ++index) {
-				Future<String> future;				
-				switch (setAlgorithm) {
-				case GREEDY_SET: 	
-					future = fixedPool.submit(new GreedySetAlgorithm2(k, threshold, docToStatisticalResult, docToTopKSetsResult,
-						index, numThreadsAlgorithm, docToSentimentSets), "DONE!");
-					break;
-				case ILP_SET: 		
-					future = fixedPool.submit(new ILPSetAlgorithm2(k, threshold, docToStatisticalResult, docToTopKSetsResult,
-						index, numThreadsAlgorithm, docToSentimentSets), "DONE!");
-					break;
-				case RANDOMIZED_ROUNDING_SET: 
-					future = fixedPool.submit(new RandomizedRoundingSet2(k, threshold, docToStatisticalResult, docToTopKSetsResult,
-						index, numThreadsAlgorithm, docToSentimentSets), "DONE!");
-					break;
-				default:
-					future = fixedPool.submit(new GreedySetAlgorithm2(k, threshold, docToStatisticalResult, docToTopKSetsResult,
-						index, numThreadsAlgorithm, docToSentimentSets), "DONE!");
-					break;
-				}				
-				futures.add(future);
-			}
+		for (int index = 0; index < numThreadsAlgorithm; ++index) {
+			Future<String> future;				
+			switch (setAlgorithm) {
+			case GREEDY_SET: 	
+				future = fixedPool.submit(new GreedySetThreadImpl(k, threshold, docToStatisticalResult, docToTopKSetsResult,
+					index, numThreadsAlgorithm, docToSentimentSets), "DONE!");
+				break;
+			case ILP_SET: 		
+				future = fixedPool.submit(new ILPSetThreadImpl(k, threshold, docToStatisticalResult, docToTopKSetsResult,
+					index, numThreadsAlgorithm, docToSentimentSets), "DONE!");
+				break;
+			case RANDOMIZED_ROUNDING_SET: 
+				future = fixedPool.submit(new RandomizedRoundingSetThreadImpl(k, threshold, docToStatisticalResult, docToTopKSetsResult,
+					index, numThreadsAlgorithm, docToSentimentSets), "DONE!");
+				break;
+			default:
+				future = fixedPool.submit(new GreedySetThreadImpl(k, threshold, docToStatisticalResult, docToTopKSetsResult,
+					index, numThreadsAlgorithm, docToSentimentSets), "DONE!");
+				break;
+			}				
+			futures.add(future);
 		}
 
 		fixedPool.shutdown();		

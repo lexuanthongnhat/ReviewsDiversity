@@ -5,7 +5,6 @@ public class Constants {
 	public final static int NUM_THREADS_ALGORITHM = 1;
 	public final static int NUM_THREADS_INIT_PAIRS = 8;
 	public final static int LENGTH_THRESHOLD = 100000;
-	public final static boolean USE_SECOND_MULTI_THREAD = true;
 	public final static boolean USE_ADVANCED_SENTENCE_BREAKING = true;
 	
 	public final static float CORRELATION_THRESHOLD = 0.15f;

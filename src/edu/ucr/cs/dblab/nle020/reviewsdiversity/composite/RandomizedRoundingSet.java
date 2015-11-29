@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILPAlgorithm.StatisticalResultAndTopKByOriginalOrder;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.RandomizedRounding;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;

@@ -36,7 +36,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import edu.ucr.cs.dblab.nle020.metamap.MetaMapParser;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetAlgorithm2;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetThreadImpl;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.TopSetsBaseline;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.DoctorSentimentReview;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.SentimentCalculator;
@@ -346,8 +346,8 @@ public class TopKBaseLineSurvey {
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
 		ConcurrentMap<Integer, List<SentimentSet>> docToTopKSets = new ConcurrentHashMap<Integer, List<SentimentSet>>();
 		
-		GreedySetAlgorithm2 ourMethod = 
-				new GreedySetAlgorithm2(K, THRESHOLD, docToStatisticalResult, docToTopKSets, 0, 1, docToSentimentSets);
+		GreedySetThreadImpl ourMethod = 
+				new GreedySetThreadImpl(K, THRESHOLD, docToStatisticalResult, docToTopKSets, 0, 1, docToSentimentSets);
 		ourMethod.run();
 		
 		
