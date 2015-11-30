@@ -13,6 +13,8 @@ public class Constants {
 	public final static int NUM_DIGIT_PRECISION_OF_SENTIMENT = 2;
 	public final static int INVALID_DISTANCE = Integer.MAX_VALUE;
 
+	public final static int NUM_DIGITS_IN_TIME = 2;
+	public final static double TIME_MS_TO_NS = 1e+6;
 	public final static int TRAINING_SIZE = 200;
 	
 	public final static int K = 10;
@@ -20,7 +22,7 @@ public class Constants {
 	
 	public final static String ROOT_CUI = "ROOT";
 	
-	public final static int NUM_DOCTORS_TO_EXPERIMENT = 200;
+	public final static int NUM_DOCTORS_TO_EXPERIMENT = 1000;
 	public final static int NUM_SYNTHETIC_DOCTORS = 100;
 	
 	public final static boolean DEBUG_MODE = false; 
@@ -30,6 +32,7 @@ public class Constants {
 	public final static String SOURCE_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\Immediate Results\\";
 	
 	public final static boolean FIND_BEST_LP_METHOD = false;
+	//public final static LPMethod MY_DEFAULT_LP_METHOD = LPMethod.AUTOMATIC;
 	public final static LPMethod MY_DEFAULT_LP_METHOD = LPMethod.DUAL_SIMPLEX;
 	public static enum LPMethod {
 		AUTOMATIC (-1),

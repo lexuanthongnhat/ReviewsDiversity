@@ -14,6 +14,8 @@ import java.util.Set;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
+
 public class Utils {
 	
 	public static void printRunningTime(long startTime, String message, boolean... useErr) {
@@ -29,6 +31,11 @@ public class Utils {
 			System.out.println(message + "\t" + Runtime.getRuntime().totalMemory()/Math.pow(2, 20) + " MB\t" + new Date());
 		else if (useErr[0] == true)
 			System.err.println(message + "\t" + Runtime.getRuntime().totalMemory()/Math.pow(2, 20) + " MB\t" + new Date());
+	}
+	
+	public static double rounding(double number, int numDigits) {
+		double forRounding = Math.pow(10, numDigits);
+		return (double) Math.round(number * forRounding) / forRounding;
 	}
 	
 	// bound is exclusive

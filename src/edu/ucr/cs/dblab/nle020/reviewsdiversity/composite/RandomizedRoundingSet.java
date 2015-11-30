@@ -6,10 +6,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP.StatisticalResultAndTopKByOriginalOrder;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.RandomizedRounding;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class RandomizedRoundingSet extends RandomizedRounding {
 	ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult = new ConcurrentHashMap<Integer, List<SentimentSet>>();
@@ -28,7 +30,7 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 	 * @return Result's statistics
 	 */
 	protected void runRandomizedRoundingSetPerDoc(int docId, List<SentimentSet> sentimentSets) {
-		long startTime = System.currentTimeMillis();
+		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
 		List<SentimentSet> topKSets = new ArrayList<SentimentSet>();
@@ -59,6 +61,8 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 		
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKSetsResult.put(docId, topKSets);
-		gatherFinalResult(System.currentTimeMillis() - startTime, sentimentSets.size() + 1, statisticalResult);		
+		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
+		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		gatherFinalResult(runningTime, sentimentSets.size() + 1, statisticalResult);		
 	}
 }

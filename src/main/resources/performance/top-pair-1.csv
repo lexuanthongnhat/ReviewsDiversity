@@ -1,0 +1,7 @@
+#k, ILP Time (ms), RR Time, Greedy Time, RR Time Diff, Greedy Time Diff,ILP Cost, RR Cost, Greedy Cost, RR Cost Diff, Greedy Cost Diff 
+k, ILP, RR, Greedy, RR Time Diff, Greedy Time Diff,ILP, RR, Greedy, RR Cost Diff, Greedy Cost Diff 
+3, 9.56, 6.23, 1.06, 34.83 %, 88.91 %, 802.993, 802.993, 807.259, 0.0 %, 0.53 %
+5, 9.52, 6.32, 1.05, 33.61 %, 88.97 %, 755.997, 756.025, 761.586, 0.0 %, 0.74 %
+10, 9.46, 6.28, 1.1, 33.62 %, 88.37 %, 670.565, 670.718, 678.845, 0.02 %, 1.23 %
+15, 9.39, 6.34, 1.2, 32.48 %, 87.22 %, 606.255, 606.314, 616.73, 0.01 %, 1.73 %
+20, 9.45, 6.16, 1.15, 34.81 %, 87.83 %, 553.008, 553.446, 564.937, 0.08 %, 2.16 %

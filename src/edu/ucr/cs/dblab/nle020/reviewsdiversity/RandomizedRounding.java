@@ -17,8 +17,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 import gurobi.GRB;
 import gurobi.GRBEnv;
 import gurobi.GRBException;
@@ -36,7 +38,7 @@ public class RandomizedRounding {
 	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
 	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 	
-	// For RandomizedRoundingSet
+	// For RandomizedRoundingSetThreadImpl
 	public RandomizedRounding(int k, float threshold,
 			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult) {
 		super();
@@ -45,7 +47,7 @@ public class RandomizedRounding {
 		this.docToStatisticalResult = docToStatisticalResult;
 	}
 	
-	// For RandomizedRounding 1, 2
+	// For RandomizedRoundingThreadImpl
 	public RandomizedRounding(int k, float threshold,
 			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult, 
 			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult,
@@ -65,7 +67,7 @@ public class RandomizedRounding {
 	 * @return Result's statistics
 	 */
 	protected void runRandomizedRoundingPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
-		long startTime = System.currentTimeMillis();
+		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);
 		statisticalResult.setNumPairs(conceptSentimentPairs.size());
@@ -90,188 +92,59 @@ public class RandomizedRounding {
 		
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKPairsResult.put(docId, topKPairs);
-		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), statisticalResult);
+		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
+		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		gatherFinalResult(runningTime, pairs.size(), statisticalResult);
 	}
-	
-	// Update result
-	public StatisticalResultAndTopKByOriginalOrder doRandomizedRounding(int[][] distances, StatisticalResult statisticalResult, 
-			Constants.LPMethod method) {	
-		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
-
-		try {
-			int numFacilities = distances.length;
-			int numCustomers = distances[0].length;
-			
-			GRBEnv env = new GRBEnv();
-			env.set(GRB.IntParam.OutputFlag, 0);
-			env.set(GRB.IntParam.Method, method.method());
-			
-			GRBModel model = new GRBModel(env);
-			model.set(GRB.StringAttr.ModelName, "Non-Metric Uncapacitated Facility");
-			
-			// Facility open indicator - fractional
-			GRBVar[] open = new GRBVar[numFacilities];
-			for (int f = 0; f < numFacilities; ++f) {
-				open[f] = model.addVar(0, 1, 0, GRB.CONTINUOUS, "open" + f);
-			}
-			
-			// Facility - Customer connecting indicator - fractional
-			GRBVar[][] connecting = new GRBVar[numFacilities][numCustomers];
-			for (int f = 0; f < numFacilities; ++f) {
-				for (int c = 0; c < numCustomers; ++c) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE)
-						connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.CONTINUOUS, "connecting" + f + "to" + c);
-				}
-			}
-			
-			model.set(GRB.IntAttr.ModelSense, 1);		// Minimization
-			model.update();
 		
-			// CONSTRAINTS: 
-			
-			// Constraint: open the root by default
-			model.addConstr(open[0], GRB.EQUAL, 1.0, "defaultRoot");
-			
-			/*
-			 *  Constraint: open k + 1 facilities, including the root
-			 *  			Sum_f x(f) = k + 1
-			 */
-			GRBLinExpr kFacilities = new GRBLinExpr();
-			for (int f = 0; f < numFacilities; ++f) {
-				kFacilities.addTerm(1.0, open[f]);
+	protected StatisticalResultAndTopKByOriginalOrder doRandomizedRounding(int[][] distances, StatisticalResult statisticalResult,
+			Constants.LPMethod method){
+		
+		int numFacilities = distances.length;
+		int numCustomers = distances[0].length;
+		
+		double[] facilityOpen = new double[numFacilities];
+		double[][] facilityConnect = new double[numFacilities][numCustomers];
+		boolean integralModel = false;
+		ILP.executeModel(distances, k, method, integralModel, facilityOpen, facilityConnect, statisticalResult);
+						
+		boolean needRandomizedRounding = false;
+		for (int f = 0; f < numFacilities; ++f) {
+			if (facilityOpen[f] > 0 && facilityOpen[f] < 1) { 
+				needRandomizedRounding = true;
+				break;
 			}
-			model.addConstr(kFacilities, GRB.EQUAL, k + 1, "kFacilities");
 			
-			/* 
-			 * Constraint: connecting each customer to only one facility
-			 * 				Sum_f x(f, c) = 1
-			 */			
-			GRBLinExpr connectingToOneFacility = new GRBLinExpr();
 			for (int c = 0; c < numCustomers; ++c) {
-				connectingToOneFacility = new GRBLinExpr();
-				for (int f = 0; f < numFacilities; ++f) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE)
-						connectingToOneFacility.addTerm(1.0, connecting[f][c]);
-				}
-				model.addConstr(connectingToOneFacility, GRB.EQUAL, 1.0, "connectingToOneFacility" + c);
-			}
-			
-			/*
-			 * Constraint: only connect customer to opened facility
-			 * 				x(f, c) <= x(f)
-			 */
-			for (int f = 0; f < numFacilities; ++f) {
-				for (int c = 0; c < numCustomers; ++c) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE)
-						model.addConstr(connecting[f][c], GRB.LESS_EQUAL, open[f], "onlyToOpenedFacility_f" + f + "_c" + "c");
-				}
-			}						
-			
-			// Optimize
-			model.optimize();						
-			
-			// Prepare some statistics, update result					
-			statisticalResult.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
-			statisticalResult.setNumFacilities(k);
-			
-			int uncovered = 0;
-			for (int c = 1; c < numCustomers; ++c) {
-				if (connecting[0][c].get(GRB.DoubleAttr.X) == 1)
-					++uncovered;
-			}
-			statisticalResult.setNumUncovered(uncovered);
-			
-			// Retrieving the fractional solution
-			//////////////////////////////////////////////////////////////
-			double[] facilityOpen = new double[numFacilities];
-			double[][] facilityConnect = new double[numFacilities][numCustomers];
-									
-			if (open[0].get(GRB.DoubleAttr.X) < 1)
-				System.err.println("Root is not choosen completely, facilityOpen[0] = " + open[0].get(GRB.DoubleAttr.X));
-				
-			for (int f = 0; f < numFacilities; ++f) {
-				facilityOpen[f] = open[f].get(GRB.DoubleAttr.X);
-				for (int c = 0; c < numCustomers; ++c) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE) {
-						facilityConnect[f][c] = connecting[f][c].get(GRB.DoubleAttr.X);
+				if (distances[f][c] != Constants.INVALID_DISTANCE) {
+					if (facilityConnect[f][c] > 0 && facilityConnect[f][c] < 1) {
+						needRandomizedRounding = true;
+						break;
 					}
 				}
 			}
-			if (Arrays.stream(facilityOpen).sum() != (k + 1))
-				System.out.println("Not k+1");
-			
-			boolean needRandomizedRounding = false;
-			for (int f = 0; f < numFacilities; ++f) {
-				if (facilityOpen[f] > 0 && facilityOpen[f] < 1) { 
-					needRandomizedRounding = true;
-					break;
-				}
-				
-				for (int c = 0; c < numCustomers; ++c) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE) {
-						if (facilityConnect[f][c] > 0 && facilityConnect[f][c] < 1) {
-							needRandomizedRounding = true;
-							break;
-						}
-					}
-				}
-				if (needRandomizedRounding)
-					break;
-			}				
+			if (needRandomizedRounding)
+				break;
+		}				
 
-			if (needRandomizedRounding) {
-//				outputToFileForDebug(distances, facilityOpen, facilityConnect, result, DESKTOP_FOLDER + "rr_debug.txt");
-				roundingRandomly(distances, facilityOpen, facilityConnect, 
-						model.get(GRB.DoubleAttr.ObjVal), statisticalResult);
+		if (needRandomizedRounding) {
+		//	outputToFileForDebug(distances, facilityOpen, facilityConnect, result, DESKTOP_FOLDER + "rr_debug.txt");
+			roundingRandomly(distances, facilityOpen, facilityConnect, statisticalResult);
+		}					
+					
+		// Get top K by original order
+		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
+		for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
+			if (facilityOpen[f] == 1.0) {
+				topKByOriginalOrders.add(f - 1);
 			}
-			
-			
-			// Get top K by original order
-			for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
-				if (open[f].get(GRB.DoubleAttr.X) == 1.0) {
-					topKByOriginalOrders.add(f - 1);
-				}
-			}
-/*			if (topKByOriginalOrders.size() > k)
-				System.err.println("Error, size of topK is " + topKByOriginalOrders.size() + " > k " + k);*/
-			
-			//////////////////////////////////////////////////////////////////////////////
-			// For testing
-			if (Constants.DEBUG_MODE) {
-	
-				
-				// Print the solution
-	/*			System.err.println("\nTOTAL COSTS: " + model.get(GRB.DoubleAttr.ObjVal));
-				System.out.println("Solution:");
-				System.out.print("Opened Facilities:\t");*/
-
-				
-	//			System.out.print("\nConnecting customer:");
-				for (int c = 0; c < numCustomers; ++c) {
-	//				System.out.print("\n\tCustomer " + c + " to facility ");
-					for (int f = 0; f < numFacilities; ++f) {
-						if (connecting[f][c].get(GRB.DoubleAttr.X) == 1.0) {
-	//						System.out.print(f + "\t");
-							facilityConnect[f][c] = 1;
-						}
-					}				
-				}
-			}
-			
-			
-			model.dispose();
-			env.dispose();
-		} catch (GRBException e) {
-		      System.out.println("Error code: " + e.getErrorCode() + ". " + e.getMessage());
-		      e.printStackTrace();
 		}
-		
+					
 		return new StatisticalResultAndTopKByOriginalOrder(statisticalResult, topKByOriginalOrders);
 	}
 	
 	// Output: update facilityOpen, facilityConnect, statisticalResult
-	private void roundingRandomly(int[][] distances, double[] facilityOpen, double[][] facilityConnect, 
-			double fractionalOptimalCost,
+	private void roundingRandomly(int[][] distances, double[] facilityOpen, double[][] facilityConnect,
 			StatisticalResult statisticalResult) {
 		System.out.println("Doing RR");
 		int numFacilities = facilityOpen.length;
@@ -281,10 +154,6 @@ public class RandomizedRounding {
 		double[][] originalConnect = new double[numFacilities][];
 		for (int f = 0; f < numFacilities; ++f)
 			originalConnect[f] = facilityConnect[f].clone();
-		
-		/*double originalFacilityCost = 0;						// can be < k, always <= k, = k most of time
-		for (double open : originalOpen)
-			originalFacilityCost += open;*/
 		
 		for (int f = 0; f < numFacilities; ++f) {
 			facilityOpen[f] = 0;
@@ -305,7 +174,6 @@ public class RandomizedRounding {
 			customers.add(customer);
 		}*/
 		
-		// TODO - re-check these threshold if you want to get optimal cost (with more than k facilities)
 		double facilityCost = 0.0f;
 		double assignmentCost = 0.0f;
 
@@ -323,7 +191,7 @@ public class RandomizedRounding {
 			}								
 		}				
 					
-		/*// assign customer to the closest selected facility
+/*		// assign customer to the closest selected facility using Unit Data Structure
 		Set<Integer> unassignedCustomers = new HashSet<Integer>();
 		for (Unit customer : customers) {
 			boolean isAssigned = false;
@@ -347,9 +215,9 @@ public class RandomizedRounding {
 				facilityConnect[0][c] = 1.0f;
 				assignmentCost += distances[0][c];									
 			}
-		}
-		*/
+		}*/
 		
+		// Assign customers to the closest selected facility 
 		for (int c = 0; c < numCustomers; ++c) {
 			int facility = 0;
 			int minD = distances[0][c];
@@ -362,38 +230,20 @@ public class RandomizedRounding {
 			assignmentCost += minD;
 			facilityConnect[facility][c] = 1;
 		}		
-
-
-		
-		int numFacilitiesOpened = 0;
+	
+				
 		int numUncovered = 0;
-		
-		for (int f = 1; f < numFacilities; ++f) {
-			facilityOpen[f] = 0;
-		}
-		
 		for (int c = 0; c < numCustomers; ++c) {
 			if (facilityConnect[0][c] == 1)
 				++numUncovered;			
-			for (int f = 1; f < numFacilities; ++f) {
-				if (facilityConnect[f][c] == 1) {
-					facilityOpen[f] = 1;
-					break;
-				}
-			}
 		}
 		
-		for (int f = 1; f < numFacilities; ++f) {
-			if (facilityOpen[f] == 1.0)
-				++numFacilitiesOpened;
-		}				
-		
 		statisticalResult.setFinalCost(assignmentCost);
-		statisticalResult.setNumFacilities(numFacilitiesOpened);
+		statisticalResult.setNumFacilities(k);
 		statisticalResult.setNumUncovered(numUncovered);
 	}
-
-	private static class Unit {
+	
+/*	private static class Unit {
 		int id = 0;
 		int distance = 0;
 		PriorityQueue<Unit> ancestors = new PriorityQueue<Unit>(new Comparator<Unit>(){
@@ -422,7 +272,7 @@ public class RandomizedRounding {
 			ancestors.add(ancestor);
 		}
 	}
-	
+*/	
 	
 	private boolean rollTheDice(double probability) {
 		if (Math.random() < probability)
@@ -431,7 +281,7 @@ public class RandomizedRounding {
 			return false;
 	}
 	
-	protected void gatherFinalResult(long runningTime, int datasetSize, StatisticalResult statisticalResult) {
+	protected void gatherFinalResult(double runningTime, int datasetSize, StatisticalResult statisticalResult) {
 		
 		if (datasetSize <= k + 1) {
 			statisticalResult.setNumFacilities(datasetSize);
@@ -500,67 +350,5 @@ public class RandomizedRounding {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-	
-	protected void checkResult(int[][] distances, double[] facilityOpen, double[][] facilityConnect, StatisticalResult result) {
-		int numFacilities = facilityOpen.length;
-		int numCustomers = facilityConnect[0].length;
-		
-		long verifyingCost = 0;	
-		
-		// Test 1
-		for (int c = 0; c < numCustomers; ++c) {
-			int numConnect = 0;
-			for (int f = 0; f < numFacilities; ++f) {
-				if (facilityConnect[f][c] == 1) {
-					verifyingCost += distances[f][c];
-					++numConnect;
-				}					
-			}
-			
-			if (numConnect != 1) {
-				System.err.println("ILP TEST 1 - ERROR at customer " + c);
-				for (int f = 0; f < numFacilities; ++f) {
-					if (facilityConnect[f][c] == 1) {
-						System.err.println("facility[" + f + "][" + c + "] = " + facilityConnect[f][c] 
-								+ ", facilityOpen[" + f + "] = " + facilityOpen[f]);
-					}					
-				}	
-			}
-		}
-
-		
-		for (int f = 0; f < numFacilities; ++f) {
-			if (facilityOpen[f] != 1) {
-
-				for (int c = 0; c < numCustomers; ++c) {
-					if (facilityConnect[f][c] == 1) {
-						System.err.println("ILP TEST 1 - ERROR 2 at facility " + f + ", customer " + c);
-					}					
-				}
-			}
-		}
-		
-		System.out.println("Cost: " + result.getFinalCost() + " - Verifying Cost: " + verifyingCost);
-		if (verifyingCost != result.getFinalCost())
-			System.err.println("ILP Error at docID " + result.getDocID());
-		
-		
-		// Test 2
-		verifyingCost = 0;
-		for (int c = 0; c < numCustomers; ++c) {
-			int min = Constants.INVALID_DISTANCE;
-			for (int f = 0; f < numFacilities; ++f) {
-				if (facilityOpen[f] == 1) {
-					if (distances[f][c] < min)
-						min = distances[f][c];
-				}
-			}			
-			verifyingCost += min;
-		}
-		
-		if (verifyingCost != result.getFinalCost())
-			System.err.println("RR TEST 2 -  Error 2 at docID " + result.getDocID() + 
-					":\tCost: " + result.getFinalCost() + " - Verifying Cost 2: " + verifyingCost);
 	}
 }

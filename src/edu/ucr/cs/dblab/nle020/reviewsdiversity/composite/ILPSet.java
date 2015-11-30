@@ -8,8 +8,10 @@ import java.util.concurrent.ConcurrentMap;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class ILPSet extends ILP {
 	ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult = new ConcurrentHashMap<Integer, List<SentimentSet>>();
@@ -28,7 +30,7 @@ public class ILPSet extends ILP {
 	 * @return Result's statistics
 	 */
 	protected void runILPSetPerDoc(int docId, List<SentimentSet> sentimentSets) {
-		long startTime = System.currentTimeMillis();
+		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
 		List<SentimentSet> topKSets = new ArrayList<SentimentSet>();
@@ -48,7 +50,7 @@ public class ILPSet extends ILP {
 		} else {
 			int[][] distances = initDistances(threshold, sentimentSets, pairs, statisticalResult);
 			
-			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult);
+			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult, LPMethod.AUTOMATIC);
 			
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
 			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
@@ -58,7 +60,9 @@ public class ILPSet extends ILP {
 		
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKSetsResult.put(docId, topKSets);
-		gatherFinalResult(System.currentTimeMillis() - startTime, sentimentSets.size() + 1, statisticalResult);		
+		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
+		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		gatherFinalResult(runningTime, sentimentSets.size() + 1, statisticalResult);		
 	}
 	
 	/**

@@ -5,7 +5,9 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 import gurobi.GRB;
 import gurobi.GRBEnv;
 import gurobi.GRBException;
@@ -16,7 +18,6 @@ import gurobi.GRBVar;
 /**
  * Integer Linear Programming Algorithm
  * @author Thong Nhat
- *
  */
 public class ILP {
 	protected int k = 0;
@@ -27,7 +28,7 @@ public class ILP {
 	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
 	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 	
-	// Used for ILPSetAlgorithm
+	// Used for ILPSetThreadImpl
 	public ILP(int k, float threshold,
 			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult) {
 		super();
@@ -36,7 +37,7 @@ public class ILP {
 		this.docToStatisticalResult = docToStatisticalResult;
 	}
 	
-	// Used for ILPAlgorithm 1, 2
+	// Used for ILPThreadImpl
 	public ILP(int k, float threshold,
 			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
 			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult) {
@@ -54,7 +55,7 @@ public class ILP {
 	 * @return Result's statistics
 	 */
 	protected void runILPPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
-		long startTime = System.currentTimeMillis();
+		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);
 		
@@ -69,7 +70,7 @@ public class ILP {
 			topKPairs = pairs;
 		} else {
 			int[][] distances = initDistances(pairs, threshold);
-			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult);
+			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult, LPMethod.AUTOMATIC);
 			
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
 			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
@@ -79,38 +80,88 @@ public class ILP {
 
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKPairsResult.put(docId, topKPairs);
-		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), statisticalResult);		
+		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
+		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		gatherFinalResult(runningTime, pairs.size(), statisticalResult);		
 	}
 	
-	// Update topK, result
-	public StatisticalResultAndTopKByOriginalOrder doILP(int[][] distances, StatisticalResult statisticalResult) {		
+	protected StatisticalResultAndTopKByOriginalOrder doILP(int[][] distances, StatisticalResult statisticalResult,
+			Constants.LPMethod method){
+		
+		int numFacilities = distances.length;
+		int numCustomers = distances[0].length;
+		
+		double[] facilityOpen = new double[numFacilities];
+		double[][] facilityConnect = new double[numFacilities][numCustomers];
+		boolean integralModel = true;
+		executeModel(distances, k, LPMethod.AUTOMATIC, integralModel, facilityOpen, facilityConnect, statisticalResult);
+		
+		
+		// Get top K by original order
 		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
+		for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
+			if (facilityOpen[f] == 1.0) {
+				topKByOriginalOrders.add(f - 1);
+			}
+		}
+		
+		return new StatisticalResultAndTopKByOriginalOrder(statisticalResult, topKByOriginalOrders);
+	}
+	
+	/**
+	 * Building and executing ILP/LP model
+	 * @param distances - input the distances between facility-customer
+	 * @param method - input MLP solver
+	 * @param integralModel - input to choose whether it's ILP or just LP 
+	 * @param facilityOpen - output of facility opening indicator
+	 * @param facilityConnect - output of facility-customer connection
+	 * @param statisticalResult - output of objective
+	 */
+	public static void executeModel(
+			int[][]distances, int k, Constants.LPMethod method, boolean integralModel, 
+			double[] facilityOpen,
+			double[][] facilityConnect,
+			StatisticalResult statisticalResult) {
 		
 		try {
 			int numFacilities = distances.length;			// Including the root
-			int numCustomers = distances[0].length;
-			
+			int numCustomers = distances[0].length;			
 			
 			GRBEnv env = new GRBEnv();
 			env.set(GRB.IntParam.OutputFlag, 0);
+			env.set(GRB.IntParam.Method, method.method());
 			
 			GRBModel model = new GRBModel(env);
 			model.set(GRB.StringAttr.ModelName, "Non-Metric Uncapacitated Facility");
 			
 			// Facility open indicator
 			GRBVar[] open = new GRBVar[numFacilities];
-			for (int f = 0; f < numFacilities; ++f) {
-				open[f] = model.addVar(0, 1, 0, GRB.BINARY, "open" + f);
-			}
+			
+			if (integralModel) 
+				for (int f = 0; f < numFacilities; ++f) {
+					open[f] = model.addVar(0, 1, 0, GRB.BINARY, "open" + f);
+				}
+			else
+				for (int f = 0; f < numFacilities; ++f) {
+					open[f] = model.addVar(0, 1, 0, GRB.CONTINUOUS, "open" + f);
+				}
 			
 			// Facility - Customer connecting indicator
 			GRBVar[][] connecting = new GRBVar[numFacilities][numCustomers];
-			for (int f = 0; f < numFacilities; ++f) {
-				for (int c = 0; c < numCustomers; ++c) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE)
-						connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.BINARY, "connecting" + f + "to" + c);
+			if (integralModel)
+				for (int f = 0; f < numFacilities; ++f) {
+					for (int c = 0; c < numCustomers; ++c) {
+						if (distances[f][c] != Constants.INVALID_DISTANCE)
+							connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.BINARY, "connecting" + f + "to" + c);
+					}
 				}
-			}
+			else
+				for (int f = 0; f < numFacilities; ++f) {
+					for (int c = 0; c < numCustomers; ++c) {
+						if (distances[f][c] != Constants.INVALID_DISTANCE)
+							connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.CONTINUOUS, "connecting" + f + "to" + c);
+					}
+				}
 			
 			model.set(GRB.IntAttr.ModelSense, 1);		// Minimization
 			model.update();
@@ -125,7 +176,10 @@ public class ILP {
 			}
 			model.addConstr(kFacilities, GRB.EQUAL, k + 1, "kFacilities");
 			
-			// Constraint: connecting each customer to only one facility
+			/* 
+			 * Constraint: connecting each customer to only one facility
+			 * 				Sum_f x(f, c) = 1
+			 */			
 			GRBLinExpr connectingToOneFacility = new GRBLinExpr();
 			for (int c = 0; c < numCustomers; ++c) {
 				connectingToOneFacility = new GRBLinExpr();
@@ -136,63 +190,40 @@ public class ILP {
 				model.addConstr(connectingToOneFacility, GRB.EQUAL, 1.0, "connectingToOneFacility" + c);
 			}
 			
-			// Constraint: only connect customer to opened facility
+			/*
+			 * Constraint: only connect customer to opened facility
+			 * 				x(f, c) <= x(f)
+			 */
 			for (int f = 0; f < numFacilities; ++f) {
 				for (int c = 0; c < numCustomers; ++c) {
 					if (distances[f][c] != Constants.INVALID_DISTANCE)
 						model.addConstr(connecting[f][c], GRB.LESS_EQUAL, open[f], "onlyToOpenedFacility_f" + f + "_c" + "c");
 				}
-			}
-						
+			}						
 			
-			// Optimize
-			model.optimize();
-			
+			// Optimize the model
+			model.optimize();			
 			
 			// Prepare some statistics, update result					
 			statisticalResult.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
-			statisticalResult.setOptimalCost(model.get(GRB.DoubleAttr.ObjBound));
+			if (integralModel)
+				statisticalResult.setOptimalCost(model.get(GRB.DoubleAttr.ObjBound));
+			
 			for (int c = 1; c < numCustomers; ++c) {
 				if (connecting[0][c].get(GRB.DoubleAttr.X) == 1.0) {
 					statisticalResult.increaseNumUncovered();
 				}
 			}
 			
-			// Get top K by original order
-			for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
-				if (open[f].get(GRB.DoubleAttr.X) == 1.0) {
-					topKByOriginalOrders.add(f - 1);
+			
+			for (int f = 0; f < numFacilities; ++f) {
+				facilityOpen[f] = open[f].get(GRB.DoubleAttr.X);
+				for (int c = 0; c < numCustomers; ++c) {
+					if (distances[f][c] != Constants.INVALID_DISTANCE) {
+						facilityConnect[f][c] = connecting[f][c].get(GRB.DoubleAttr.X);
+					}
 				}
 			}
-			
-			//////////////////////////////////////////////////////////////////////////////
-			// For testing
-			if (Constants.DEBUG_MODE) {
-				int[] facilityOpen = new int[numFacilities];
-				int[][] facilityConnect = new int[numFacilities][numCustomers];
-				
-				for (int f = 0; f < numFacilities; ++f) {
-					facilityOpen[f] = 0;
-					for (int c = 0; c < numCustomers; ++c) {
-						facilityConnect[f][c] = 0;
-					}
-				}		
-				
-				// Print the solution
-				for (int f = 0; f < numFacilities; ++f) {
-					if (open[f].get(GRB.DoubleAttr.X) == 1.0)
-						facilityOpen[f] = 1;
-				}
-				
-				for (int c = 0; c < numCustomers; ++c) {
-					for (int f = 0; f < numFacilities; ++f) {
-						if (connecting[f][c].get(GRB.DoubleAttr.X) == 1.0)
-							facilityConnect[f][c] = 1;
-					}				
-				}				
-				
-				checkResult(distances, facilityOpen, facilityConnect, statisticalResult);
-			}			
 			
 			model.dispose();
 			env.dispose();
@@ -200,11 +231,9 @@ public class ILP {
 		      System.out.println("Error code: " + e.getErrorCode() + ". " + e.getMessage());
 		      e.printStackTrace();
 		}
-		
-		return new StatisticalResultAndTopKByOriginalOrder(statisticalResult, topKByOriginalOrders);
 	}
-	
-	protected void gatherFinalResult(long runningTime, int datasetSize, StatisticalResult statisticalResult) {
+
+	protected void gatherFinalResult(double runningTime, int datasetSize, StatisticalResult statisticalResult) {
 		
 		if (datasetSize <= k + 1) {
 			statisticalResult.setRunningTime(0);

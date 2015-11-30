@@ -3,6 +3,7 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,7 +47,8 @@ public class Greedy {
 	 * @return Result's statistics
 	 */
 	protected void runGreedyPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
-		long startTime = System.currentTimeMillis();
+		//long startTime = System.currentTimeMillis();
+		long startTime = System.nanoTime();
 				
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
 		List<FullPair> topK = new ArrayList<FullPair>();	
@@ -76,7 +78,10 @@ public class Greedy {
 		
 		docToTopKPairsResult.put(docId, topKPairsResult);
 		docToStatisticalResult.put(docId, statisticalResult);
-		gatherFinalResult(System.currentTimeMillis() - startTime, pairs.size(), statisticalResult, topK);
+		
+		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
+		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		gatherFinalResult(runningTime, pairs.size(), statisticalResult, topK);
 //		Utils.printRunningTime(startTime, "Greedy finished docId " + docId);
 	}	
 	
@@ -339,7 +344,7 @@ public class Greedy {
 			System.err.println("Greedy Error at docID " + statisticalResult.getDocID());
 	}
 
-	private void gatherFinalResult(long runningTime, int datasetSize, StatisticalResult statisticalResult, List<FullPair> topK) {
+	private void gatherFinalResult(double runningTime, int datasetSize, StatisticalResult statisticalResult, List<FullPair> topK) {
 		if (datasetSize <= k) {
 			statisticalResult.setFinalCost(0);
 			statisticalResult.setNumUncovered(0);

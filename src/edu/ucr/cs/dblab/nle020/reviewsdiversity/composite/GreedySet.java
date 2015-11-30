@@ -17,6 +17,7 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.FullPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
+import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class GreedySet {
 	protected int k = 0;
@@ -44,7 +45,7 @@ public class GreedySet {
 	 * @return Result's statistics
 	 */
 	protected void runGreedyPerDoc(int docId, Collection<? extends SentimentSet> sentimentSets) {
-		long startTime = System.currentTimeMillis();
+		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);;
 
@@ -68,8 +69,6 @@ public class GreedySet {
 				chooseNextPair(heap, topK, statisticalResult);
 			}
 		}
-		
-		gatherFinalResult(System.currentTimeMillis() - startTime, fullPairSets.size(), statisticalResult, topK);
 				
 		if (Constants.DEBUG_MODE)
 			checkResult(topK, distances, statisticalResult);
@@ -80,6 +79,9 @@ public class GreedySet {
 		docToStatisticalResult.put(docId, statisticalResult);
 //		Utils.printRunningTime(startTime, "Greedy finished docId " + docId);
 //		printResult();	
+		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
+		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		gatherFinalResult(runningTime, fullPairSets.size(), statisticalResult, topK);
 	}	
 	
 	private List<SentimentSet> convertTopKFullPairsToTopKSets(
@@ -355,7 +357,7 @@ public class GreedySet {
 	}
 	
 	
-	private void gatherFinalResult(long runningTime, int datasetSize, StatisticalResult result, List<FullPair> topK) {
+	private void gatherFinalResult(double runningTime, int datasetSize, StatisticalResult result, List<FullPair> topK) {
 		if (datasetSize <= k) {
 			result.setFinalCost(0);
 			result.setNumUncovered(0);

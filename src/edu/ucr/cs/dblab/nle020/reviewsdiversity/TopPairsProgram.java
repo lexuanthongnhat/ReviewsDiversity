@@ -52,12 +52,14 @@ public class TopPairsProgram {
 	
 	private static int k = Constants.K;
 	private static float threshold = Constants.THRESHOLD;
-
-	private static Set<Integer> randomIndices = Utils.randomIndices(1000, Constants.NUM_DOCTORS_TO_EXPERIMENT);
 	
-	private static final int GREEDY_INDEX = 0;
-	private static final int ILP_INDEX = 1;
-	private static final int RR_INDEX = 2;
+	private static boolean RANDOMIZE_DOCS = false;
+	private static Set<Integer> randomIndices = Utils.randomIndices(1000, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+	private final static int NUM_DOCTORS_TO_EXPERIMENT = Constants.NUM_DOCTORS_TO_EXPERIMENT;
+	
+	private static final int ILP_INDEX = 0;
+	private static final int RR_INDEX = 1;
+	private static final int GREEDY_INDEX = 2;
 
 	public final static String DOC_TO_REVIEWS_PATH = "src/main/resources/doc_pairs_1_prunned_vector.txt";
 //	public final static String OUTPUT_FOLDER = "D:\\Experiments\\";
@@ -70,11 +72,12 @@ public class TopPairsProgram {
 	public static void main(String[] args) throws InterruptedException, ExecutionException, IOException {
 		long startTime = System.currentTimeMillis();
 //		getDatasetStatistics();
+		
 		topPairsExperiment();
+		topSetsExperiment(SetOption.REVIEW);
+		topSetsExperiment(SetOption.SENTENCE);
+		
 //		topPairsSyntheticExperiment();
-			
-//		topSetsExperiment(SetOption.REVIEW);
-//		topSetsExperiment(SetOption.SENTENCE);
 		Utils.printRunningTime(startTime, "Finished evaluation");
 	}
 	
@@ -163,10 +166,10 @@ public class TopPairsProgram {
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
 		// TODO - the first "3" is always slower than the other numbers 
-//		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-		int[] ks = new int[] {5};
-//		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
-		float[] thresholds = new float[] {0.2f};
+		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
+//		int[] ks = new int[] {5};
+		float[] thresholds = new float[] {0.1f, 0.3f};
+//		float[] thresholds = new float[] {0.3f};
 		for (int numChoosen : ks) {
 			k = numChoosen;
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
@@ -180,13 +183,12 @@ public class TopPairsProgram {
 			}
 		}
 		
-		String finalOutputExcelPath = OUTPUT_FOLDER + "Top Pairs_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
-		outputSummaryStatisticsToExcel(statisticalResults, finalOutputExcelPath);
+		outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER, "top-pair");
 	}
 
 	private static StatisticalResult[] topPairsExperiment(String outputFolder) throws InterruptedException, ExecutionException {
 		long startTime = System.currentTimeMillis();		
-		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, true);
+		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
 		printInitialization(docToConceptSentimentPairs);
 		
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedy = new ConcurrentHashMap<Integer, StatisticalResult>();
@@ -197,7 +199,7 @@ public class TopPairsProgram {
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultILP = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 		ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResultRR = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
 						
-		String outputPrefix = outputFolder + "top_pairs_result_" + Constants.NUM_DOCTORS_TO_EXPERIMENT;
+		String outputPrefix = outputFolder + "top_pairs_result_" + NUM_DOCTORS_TO_EXPERIMENT;
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToTopPairsResultILP);
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToTopPairsResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);
@@ -241,7 +243,7 @@ public class TopPairsProgram {
 			outputTopKToJson(outputPrefix + "_rr_pair.txt", docToTopKPairsResultRR);
 		}
 		
-		String outputPath = outputFolder + "review_diversity_k" + k + "_threshold" + threshold + "_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
+		String outputPath = outputFolder + "review_diversity_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
 		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 						
@@ -269,12 +271,12 @@ public class TopPairsProgram {
 		int numDecimals = 1;
 
 		docToConceptSentimentPairs = createSyntheticDataset(
-				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, true), 
+				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS), 
 				Constants.NUM_SYNTHETIC_DOCTORS, numDecimals);
 
 //		printInitialization(docToConceptSentimentPairs);
 		
-		String outputPrefix = OUTPUT_FOLDER + "top_pairs_synthetic_result_" + Constants.NUM_DOCTORS_TO_EXPERIMENT;
+		String outputPrefix = OUTPUT_FOLDER + "top_pairs_synthetic_result_" + NUM_DOCTORS_TO_EXPERIMENT;
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToTopPairsResultILP);
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToTopPairsResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);
@@ -292,7 +294,7 @@ public class TopPairsProgram {
 		outputResultToJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);*/
 		
 		String outputPath = OUTPUT_FOLDER + "review_diversity_synthetic_k" + k + "_threshold" + threshold 
-				+ "_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
+				+ "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
 		outputStatisticalResultToExcel(outputPath, isSet, 
 				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
@@ -305,8 +307,8 @@ public class TopPairsProgram {
 		
 		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
 //		int[] ks = new int[] {5};
-		float[] thresholds = new float[] {0.1f, 0.2f, 0.3f};
-//		float[] thresholds = new float[] {0.2f};
+		float[] thresholds = new float[] {0.1f, 0.3f};
+//		float[] thresholds = new float[] {0.3f};
 		for (int numChoosen : ks) {
 			k = numChoosen;
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
@@ -321,8 +323,7 @@ public class TopPairsProgram {
 			}
 		}
 		
-		String finalOutputExcelPath = OUTPUT_FOLDER + "Top " + setOption + "_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
-		outputSummaryStatisticsToExcel(statisticalResults, finalOutputExcelPath);
+		outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER, "top-" + setOption.toString().toLowerCase());
 	}
 	
 	private static StatisticalResult[] topSetsExperiment(SetOption setOption, String outputFolder) {
@@ -337,20 +338,19 @@ public class TopPairsProgram {
 		ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsILP = new ConcurrentHashMap<Integer, List<SentimentSet>>();
 		ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsRR = new ConcurrentHashMap<Integer, List<SentimentSet>>();
 		
-		boolean getSomeRandomItems = true;
 		switch (setOption) {
 		case REVIEW: 	
-			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, getSomeRandomItems);
+			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
 			break;
 		case SENTENCE:  
-			docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH, getSomeRandomItems);
+			docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
 			break;
 		default: 		
-			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, getSomeRandomItems);
+			docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
 			break;
 		}			
 
-		String outputPrefix = outputFolder + "top_" + setOption + "_result_" + Constants.NUM_DOCTORS_TO_EXPERIMENT;
+		String outputPrefix = outputFolder + "top_" + setOption + "_result_" + NUM_DOCTORS_TO_EXPERIMENT;
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToStatisticalResultILP);
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToStatisticalResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
@@ -371,7 +371,7 @@ public class TopPairsProgram {
 		outputTopKToJson(outputPrefix + "_rr_set.txt", convertTopKSetsMapToSetResultMap(docToTopKSetsRR));
 				
 		String outputPath = outputFolder + "review_diversity_" + setOption + 
-										"_k" + k + "_threshold" + threshold + "_" + Constants.NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
+										"_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = true;
 		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 		
@@ -735,8 +735,6 @@ public class TopPairsProgram {
 		Cell greedyRatioCell = row.createCell(indexOffset + 9);
 		Cell rrRatioCell = row.createCell(indexOffset + 10);
 		
-		Cell rrChosenCell = row.createCell(indexOffset + 11);
-
 	
 		numUncoveredILPCell.setCellStyle(cs);
 		numUncoveredGreedyCell.setCellStyle(cs);
@@ -748,9 +746,7 @@ public class TopPairsProgram {
 		greedyCostCell.setCellStyle(cs);
 		rrCostCell.setCellStyle(cs);		
 		greedyRatioCell.setCellStyle(cs);		
-		rrRatioCell.setCellStyle(cs);
-		rrChosenCell.setCellStyle(cs);
-		
+		rrRatioCell.setCellStyle(cs);		
 		
 		numUncoveredILPCell.setCellValue(ilpResult.getNumUncovered());
 		numUncoveredGreedyCell.setCellValue(greedyResult.getNumUncovered());
@@ -802,11 +798,6 @@ public class TopPairsProgram {
 			} else if (ilpResult.getFinalCost() == 0 && rrResult.getFinalCost() == 0) {
 				rrRatioCell.setCellValue("0%");
 			}
-
-
-			rrChosenCell.setCellValue(rrResult.getNumFacilities());
-			if (rrResult.getNumFacilities() > k)
-				rrChosenCell.setCellStyle(csOrange);
 		}
 	}
 	
@@ -908,13 +899,8 @@ public class TopPairsProgram {
 		for (int method = 0; method < numMethods - 1; ++method) {
 			ratios[method].setCellValue(methods[method + 1] + " Increased Ratios");
 		}
-		
-		
-		Cell rrNumChoosenCell = row.createCell(lastColumn);
-		rrNumChoosenCell.setCellStyle(cs);
-		rrNumChoosenCell.setCellValue("# Choosen Rounding");
-		
-		Cell infoCell = row.createCell(lastColumn + 1);
+				
+		Cell infoCell = row.createCell(lastColumn);
 		infoCell.setCellStyle(cs);
 		infoCell.setCellValue("K = " + k + ", Threshold = " + threshold);
 	}
@@ -929,7 +915,7 @@ public class TopPairsProgram {
 		if (getSomeRandomItems)
 			indices = randomIndices;
 		else {
-			for (int index = 0; index < doctorSentimentReviews.size(); ++index) {
+			for (int index = 0; index < NUM_DOCTORS_TO_EXPERIMENT; ++index) {
 				indices.add(index);
 			}
 		}
@@ -969,7 +955,7 @@ public class TopPairsProgram {
 		if (getSomeRandomItems)
 			indices = randomIndices;
 		else {
-			for (int index = 0; index < doctorSentimentReviews.size(); ++index) {
+			for (int index = 0; index < NUM_DOCTORS_TO_EXPERIMENT; ++index) {
 				indices.add(index);
 			}
 		}
@@ -1012,7 +998,7 @@ public class TopPairsProgram {
 		if (getSomeRandomItems)
 			indices = randomIndices;
 		else {
-			for (int index = 0; index < doctorSentimentReviews.size(); ++index) {
+			for (int index = 0; index < NUM_DOCTORS_TO_EXPERIMENT; ++index) {
 				indices.add(index);
 			}
 		}
@@ -1108,18 +1094,20 @@ public class TopPairsProgram {
 		
 		StatisticalResult[] statisticalResults = new StatisticalResult[3];
 		statisticalResults[GREEDY_INDEX] 	= 
-				new StatisticalResult(k, threshold, costSum[GREEDY_INDEX] / count, (long) (runningTimeSum[GREEDY_INDEX] / count));
+				new StatisticalResult(k, threshold, costSum[GREEDY_INDEX] / count, 	
+						Utils.rounding(runningTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
 		statisticalResults[ILP_INDEX] 		= 
-				new StatisticalResult(k, threshold, costSum[ILP_INDEX] / count, (long) (runningTimeSum[ILP_INDEX] / count));
+				new StatisticalResult(k, threshold, costSum[ILP_INDEX] / count, 
+						Utils.rounding(runningTimeSum[ILP_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
 		statisticalResults[RR_INDEX] 		= 
-				new StatisticalResult(k, threshold, costSum[RR_INDEX] / count, (long) (runningTimeSum[RR_INDEX] / count));
+				new StatisticalResult(k, threshold, costSum[RR_INDEX] / count, 
+						Utils.rounding(runningTimeSum[RR_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
 		
 		return statisticalResults;
 	}
 	
-	private static void outputSummaryStatisticsToExcel(
-			List<StatisticalResult[]> statisticalResults, String finalOutputExcelPath) {
-		Workbook wb = new XSSFWorkbook();
+	private static void outputSummaryStatisticsToCSV(
+			List<StatisticalResult[]> statisticalResults, String finalOutputFolder, String fileNamePrefix) {
 		
 		Map<Float, List<StatisticalResult[]>> thresholdToStatisticalResults = new HashMap<Float, List<StatisticalResult[]>>();
 		statisticalResults.stream().forEach(statistics -> {
@@ -1129,56 +1117,52 @@ public class TopPairsProgram {
 			thresholdToStatisticalResults.get(threshold).add(statistics);
 			});
 		
-		try {
-			for (Float threshold : thresholdToStatisticalResults.keySet()) {
-				Sheet sheet = wb.createSheet("Threshold " + threshold);
-				fillTheSheetWithSummaryStatistics(sheet, thresholdToStatisticalResults.get(threshold));
-			}
+		for (Float threshold : thresholdToStatisticalResults.keySet()) {
+			int modifiedThresholdForLatexName = (int) (threshold * 10);
+			String fileName = finalOutputFolder + fileNamePrefix + "-" + modifiedThresholdForLatexName + ".csv"; 
+			String content = prepareCSVSummary(thresholdToStatisticalResults.get(threshold));
 			
-			wb.write(Files.newOutputStream(Paths.get(finalOutputExcelPath)));
-			wb.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+			try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileName), 
+					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+				
+				writer.write(content);
+				writer.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
+		
+		System.err.println("Summaries was outputed to \"" + finalOutputFolder + "\"");
 	}
-
-	private static void fillTheSheetWithSummaryStatistics(Sheet sheet,
-			List<StatisticalResult[]> statisticalResults) {
-				
-		for (int count = 0; count < statisticalResults.size() + 1; ++count) {
-			Row row = sheet.createRow(count);
+	
+	private static String prepareCSVSummary(List<StatisticalResult[]> resultsList) {
+		String content = "#k, ILP Time (ms), RR Time, Greedy Time, RR Time Diff, Greedy Time Diff,"
+				+ "ILP Cost, RR Cost, Greedy Cost, RR Cost Diff, Greedy Cost Diff \n";
+		content = content + "k, ILP, RR, Greedy, RR Time Diff, Greedy Time Diff,"
+				+ "ILP, RR, Greedy, RR Cost Diff, Greedy Cost Diff \n";
+		
+		int i = 0;
+		if (resultsList.get(0)[GREEDY_INDEX].getK() == resultsList.get(1)[GREEDY_INDEX].getK())
+			i = 1;
+		for ( ; i < resultsList.size(); ++i) {
+			StatisticalResult[] stats = resultsList.get(i);
+			double ilpTime = stats[ILP_INDEX].getRunningTime();
+			double rrTime = stats[RR_INDEX].getRunningTime();
+			double greedyTime = stats[GREEDY_INDEX].getRunningTime();
+			double rrChangeTime = - Utils.rounding((rrTime - ilpTime) / ilpTime * 100, Constants.NUM_DIGITS_IN_TIME);
+			double greedyChangeTime = - Utils.rounding((greedyTime - ilpTime) / ilpTime * 100, Constants.NUM_DIGITS_IN_TIME);
 			
-			Cell cellK = row.createCell(0);
-			Cell cellTimeGreedy = row.createCell(1);
-			Cell cellTimeILP	= row.createCell(2);
-			Cell cellTimeRR		= row.createCell(3);
+			double ilpCost = stats[ILP_INDEX].getFinalCost();
+			double rrCost = stats[RR_INDEX].getFinalCost();
+			double greedyCost = stats[GREEDY_INDEX].getFinalCost();
+			double rrChangeCost = Utils.rounding((rrCost - ilpCost) / ilpCost * 100, Constants.NUM_DIGITS_IN_TIME);
+			double greedyChangeCost = Utils.rounding((greedyCost - ilpCost) / ilpCost * 100, Constants.NUM_DIGITS_IN_TIME);
 			
-			Cell cellCostGreedy	= row.createCell(4);
-			Cell cellCostILP	= row.createCell(5);
-			Cell cellCostRR		= row.createCell(6);
-			
-			if (count == 0) {
-				cellK.setCellValue("k");
-				
-				cellTimeGreedy.setCellValue("Greedy Time");
-				cellTimeILP.setCellValue("ILP Time");
-				cellTimeRR.setCellValue("RR Time");
-				
-				cellCostGreedy.setCellValue("Greedy Cost");
-				cellCostILP.setCellValue("ILP Cost");
-				cellCostRR.setCellValue("RR Cost");
-			} else {
-				StatisticalResult[] stats = statisticalResults.get(count - 1);
-				cellK.setCellValue(stats[GREEDY_INDEX].getK());
-				
-				cellTimeGreedy.setCellValue(stats[GREEDY_INDEX].getRunningTime());
-				cellTimeILP.setCellValue(stats[ILP_INDEX].getRunningTime());
-				cellTimeRR.setCellValue(stats[RR_INDEX].getRunningTime());
-				
-				cellCostGreedy.setCellValue(stats[GREEDY_INDEX].getFinalCost());
-				cellCostILP.setCellValue(stats[ILP_INDEX].getFinalCost());
-				cellCostRR.setCellValue(stats[RR_INDEX].getFinalCost());
-			}
-		}		
+			content = content + resultsList.get(i)[GREEDY_INDEX].getK() + ", " 
+					+ ilpTime + ", " + rrTime + ", " + greedyTime + ", " + rrChangeTime + " %, " + greedyChangeTime + " %, "
+					+ ilpCost + ", " + rrCost + ", " + greedyCost + ", " + rrChangeCost + " %, " + greedyChangeCost + " %\n";
+		}
+		
+		return content;
 	}
 }

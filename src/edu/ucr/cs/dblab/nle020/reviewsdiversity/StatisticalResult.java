@@ -19,11 +19,11 @@ public class StatisticalResult {
 	private int numPotentialUsefulCover = 0;				// Before Algorithm
 	private int numPotentialUsefulCoverWithThreshold = 0;	// Before Algorithm, care about sentiment cover
 
-	private long runningTime = 0;
+	private double runningTime = 0;
 
 	public StatisticalResult(){}
 	
-	public StatisticalResult(int k, float threshold, double finalCost, long runningTime) {
+	public StatisticalResult(int k, float threshold, double finalCost, double runningTime) {
 		this.k = k;
 		this.threshold = threshold;		
 		this.finalCost = finalCost;
@@ -122,11 +122,11 @@ public class StatisticalResult {
 		this.numPairs = numPairs;
 	}
 
-	public long getRunningTime() {
+	public double getRunningTime() {
 		return runningTime;
 	}
 
-	public void setRunningTime(long runningTime) {
+	public void setRunningTime(double runningTime) {
 		this.runningTime = runningTime;
 	}
 	
