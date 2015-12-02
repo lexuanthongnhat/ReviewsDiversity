@@ -73,11 +73,11 @@ public class TopPairsProgram {
 		long startTime = System.currentTimeMillis();
 //		getDatasetStatistics();
 		
-		topPairsExperiment();
-		topSetsExperiment(SetOption.REVIEW);
-		topSetsExperiment(SetOption.SENTENCE);
+//		topPairsExperiment();
+//		topSetsExperiment(SetOption.REVIEW);
+//		topSetsExperiment(SetOption.SENTENCE);
 		
-//		topPairsSyntheticExperiment();
+		topPairsSyntheticExperiment();
 		Utils.printRunningTime(startTime, "Finished evaluation");
 	}
 	
@@ -276,14 +276,14 @@ public class TopPairsProgram {
 
 //		printInitialization(docToConceptSentimentPairs);
 		
-		String outputPrefix = OUTPUT_FOLDER + "top_pairs_synthetic_result_" + NUM_DOCTORS_TO_EXPERIMENT;
+		String outputPrefix = OUTPUT_FOLDER + "top_pairs_synthetic_" + NUM_DOCTORS_TO_EXPERIMENT + "/";
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToTopPairsResultILP);
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToTopPairsResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);
 		
 		runTopPairsAlgoMultiThreads(Algorithm.GREEDY, Constants.NUM_THREADS_ALGORITHM, docToConceptSentimentPairs, 
 				docToStatisticalResultGreedy, docToTopKPairsResultGreedy);
-		outputStatisticalResultToJson(outputPrefix + "_greedy.txt", docToStatisticalResultGreedy);
+		outputStatisticalResultToJson(outputPrefix + "greedy.txt", docToStatisticalResultGreedy);
 		
 /*		runTopPairsAlgoMultiThreads(Algorithm.ILP, Constants.NUM_THREADS_ALGORITHM, docToConceptSentimentPairs, 
  				docToTopPairsResultILP, docToTopKPairsResultILP);
@@ -293,7 +293,7 @@ public class TopPairsProgram {
  * 				docToTopPairsResultRR, docToTopKPairsResultRR);
 		outputResultToJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);*/
 		
-		String outputPath = OUTPUT_FOLDER + "review_diversity_synthetic_k" + k + "_threshold" + threshold 
+		String outputPath = OUTPUT_FOLDER + "synthetic_k" + k + "_threshold" + threshold 
 				+ "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
 		outputStatisticalResultToExcel(outputPath, isSet, 
@@ -1045,10 +1045,9 @@ public class TopPairsProgram {
 		int forRounding = (int) Math.pow(10, numDecimals);
 		
 		Map<Integer, List<ConceptSentimentPair>> result = new HashMap<Integer, List<ConceptSentimentPair>>();
-		Map<Integer, Set<ConceptSentimentPair>> temp = new HashMap<Integer, Set<ConceptSentimentPair>>();
 		
 		for (int i = 0; i < numDocs; ++i) {
-			temp.put(i, new HashSet<ConceptSentimentPair>());
+			result.put(i, new ArrayList<ConceptSentimentPair>());
 		}
 		
 		int count = 0;
@@ -1058,15 +1057,11 @@ public class TopPairsProgram {
 			
 			for (ConceptSentimentPair pair : docToConceptSentimentPairs.get(docID)) {
 				pair.setSentiment((float) Math.round(pair.getSentiment() * forRounding) / forRounding);
-				temp.get(index).add(pair);
+				if (!result.get(index).contains(pair))
+					result.get(index).add(pair);
 			}
+			count++;
 		}
-		
-		for (int i = 0; i < numDocs; ++i) {
-			result.put(i, new ArrayList<ConceptSentimentPair>());
-			result.get(i).addAll(temp.get(i));
-		}
-		temp = null;
 		
 		return result;
 	}
