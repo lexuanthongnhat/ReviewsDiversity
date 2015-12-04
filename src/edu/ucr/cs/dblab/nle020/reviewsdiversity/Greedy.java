@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.TimeUnit;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
@@ -62,7 +63,11 @@ public class Greedy {
 			initDistances(conceptSentimentPairs, distances, pairs);
 				
 		PriorityQueue<FullPair> heap = initHeap(pairs);
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.SETUP,
+				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));		
 		
+		long startPartialTime = System.nanoTime();
 		if (pairs.size() <= k) {
 			topK = pairs;
 		} else {
@@ -70,17 +75,23 @@ public class Greedy {
 				chooseNextPair(heap, topK, statisticalResult);
 			}
 		}
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.MAIN,
+				Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));	
 				
 		if (Constants.DEBUG_MODE)
 			checkResult(topK, distances, statisticalResult);
 		
+		startPartialTime = System.nanoTime();
 		List<ConceptSentimentPair> topKPairsResult = convertTopKFullPairsToTopKPairs(conceptSentimentPairs, topK);
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.GET_TOPK, 
+				Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));
 		
 		docToTopKPairsResult.put(docId, topKPairsResult);
-		docToStatisticalResult.put(docId, statisticalResult);
+		docToStatisticalResult.put(docId, statisticalResult);			
 		
-		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
-		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);	
 		gatherFinalResult(runningTime, pairs.size(), statisticalResult, topK);
 //		Utils.printRunningTime(startTime, "Greedy finished docId " + docId);
 	}	

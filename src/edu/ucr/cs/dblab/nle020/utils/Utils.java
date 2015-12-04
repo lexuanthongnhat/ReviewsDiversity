@@ -38,6 +38,13 @@ public class Utils {
 		return (double) Math.round(number * forRounding) / forRounding;
 	}
 	
+	public static double runningTimeInMs(long startTime, int numDigits) {
+		return rounding(
+					(double) (System.nanoTime() - startTime) / 1000000.0f, 
+					numDigits
+				);
+	}
+	
 	// bound is exclusive
 	public static Set<Integer> randomIndices(int bound, int numIndices) {
 		

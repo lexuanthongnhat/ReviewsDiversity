@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
 import gurobi.GRB;
@@ -69,24 +70,33 @@ public class ILP {
 		if (pairs.size() <= k + 1) {
 			topKPairs = pairs;
 		} else {
-			int[][] distances = initDistances(pairs, threshold);
+			int[][] distances = initDistances(pairs, threshold);			
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.SETUP,
+					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
+			
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult, LPMethod.AUTOMATIC);
 			
+			long startPartialTime = System.nanoTime();
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
 			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
 				topKPairs.add(conceptSentimentPairs.get(order));
 			}
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.GET_TOPK,
+					Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));
 		}		
 
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKPairsResult.put(docId, topKPairs);
-		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
-		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		
+		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);
 		gatherFinalResult(runningTime, pairs.size(), statisticalResult);		
 	}
 	
 	protected StatisticalResultAndTopKByOriginalOrder doILP(int[][] distances, StatisticalResult statisticalResult,
 			Constants.LPMethod method){
+		long startTime = System.nanoTime();
 		
 		int numFacilities = distances.length;
 		int numCustomers = distances[0].length;
@@ -96,6 +106,9 @@ public class ILP {
 		boolean integralModel = true;
 		executeModel(distances, k, LPMethod.AUTOMATIC, integralModel, facilityOpen, facilityConnect, statisticalResult);
 		
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.MAIN,
+				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
 		
 		// Get top K by original order
 		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
@@ -104,7 +117,7 @@ public class ILP {
 				topKByOriginalOrders.add(f - 1);
 			}
 		}
-		
+			
 		return new StatisticalResultAndTopKByOriginalOrder(statisticalResult, topKByOriginalOrders);
 	}
 	

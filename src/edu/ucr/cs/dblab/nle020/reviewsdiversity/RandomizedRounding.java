@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
@@ -81,25 +82,32 @@ public class RandomizedRounding {
 			topKPairs = pairs;
 		} else {
 			int[][] distances = ILP.initDistances(pairs, threshold);
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.SETUP,
+					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
+			
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
 					doRandomizedRounding(distances, statisticalResult, method);	
 			
+			long startPartialTime = System.nanoTime();
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
 			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
 				topKPairs.add(conceptSentimentPairs.get(order));
 			}
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.GET_TOPK,
+					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
 		}		
 		
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKPairsResult.put(docId, topKPairs);
-		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
-		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);
 		gatherFinalResult(runningTime, pairs.size(), statisticalResult);
 	}
 		
 	protected StatisticalResultAndTopKByOriginalOrder doRandomizedRounding(int[][] distances, StatisticalResult statisticalResult,
 			Constants.LPMethod method){
-		
+		long startTime = System.nanoTime();		
 		int numFacilities = distances.length;
 		int numCustomers = distances[0].length;
 		
@@ -107,7 +115,11 @@ public class RandomizedRounding {
 		double[][] facilityConnect = new double[numFacilities][numCustomers];
 		boolean integralModel = false;
 		ILP.executeModel(distances, k, method, integralModel, facilityOpen, facilityConnect, statisticalResult);
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.MAIN,
+				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
 						
+		
 		boolean needRandomizedRounding = false;
 		for (int f = 0; f < numFacilities; ++f) {
 			if (facilityOpen[f] > 0 && facilityOpen[f] < 1) { 
@@ -129,7 +141,11 @@ public class RandomizedRounding {
 
 		if (needRandomizedRounding) {
 		//	outputToFileForDebug(distances, facilityOpen, facilityConnect, result, DESKTOP_FOLDER + "rr_debug.txt");
+			startTime = System.nanoTime();
 			roundingRandomly(distances, facilityOpen, facilityConnect, statisticalResult);
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.RR,
+					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
 		}					
 					
 		// Get top K by original order

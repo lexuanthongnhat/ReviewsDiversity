@@ -1,7 +1,7 @@
-#k, ILP Time (ms), RR Time, Greedy Time, RR Time Diff, Greedy Time Diff,ILP Cost, RR Cost, Greedy Cost, RR Cost Diff, Greedy Cost Diff 
-k, ILP, RR, Greedy, RR Time Diff, Greedy Time Diff,ILP, RR, Greedy, RR Cost Diff, Greedy Cost Diff 
-3, 19.41, 8.2, 3.18, 57.75 %, 83.62 %, 571.983, 574.559, 574.021, 0.45 %, 0.36 %
-5, 26.76, 10.45, 2.97, 60.95 %, 88.9 %, 462.384, 466.505, 464.709, 0.89 %, 0.5 %
-10, 20.44, 7.36, 2.96, 63.99 %, 85.52 %, 294.97, 298.224, 297.748, 1.1 %, 0.94 %
-15, 10.58, 6.83, 3.05, 35.44 %, 71.17 %, 195.9, 197.977, 198.413, 1.06 %, 1.28 %
-20, 11.15, 6.55, 3.1, 41.26 %, 72.2 %, 130.507, 131.605, 132.71, 0.84 %, 1.69 %
+#k, ILP Time (ms), RR Time, Greedy Time, RR Time Diff, Greedy Time Diff,ILP Cost, RR Cost, Greedy Cost, RR Cost Diff, Greedy Cost Diff, ILP Setup, ILP Main, ILP GetK, RR Setup, RR Main, RR GetK, RR rr, Greedy Setup, Greedy Main, Greedy GetK
+k, ILP, RR, Greedy, RR Time Diff, Greedy Time Diff,ILP, RR, Greedy, RR Cost Diff, Greedy Cost Diff, ILP Setup, ILP Main, ILP GetK, RR Setup, RR Main, RR GetK, RR rr, Greedy Setup, Greedy Main, Greedy GetK
+3, 9.4, 7.44, 2.45, 20.85 %, 73.94 %, 590.96, 591.98, 592.44, 0.17 %, 0.25 %, 1.84, 7.56, 0.0, 0.15, 5.55, 0.0, 0.0, 2.41, 0.03, 0.0
+5, 10.0, 6.27, 2.41, 37.3 %, 75.9 %, 480.65, 487.14, 482.46, 1.35 %, 0.38 %, 1.85, 8.15, 0.0, 0.13, 4.47, 0.0, 0.0, 2.36, 0.04, 0.0
+10, 8.88, 6.04, 2.42, 31.98 %, 72.75 %, 310.66, 312.26, 313.64, 0.52 %, 0.96 %, 1.83, 7.0, -0.02, 0.15, 4.12, -0.02, 0.0, 2.36, 0.05, 0.0
+15, 8.59, 5.6, 2.4, 34.81 %, 72.06 %, 209.08, 210.15, 211.78, 0.51 %, 1.29 %, 1.78, 6.75, -0.03, 0.14, 3.79, -0.03, 0.0, 2.33, 0.06, 0.0
+20, 8.21, 5.64, 2.45, 31.3 %, 70.16 %, 140.21, 142.02, 142.0, 1.29 %, 1.28 %, 1.8, 6.29, -0.06, 0.14, 3.71, -0.06, 0.0, 2.38, 0.07, 0.0

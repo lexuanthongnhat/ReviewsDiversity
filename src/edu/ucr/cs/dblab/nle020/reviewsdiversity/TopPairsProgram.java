@@ -35,6 +35,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetThreadImpl;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.ILPSetThreadImpl;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.RandomizedRoundingSetThreadImpl;
@@ -73,11 +74,11 @@ public class TopPairsProgram {
 		long startTime = System.currentTimeMillis();
 //		getDatasetStatistics();
 		
-//		topPairsExperiment();
-//		topSetsExperiment(SetOption.REVIEW);
-//		topSetsExperiment(SetOption.SENTENCE);
+		topPairsExperiment();
+		topSetsExperiment(SetOption.REVIEW);
+		topSetsExperiment(SetOption.SENTENCE);
 		
-		topPairsSyntheticExperiment();
+//		topPairsSyntheticExperiment();
 		Utils.printRunningTime(startTime, "Finished evaluation");
 	}
 	
@@ -167,7 +168,7 @@ public class TopPairsProgram {
 		
 		// TODO - the first "3" is always slower than the other numbers 
 		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-//		int[] ks = new int[] {5};
+//		int[] ks = new int[] {10};
 		float[] thresholds = new float[] {0.1f, 0.3f};
 //		float[] thresholds = new float[] {0.3f};
 		for (int numChoosen : ks) {
@@ -1072,8 +1073,13 @@ public class TopPairsProgram {
 			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultRR) {
 				
 		double count = 0.0f;
-		double[] costSum = new double[] {0.0f, 0.0f, 0.0f};
+		double rrCount = 0.0f;
+		double[] costSum = new double[] {0.0f, 0.0f, 0.0f};		
 		double[] runningTimeSum = new double[] {0, 0, 0};
+		double[] setupTimeSum = new double[] {0, 0, 0};
+		double[] mainTimeSum = new double[] {0, 0, 0};
+		double[] getKTimeSum = new double[] {0, 0, 0};
+		double rrTime = 0;
 		for (Integer docId : docToStatisticalResultGreedy.keySet()) {
 			if (docToStatisticalResultILP.containsKey(docId) && docToStatisticalResultRR.containsKey(docId)) {
 				++count;
@@ -1084,19 +1090,65 @@ public class TopPairsProgram {
 				runningTimeSum[GREEDY_INDEX] 	+= docToStatisticalResultGreedy.get(docId).getRunningTime();
 				runningTimeSum[ILP_INDEX] 		+= docToStatisticalResultILP.get(docId).getRunningTime();
 				runningTimeSum[RR_INDEX]		+= docToStatisticalResultRR.get(docId).getRunningTime();
+				
+				setupTimeSum[GREEDY_INDEX]		
+						+= docToStatisticalResultGreedy.get(docId).getPartialTime(PartialTimeIndex.SETUP);
+				setupTimeSum[ILP_INDEX]		
+						+= docToStatisticalResultILP.get(docId).getPartialTime(PartialTimeIndex.SETUP);
+				setupTimeSum[RR_INDEX]		
+						+= docToStatisticalResultRR.get(docId).getPartialTime(PartialTimeIndex.SETUP);
+				
+				mainTimeSum[GREEDY_INDEX]		
+						+= docToStatisticalResultGreedy.get(docId).getPartialTime(PartialTimeIndex.MAIN);
+				mainTimeSum[ILP_INDEX]		
+						+= docToStatisticalResultILP.get(docId).getPartialTime(PartialTimeIndex.MAIN);
+				mainTimeSum[RR_INDEX]		
+						+= docToStatisticalResultRR.get(docId).getPartialTime(PartialTimeIndex.MAIN);
+				
+				getKTimeSum[GREEDY_INDEX]		
+						+= docToStatisticalResultGreedy.get(docId).getPartialTime(PartialTimeIndex.GET_TOPK);
+				getKTimeSum[ILP_INDEX]		
+						+= docToStatisticalResultILP.get(docId).getPartialTime(PartialTimeIndex.GET_TOPK);
+				getKTimeSum[RR_INDEX]		
+						+= docToStatisticalResultRR.get(docId).getPartialTime(PartialTimeIndex.GET_TOPK);
+				
+				if (docToStatisticalResultRR.get(docId).getPartialTime(PartialTimeIndex.RR) > 0) {
+					rrCount++;
+					rrTime += docToStatisticalResultRR.get(docId).getPartialTime(PartialTimeIndex.RR);
+				}
 			}
 		}
 		
 		StatisticalResult[] statisticalResults = new StatisticalResult[3];
-		statisticalResults[GREEDY_INDEX] 	= 
-				new StatisticalResult(k, threshold, costSum[GREEDY_INDEX] / count, 	
-						Utils.rounding(runningTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
-		statisticalResults[ILP_INDEX] 		= 
-				new StatisticalResult(k, threshold, costSum[ILP_INDEX] / count, 
-						Utils.rounding(runningTimeSum[ILP_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
-		statisticalResults[RR_INDEX] 		= 
-				new StatisticalResult(k, threshold, costSum[RR_INDEX] / count, 
-						Utils.rounding(runningTimeSum[RR_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[GREEDY_INDEX] 	= new StatisticalResult(k, threshold, costSum[GREEDY_INDEX] / count, 	
+				Utils.rounding(runningTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[GREEDY_INDEX].addPartialTime(PartialTimeIndex.SETUP, 
+				Utils.rounding(setupTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[GREEDY_INDEX].addPartialTime(PartialTimeIndex.MAIN, 
+				Utils.rounding(mainTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[GREEDY_INDEX].addPartialTime(PartialTimeIndex.GET_TOPK, 
+				Utils.rounding(getKTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+				
+		statisticalResults[ILP_INDEX] 		= new StatisticalResult(k, threshold, costSum[ILP_INDEX] / count, 
+				Utils.rounding(runningTimeSum[ILP_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[ILP_INDEX].addPartialTime(PartialTimeIndex.SETUP, 
+				Utils.rounding(setupTimeSum[ILP_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[ILP_INDEX].addPartialTime(PartialTimeIndex.MAIN, 
+				Utils.rounding(mainTimeSum[ILP_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[ILP_INDEX].addPartialTime(PartialTimeIndex.GET_TOPK, 
+				Utils.rounding(getKTimeSum[ILP_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		
+		statisticalResults[RR_INDEX] 		= new StatisticalResult(k, threshold, costSum[RR_INDEX] / count, 
+				Utils.rounding(runningTimeSum[RR_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[RR_INDEX].addPartialTime(PartialTimeIndex.SETUP, 
+				Utils.rounding(setupTimeSum[RR_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[RR_INDEX].addPartialTime(PartialTimeIndex.MAIN, 
+				Utils.rounding(mainTimeSum[RR_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		statisticalResults[RR_INDEX].addPartialTime(PartialTimeIndex.GET_TOPK, 
+				Utils.rounding(getKTimeSum[RR_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
+		if (rrCount >=1)
+			statisticalResults[RR_INDEX].addPartialTime(PartialTimeIndex.RR, 
+					Utils.rounding(rrTime / count, Constants.NUM_DIGITS_IN_TIME));
 		
 		return statisticalResults;
 	}
@@ -1132,9 +1184,13 @@ public class TopPairsProgram {
 	
 	private static String prepareCSVSummary(List<StatisticalResult[]> resultsList) {
 		String content = "#k, ILP Time (ms), RR Time, Greedy Time, RR Time Diff, Greedy Time Diff,"
-				+ "ILP Cost, RR Cost, Greedy Cost, RR Cost Diff, Greedy Cost Diff \n";
+				+ "ILP Cost, RR Cost, Greedy Cost, RR Cost Diff, Greedy Cost Diff, "
+				+ "ILP Setup, ILP Main, ILP GetK, RR Setup, RR Main, RR GetK, RR rr, "
+				+ "Greedy Setup, Greedy Main, Greedy GetK\n";
 		content = content + "k, ILP, RR, Greedy, RR Time Diff, Greedy Time Diff,"
-				+ "ILP, RR, Greedy, RR Cost Diff, Greedy Cost Diff \n";
+				+ "ILP, RR, Greedy, RR Cost Diff, Greedy Cost Diff, "
+				+ "ILP Setup, ILP Main, ILP GetK, RR Setup, RR Main, RR GetK, RR rr, "
+				+ "Greedy Setup, Greedy Main, Greedy GetK\n";
 		
 		int i = 0;
 		if (resultsList.get(0)[GREEDY_INDEX].getK() == resultsList.get(1)[GREEDY_INDEX].getK())
@@ -1147,6 +1203,10 @@ public class TopPairsProgram {
 			double rrChangeTime = - Utils.rounding((rrTime - ilpTime) / ilpTime * 100, Constants.NUM_DIGITS_IN_TIME);
 			double greedyChangeTime = - Utils.rounding((greedyTime - ilpTime) / ilpTime * 100, Constants.NUM_DIGITS_IN_TIME);
 			
+			Map<PartialTimeIndex, Double> ilpPartialTimes = stats[ILP_INDEX].getPartialTimes();
+			Map<PartialTimeIndex, Double> rrPartialTimes = stats[RR_INDEX].getPartialTimes();
+			Map<PartialTimeIndex, Double> greedyPartialTimes = stats[GREEDY_INDEX].getPartialTimes();
+			
 			double ilpCost = stats[ILP_INDEX].getFinalCost();
 			double rrCost = stats[RR_INDEX].getFinalCost();
 			double greedyCost = stats[GREEDY_INDEX].getFinalCost();
@@ -1155,7 +1215,14 @@ public class TopPairsProgram {
 			
 			content = content + resultsList.get(i)[GREEDY_INDEX].getK() + ", " 
 					+ ilpTime + ", " + rrTime + ", " + greedyTime + ", " + rrChangeTime + " %, " + greedyChangeTime + " %, "
-					+ ilpCost + ", " + rrCost + ", " + greedyCost + ", " + rrChangeCost + " %, " + greedyChangeCost + " %\n";
+					+ ilpCost + ", " + rrCost + ", " + greedyCost + ", " + rrChangeCost + " %, " + greedyChangeCost + " %, "
+					+ ilpPartialTimes.get(PartialTimeIndex.SETUP) + ", " + ilpPartialTimes.get(PartialTimeIndex.MAIN) 
+					+ ", " + ilpPartialTimes.get(PartialTimeIndex.GET_TOPK) + ", "
+					+ rrPartialTimes.get(PartialTimeIndex.SETUP) + ", " + rrPartialTimes.get(PartialTimeIndex.MAIN) 
+					+ ", " + rrPartialTimes.get(PartialTimeIndex.GET_TOPK) + ", " + rrPartialTimes.get(PartialTimeIndex.RR) + ", "
+					+ greedyPartialTimes.get(PartialTimeIndex.SETUP) + ", " + greedyPartialTimes.get(PartialTimeIndex.MAIN) 
+					+ ", " + greedyPartialTimes.get(PartialTimeIndex.GET_TOPK)
+					+ "\n";
 		}
 		
 		return content;

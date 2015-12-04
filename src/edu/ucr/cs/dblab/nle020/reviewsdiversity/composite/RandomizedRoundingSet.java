@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.RandomizedRounding;
@@ -45,6 +46,10 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 			}
 		}
 		
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.SETUP, 
+				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
+		
 		if (sentimentSets.size() <= k) {
 			topKSets = sentimentSets;
 		} else {
@@ -53,16 +58,19 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
 					doRandomizedRounding(distances, statisticalResult, method);
 			
+			long startPartialTime = System.nanoTime();
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
 			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
 				topKSets.add(sentimentSets.get(order));
 			}	
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.GET_TOPK, 
+					Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));
 		}		
 		
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKSetsResult.put(docId, topKSets);
-		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
-		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);
 		gatherFinalResult(runningTime, sentimentSets.size() + 1, statisticalResult);		
 	}
 }

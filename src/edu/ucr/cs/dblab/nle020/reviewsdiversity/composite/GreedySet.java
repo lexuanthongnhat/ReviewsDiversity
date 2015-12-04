@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.FullPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
@@ -60,27 +61,35 @@ public class GreedySet {
 			initDistances(fullPairSets, distances);		
 		
 		PriorityQueue<FullPair> heap = initHeap(fullPairSets);
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.SETUP, 
+				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
+		
+		long startPartialTime = System.nanoTime();
 		if (fullPairSets.size() <= k) {
 			topK.addAll(fullPairSets);
 		} else {
 			for (int i = 0; i < k; i++) {
-				if (System.currentTimeMillis() - startTime > 1000 * 60)
-					System.err.println("???");
 				chooseNextPair(heap, topK, statisticalResult);
 			}
 		}
-				
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.MAIN, 
+				Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));				
+	
 		if (Constants.DEBUG_MODE)
 			checkResult(topK, distances, statisticalResult);
 					
+		startPartialTime = System.nanoTime();
 		List<SentimentSet> topKSetsResult = convertTopKFullPairsToTopKSets(sentimentSets, topK);
-		docToTopKSetsResult.put(docId, topKSetsResult);
+		statisticalResult.addPartialTime(
+				PartialTimeIndex.GET_TOPK, 
+				Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));
 		
-		docToStatisticalResult.put(docId, statisticalResult);
-//		Utils.printRunningTime(startTime, "Greedy finished docId " + docId);
-//		printResult();	
-		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
-		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		docToTopKSetsResult.put(docId, topKSetsResult);
+		docToStatisticalResult.put(docId, statisticalResult);			
+		
+		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);	
 		gatherFinalResult(runningTime, fullPairSets.size(), statisticalResult, topK);
 	}	
 	

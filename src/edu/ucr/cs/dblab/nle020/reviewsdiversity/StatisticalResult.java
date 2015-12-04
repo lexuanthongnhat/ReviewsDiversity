@@ -1,5 +1,10 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 public class StatisticalResult {
 	private int docID = 0;
 	
@@ -20,6 +25,7 @@ public class StatisticalResult {
 	private int numPotentialUsefulCoverWithThreshold = 0;	// Before Algorithm, care about sentiment cover
 
 	private double runningTime = 0;
+	private Map<Constants.PartialTimeIndex, Double> partialTimes = new HashMap<Constants.PartialTimeIndex, Double>();
 
 	public StatisticalResult(){}
 	
@@ -37,19 +43,24 @@ public class StatisticalResult {
 		this.threshold = threshold;
 	}
 
-	@Override
-	public String toString() {
-		StringBuilder builder = new StringBuilder();
-		builder.append("docID " + docID + ",\tk = " + k + ",\t threshold = " + threshold + "\n");
-		builder.append("numPairs:\t" + numPairs + "\t numUncovered: " + numUncovered + "\trunningTime: " + runningTime + " ms\n");
-		builder.append("initialCost:\t" + initialCost + "\t finalCost: " + finalCost);
-		if (optimalCost != -1)
-			builder.append("\t optimalCost: \t" + optimalCost + ",\t ratio: " + finalCost/optimalCost);
-		
-		return builder.toString();
+	public void addPartialTime(Constants.PartialTimeIndex index, double partialTime) {
+		partialTimes.put(index, partialTime);
+	}
+	public double getPartialTime(Constants.PartialTimeIndex index) {
+		if (partialTimes.containsKey(index))
+			return partialTimes.get(index);
+		else
+			return -1.0f;
 	}
 	
-	
+	@Override
+	public String toString() {
+		return "StatisticalResult [docID=" + docID + ", k=" + k
+				+ ", threshold=" + threshold + ", finalCost=" + finalCost
+				+ ", numPairs=" + numPairs + ", runningTime=" + runningTime
+				+ ", partialTimes=" + partialTimes + "]";
+	}
+
 	public int getDocID() {
 		return docID;
 	}
@@ -181,6 +192,14 @@ public class StatisticalResult {
 
 	public void setNumSets(int numSets) {
 		this.numSets = numSets;
+	}
+
+	public Map<Constants.PartialTimeIndex, Double> getPartialTimes() {
+		return partialTimes;
+	}
+
+	public void setPartialTimes(Map<Constants.PartialTimeIndex, Double> partialTimes) {
+		this.partialTimes = partialTimes;
 	}
 	
 }

@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
@@ -49,19 +50,25 @@ public class ILPSet extends ILP {
 			topKSets = sentimentSets;
 		} else {
 			int[][] distances = initDistances(threshold, sentimentSets, pairs, statisticalResult);
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.SETUP, 
+					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 			
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult, LPMethod.AUTOMATIC);
 			
+			long startPartialTime = System.nanoTime();
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
 			for (Integer order : statisticalResultAndTopKByOriginalOrder.getTopKByOriginalOrders()) {
 				topKSets.add(sentimentSets.get(order));
 			}	
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.GET_TOPK, 
+					Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));
 		}		
 		
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKSetsResult.put(docId, topKSets);
-		double runningTime = (double) (System.nanoTime() - startTime) / Constants.TIME_MS_TO_NS;
-		runningTime = Utils.rounding(runningTime, Constants.NUM_DIGITS_IN_TIME);
+		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);
 		gatherFinalResult(runningTime, sentimentSets.size() + 1, statisticalResult);		
 	}
 	
