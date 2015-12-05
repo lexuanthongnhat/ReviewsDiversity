@@ -45,6 +45,8 @@ public class ILPSet extends ILP {
 				}				
 			}
 		}
+		statisticalResult.setNumPairs(pairs.size());
+		statisticalResult.setNumSets(sentimentSets.size());
 		
 		if (sentimentSets.size() <= k) {
 			topKSets = sentimentSets;

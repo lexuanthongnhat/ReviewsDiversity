@@ -45,6 +45,8 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 				}				
 			}
 		}
+		statisticalResult.setNumPairs(pairs.size());
+		statisticalResult.setNumSets(sentimentSets.size());
 		
 		statisticalResult.addPartialTime(
 				PartialTimeIndex.SETUP, 

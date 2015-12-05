@@ -168,7 +168,7 @@ public class TopPairsProgram {
 		
 		// TODO - the first "3" is always slower than the other numbers 
 		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-//		int[] ks = new int[] {10};
+//		int[] ks = new int[] {3, 10};
 		float[] thresholds = new float[] {0.1f, 0.3f};
 //		float[] thresholds = new float[] {0.3f};
 		for (int numChoosen : ks) {
@@ -247,7 +247,9 @@ public class TopPairsProgram {
 		String outputPath = outputFolder + "review_diversity_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
 		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
-						
+		outputTimeToCsv(outputFolder + "time_k" + k + "_s" + ((int) (threshold * 10))  + ".csv", 
+				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		
 		Utils.printRunningTime(startTime, "Finished Top Pairs", true);
 		
 		return summaryStatisticalResultsOfDifferentMethods(docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
@@ -375,6 +377,9 @@ public class TopPairsProgram {
 										"_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = true;
 		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		
+		outputTimeToCsv(outputFolder + "time_k" + k + "_s" + ((int) (threshold * 10))  + ".csv", 
+				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 		
 		Utils.printRunningTime(startTime, "Finished Top " + setOption, true);		
 
@@ -1067,10 +1072,81 @@ public class TopPairsProgram {
 		return result;
 	}
 	
+	private static void outputTimeToCsv(
+			String outputFile,
+			Map<Integer, StatisticalResult> docToStatisticalResultGreedy,
+			Map<Integer, StatisticalResult> docToStatisticalResultILP,
+			Map<Integer, StatisticalResult> docToStatisticalResultRR) {
+		
+		Map<Integer, StatisticalResult> numPairsToAverageGreedy = extractNumPairsToTime(docToStatisticalResultGreedy);
+		Map<Integer, StatisticalResult> numPairsToAverageILP = extractNumPairsToTime(docToStatisticalResultILP);
+		Map<Integer, StatisticalResult> numPairsToAverageRR = extractNumPairsToTime(docToStatisticalResultRR);
+		
+		List<Integer> numPairs = new ArrayList<Integer>(numPairsToAverageGreedy.keySet());
+		Collections.sort(numPairs);
+		
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputFile), 
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+			writer.write("numPairs, ilp, rr, greedy, ilp setup, rr setup, greedy setup, ilp main, rr main, greedy main");
+			writer.newLine();
+			for (int i = 0; i < numPairs.size(); ++i) {
+				int numPair = numPairs.get(i);
+				if (numPair <= 20)
+					continue;
+				
+				StatisticalResult ilp = numPairsToAverageILP.get(numPair);
+				StatisticalResult rr = numPairsToAverageRR.get(numPair);
+				StatisticalResult greedy = numPairsToAverageGreedy.get(numPair);
+				writer.write(numPair + ", " + ilp.getRunningTime() + ", " + rr.getRunningTime() + ", " + greedy.getRunningTime() + ", "
+						+ ilp.getPartialTime(PartialTimeIndex.SETUP) + ", " + rr.getPartialTime(PartialTimeIndex.SETUP) + ", "
+						+ greedy.getPartialTime(PartialTimeIndex.SETUP) + ", " + ilp.getPartialTime(PartialTimeIndex.MAIN) + ", " 
+						+ rr.getPartialTime(PartialTimeIndex.MAIN) + ", " + greedy.getPartialTime(PartialTimeIndex.MAIN));
+				writer.newLine();	
+				writer.flush();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	private static Map<Integer, StatisticalResult> extractNumPairsToTime(
+			Map<Integer, StatisticalResult> docToStatisticalResult) {
+		Map<Integer, StatisticalResult> numPairsToAverageStat = new HashMap<Integer, StatisticalResult>();		
+		Map<Integer, List<StatisticalResult>> numPairsToStats = new HashMap<Integer, List<StatisticalResult>>();
+		for (Integer docId : docToStatisticalResult.keySet()) {
+			int numPairs = docToStatisticalResult.get(docId).getNumPairs();
+			if (!numPairsToStats.containsKey(numPairs))
+				numPairsToStats.put(numPairs, new ArrayList<StatisticalResult>());
+			
+			numPairsToStats.get(numPairs).add(docToStatisticalResult.get(docId));
+		}
+		
+		for (Integer numPairs : numPairsToStats.keySet()) {
+			List<StatisticalResult> stats = numPairsToStats.get(numPairs);
+			int num = stats.size();
+			StatisticalResult averageStat = new StatisticalResult();
+			stats.stream().forEach(stat -> {
+				averageStat.increaseRunningTime(stat.getRunningTime());
+				averageStat.increasePartialTime(stat);
+			});
+			
+			averageStat.setRunningTime(Utils.rounding(averageStat.getRunningTime() / num, Constants.NUM_DIGITS_IN_TIME));
+			for (PartialTimeIndex index : averageStat.getPartialTimes().keySet()) {
+				averageStat.getPartialTimes().put(
+						index, 
+						Utils.rounding(averageStat.getPartialTimes().get(index) / num, Constants.NUM_DIGITS_IN_TIME));
+			}
+			
+			numPairsToAverageStat.put(numPairs, averageStat);
+		}
+		
+		return numPairsToAverageStat;
+	}
+
 	private static StatisticalResult[] summaryStatisticalResultsOfDifferentMethods(
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedy,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILP,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultRR) {
+			Map<Integer, StatisticalResult> docToStatisticalResultGreedy,
+			Map<Integer, StatisticalResult> docToStatisticalResultILP,
+			Map<Integer, StatisticalResult> docToStatisticalResultRR) {
 				
 		double count = 0.0f;
 		double rrCount = 0.0f;
@@ -1183,11 +1259,7 @@ public class TopPairsProgram {
 	}
 	
 	private static String prepareCSVSummary(List<StatisticalResult[]> resultsList) {
-		String content = "#k, ILP Time (ms), RR Time, Greedy Time, RR Time Diff, Greedy Time Diff,"
-				+ "ILP Cost, RR Cost, Greedy Cost, RR Cost Diff, Greedy Cost Diff, "
-				+ "ILP Setup, ILP Main, ILP GetK, RR Setup, RR Main, RR GetK, RR rr, "
-				+ "Greedy Setup, Greedy Main, Greedy GetK\n";
-		content = content + "k, ILP, RR, Greedy, RR Time Diff, Greedy Time Diff,"
+		String content = "k, ILP, RR, Greedy, RR Time Diff, Greedy Time Diff,"
 				+ "ILP, RR, Greedy, RR Cost Diff, Greedy Cost Diff, "
 				+ "ILP Setup, ILP Main, ILP GetK, RR Setup, RR Main, RR GetK, RR rr, "
 				+ "Greedy Setup, Greedy Main, Greedy GetK\n";

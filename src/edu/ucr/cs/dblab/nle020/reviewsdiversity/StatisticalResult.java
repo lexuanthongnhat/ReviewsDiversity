@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
+
 public class StatisticalResult {
 	private int docID = 0;
 	
@@ -51,6 +53,26 @@ public class StatisticalResult {
 			return partialTimes.get(index);
 		else
 			return -1.0f;
+	}
+	
+	public void increaseRunningTime(double amount) {
+		runningTime += amount;
+	}
+	
+	public void increasePartialTime(PartialTimeIndex index, double amount) {
+		if (!partialTimes.containsKey(index))
+			partialTimes.put(index, amount);
+		else
+			partialTimes.put(index, partialTimes.get(index) + amount);
+	}
+	
+	public void increasePartialTime(StatisticalResult stat) {
+		for (PartialTimeIndex index : stat.getPartialTimes().keySet()) {
+			if (!partialTimes.containsKey(index))
+				partialTimes.put(index, stat.getPartialTime(index));
+			else
+				partialTimes.put(index, partialTimes.get(index) + stat.getPartialTime(index));
+		}
 	}
 	
 	@Override
