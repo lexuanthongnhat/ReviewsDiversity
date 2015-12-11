@@ -96,7 +96,7 @@ public class RandomizedRounding {
 			}
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.GET_TOPK,
-					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
+					Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));	
 		}		
 		
 		docToStatisticalResult.put(docId, statisticalResult);
@@ -193,18 +193,26 @@ public class RandomizedRounding {
 		double facilityCost = 0.0f;
 		double assignmentCost = 0.0f;
 
+		double[] probs = new double[numFacilities];
+		probs[0] = 0;
+		double tempSum = 0;
+		for (int f = 1; f < numFacilities; ++f) {
+			tempSum += originalOpen[f];
+			probs[f] = tempSum / (double) k;
+		}
 		// sampling once per iteration
 		while (facilityCost < k) {			
+			double r = Math.random();
 			for (int f = 1; f < numFacilities; ++f) {
-				// Rounding with probability x(f)/|x|				
-				if (rollTheDice(originalOpen[f] / k)) {	
-					if (facilityOpen[f] == 0) {
-						facilityOpen[f] = 1;
-						facilityCost++;
+				if (originalOpen[f] > 0) 
+					if (r >= probs[f - 1] && r <= probs[f]) {
+						if (facilityOpen[f] == 0) {
+							facilityOpen[f] = 1;
+							facilityCost++;							
+						}
 						break;
 					}
-				}			
-			}								
+			}					
 		}				
 					
 /*		// assign customer to the closest selected facility using Unit Data Structure

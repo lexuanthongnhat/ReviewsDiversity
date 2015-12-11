@@ -47,15 +47,14 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 		}
 		statisticalResult.setNumPairs(pairs.size());
 		statisticalResult.setNumSets(sentimentSets.size());
-		
-		statisticalResult.addPartialTime(
-				PartialTimeIndex.SETUP, 
-				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
-		
+				
 		if (sentimentSets.size() <= k) {
 			topKSets = sentimentSets;
 		} else {
 			int[][] distances = ILPSet.initDistances(threshold, sentimentSets, pairs, statisticalResult);
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.SETUP, 
+					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 			
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
 					doRandomizedRounding(distances, statisticalResult, method);

@@ -1091,7 +1091,7 @@ public class TopPairsProgram {
 			writer.newLine();
 			for (int i = 0; i < numPairs.size(); ++i) {
 				int numPair = numPairs.get(i);
-				if (numPair <= 20)
+				if (numPair <= 30 || numPair >= 1000)
 					continue;
 				
 				StatisticalResult ilp = numPairsToAverageILP.get(numPair);
