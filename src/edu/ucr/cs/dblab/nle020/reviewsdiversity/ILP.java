@@ -109,7 +109,7 @@ public class ILP {
 		statisticalResult.addPartialTime(
 				PartialTimeIndex.MAIN,
 				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
-		
+//		System.out.println(Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 		// Get top K by original order
 		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
 		for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
@@ -143,6 +143,7 @@ public class ILP {
 			GRBEnv env = new GRBEnv();
 			env.set(GRB.IntParam.OutputFlag, 0);
 			env.set(GRB.IntParam.Method, method.method());
+	//		env.set(GRB.IntParam.Threads, 0);
 			
 			GRBModel model = new GRBModel(env);
 			model.set(GRB.StringAttr.ModelName, "Non-Metric Uncapacitated Facility");
@@ -237,6 +238,11 @@ public class ILP {
 					}
 				}
 			}
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.LP,
+					Utils.rounding(1000 * model.get(GRB.DoubleAttr.Runtime), 
+							Constants.NUM_DIGITS_IN_TIME));
+			//System.out.println("Model running time: " + 1000 * model.get(GRB.DoubleAttr.Runtime));
 			
 			model.dispose();
 			env.dispose();

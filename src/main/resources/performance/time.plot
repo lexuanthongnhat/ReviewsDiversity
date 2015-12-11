@@ -53,7 +53,9 @@ do for [folder in "'Top Pairs/' 'Top REVIEW/' 'Top SENTENCE/'"] {
 			set output folder . subfolder . "main_" . filename . ".pdf"
 			plot folder . subfolder . filename . '.csv' using 1:8 title column with lines, \
 				'' u 1:9 title column with lines, \
-				'' u 1:10 title column with lines
+				'' u 1:10 title column with lines, \
+				'' u 1:11 title column with lines, \
+				'' u 1:12 title column with lines
 		}
 	}
 }

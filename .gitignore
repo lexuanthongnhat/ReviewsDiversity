@@ -1,7 +1,7 @@
 # My experiment results
 src/main/resources/performance/Top Pairs/
-src/main/resources/performance/Top SENTENCES/
-src/main/resources/performance/Top REVIEWS/
+src/main/resources/performance/Top SENTENCE/
+src/main/resources/performance/Top REVIEW/
 
 #################
 ## Eclipse

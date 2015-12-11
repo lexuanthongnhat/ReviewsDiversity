@@ -176,7 +176,7 @@ public class TopPairsProgram {
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
 				threshold = thresholds[thresh];
 				
-				String subFolder = "Top Pairs\\k" + k + "_threshold" + threshold + "\\";				
+				String subFolder = "Top Pairs/k" + k + "_threshold" + threshold + "/";				
 				if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder)))
 					Files.createDirectories(Paths.get(OUTPUT_FOLDER + subFolder));
 				
@@ -1087,11 +1087,12 @@ public class TopPairsProgram {
 		
 		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputFile), 
 				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-			writer.write("numPairs, ilp, rr, greedy, ilp setup, rr setup, greedy setup, ilp main, rr main, greedy main");
+			writer.write("numPairs, ilp, rr, greedy, ilp setup, rr setup, greedy setup, "
+					+ "ilp main, rr main, greedy main, ilp, rr's lp");
 			writer.newLine();
 			for (int i = 0; i < numPairs.size(); ++i) {
 				int numPair = numPairs.get(i);
-				if (numPair <= 30 || numPair >= 1000)
+				if (numPair <= 30 || numPair >= 900)
 					continue;
 				
 				StatisticalResult ilp = numPairsToAverageILP.get(numPair);
@@ -1100,8 +1101,10 @@ public class TopPairsProgram {
 				writer.write(numPair + ", " + ilp.getRunningTime() + ", " + rr.getRunningTime() + ", " + greedy.getRunningTime() + ", "
 						+ ilp.getPartialTime(PartialTimeIndex.SETUP) + ", " + rr.getPartialTime(PartialTimeIndex.SETUP) + ", "
 						+ greedy.getPartialTime(PartialTimeIndex.SETUP) + ", " + ilp.getPartialTime(PartialTimeIndex.MAIN) + ", " 
-						+ rr.getPartialTime(PartialTimeIndex.MAIN) + ", " + greedy.getPartialTime(PartialTimeIndex.MAIN));
+						+ rr.getPartialTime(PartialTimeIndex.MAIN) + ", " + greedy.getPartialTime(PartialTimeIndex.MAIN) + ", "
+						+ ilp.getPartialTime(PartialTimeIndex.LP) + ", " + rr.getPartialTime(PartialTimeIndex.LP));
 				writer.newLine();	
+				
 				writer.flush();
 			}
 		} catch (IOException e) {
