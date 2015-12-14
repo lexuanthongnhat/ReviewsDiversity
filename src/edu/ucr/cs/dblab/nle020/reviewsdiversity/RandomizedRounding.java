@@ -162,25 +162,40 @@ public class RandomizedRounding {
 	// Output: update facilityOpen, facilityConnect, statisticalResult
 	private void roundingRandomly(int[][] distances, double[] facilityOpen, double[][] facilityConnect,
 			StatisticalResult statisticalResult) {
-		System.out.println("Doing RR");
+		long startTime = System.currentTimeMillis();
+		System.out.println("Starting Randomized Rounding ...");
+		
+		boolean withReplacement = false;
+		sampleKItemsFaster(facilityOpen, withReplacement);
+					
 		int numFacilities = facilityOpen.length;
 		int numCustomers = facilityConnect[0].length;
 		
-		double[] originalOpen = facilityOpen.clone();
 		double[][] originalConnect = new double[numFacilities][];
 		for (int f = 0; f < numFacilities; ++f)
-			originalConnect[f] = facilityConnect[f].clone();
-		
-		for (int f = 0; f < numFacilities; ++f) {
-			facilityOpen[f] = 0;
-			for (int c = 0; c < numCustomers; ++c) {
+			originalConnect[f] = facilityConnect[f].clone();		
+		for (int f = 0; f < numFacilities; ++f) 
+			for (int c = 0; c < numCustomers; ++c) 
 				facilityConnect[f][c] = 0;
+		
+		// Assign customers to the closest selected facility 
+		double assignmentCost = 0.0f;
+		for (int c = 0; c < numCustomers; ++c) {
+			int facility = 0;
+			int minD = distances[0][c];
+			for (int f = 0; f < numFacilities; ++f) {
+				if (distances[f][c] != Constants.INVALID_DISTANCE 
+						&& facilityOpen[f] == 1 && distances[f][c] < minD) {
+					facility = f;
+					minD = distances[f][c];
+				}
 			}
-		}
-		facilityOpen[0] = 1;
-		
-		
-		/*List<Unit> customers = new ArrayList<Unit>(); 
+			assignmentCost += minD;
+			facilityConnect[facility][c] = 1;
+		}		
+	
+		/*		// assign customer to the closest selected facility using Unit Data Structure
+ 		List<Unit> customers = new ArrayList<Unit>(); 
 		for (int c = 0; c < numCustomers; ++c) {
 			Unit customer = new Unit(c);
 			for (int f = 0; f < numFacilities; ++f) {
@@ -188,34 +203,8 @@ public class RandomizedRounding {
 					customer.addAncestor(new Unit(f, distances[f][c]));
 			}
 			customers.add(customer);
-		}*/
-		
-		double facilityCost = 0.0f;
-		double assignmentCost = 0.0f;
-
-		double[] probs = new double[numFacilities];
-		probs[0] = 0;
-		double tempSum = 0;
-		for (int f = 1; f < numFacilities; ++f) {
-			tempSum += originalOpen[f];
-			probs[f] = tempSum / (double) k;
 		}
-		// sampling once per iteration
-		while (facilityCost < k) {			
-			double r = Math.random();
-			for (int f = 1; f < numFacilities; ++f) {
-				if (originalOpen[f] > 0) 
-					if (r >= probs[f - 1] && r <= probs[f]) {
-						if (facilityOpen[f] == 0) {
-							facilityOpen[f] = 1;
-							facilityCost++;							
-						}
-						break;
-					}
-			}					
-		}				
-					
-/*		// assign customer to the closest selected facility using Unit Data Structure
+		
 		Set<Integer> unassignedCustomers = new HashSet<Integer>();
 		for (Unit customer : customers) {
 			boolean isAssigned = false;
@@ -241,31 +230,157 @@ public class RandomizedRounding {
 			}
 		}*/
 		
-		// Assign customers to the closest selected facility 
-		for (int c = 0; c < numCustomers; ++c) {
-			int facility = 0;
-			int minD = distances[0][c];
-			for (int f = 0; f < numFacilities; ++f) {
-				if (distances[f][c] != Constants.INVALID_DISTANCE && facilityOpen[f] == 1 && distances[f][c] < minD) {
-					facility = f;
-					minD = distances[f][c];
-				}
-			}
-			assignmentCost += minD;
-			facilityConnect[facility][c] = 1;
-		}		
-	
-				
-		int numUncovered = 0;
-		for (int c = 0; c < numCustomers; ++c) {
-			if (facilityConnect[0][c] == 1)
-				++numUncovered;			
-		}
-		
 		statisticalResult.setFinalCost(assignmentCost);
 		statisticalResult.setNumFacilities(k);
+		
+		int numUncovered = 0;
+		for (int c = 0; c < numCustomers; ++c)
+			if (facilityConnect[0][c] == 1)
+				++numUncovered;					
 		statisticalResult.setNumUncovered(numUncovered);
+		Utils.printRunningTime(startTime, "Finished Randomized Rounding");
 	}
+	
+	private void sampleKItems(double[] facilityOpen, boolean withReplacement) {
+		int numFacilities = facilityOpen.length;		
+		double[] originalOpen = facilityOpen.clone();
+		
+		for (int f = 0; f < numFacilities; ++f)
+			facilityOpen[f] = 0;
+		facilityOpen[0] = 1;		
+		double facilityCost = 0.0f;
+
+		double[] probs = new double[numFacilities];
+		probs[0] = 0;
+		double tempSum = 0;
+		for (int f = 1; f < numFacilities; ++f) {
+			tempSum += originalOpen[f];
+			probs[f] = tempSum / (double) k;
+		}
+		// sampling once per iteration
+		while (facilityCost < k) {			
+			double r = Math.random();
+			for (int f = 1; f < numFacilities; ++f) {
+				if (originalOpen[f] > 0) 
+					if (r >= probs[f - 1] && r <= probs[f]) {
+						if (facilityOpen[f] == 0) {
+							facilityOpen[f] = 1;
+							facilityCost++;							
+						}
+						break;
+					}
+			}					
+		}	
+	}	
+	
+	private void sampleKItemsFaster(double[] facilityOpen, boolean withReplacement) {
+		int numFacilities = facilityOpen.length;						
+
+		int numCandidate = 0;
+		for (int f = 1; f < numFacilities; ++f) {
+			if (facilityOpen[f] > 0)
+				++numCandidate;
+		}
+		
+		double[] candidates = new double[numCandidate];
+		Map<Integer, Integer> candidateToIndex = new HashMap<Integer, Integer>();
+		int caIndex = 0;
+		for (int f = 1; f < numFacilities; ++f) {
+			if (facilityOpen[f] > 0) {
+				candidates[caIndex] = facilityOpen[f];
+				candidateToIndex.put(caIndex, f);
+				++caIndex;
+			}				
+		}
+		
+		for (int f = 0; f < numFacilities; ++f)
+			facilityOpen[f] = 0;
+		facilityOpen[0] = 1;
+		
+		Set<Integer> selected = new HashSet<Integer>();		
+		if (withReplacement)
+			selected = sampleKItemsWithReplacement(candidates);
+		else
+			selected = sampleKItemsWithoutReplacement(candidates);
+		
+		for (Integer selectedIndex : selected)
+			facilityOpen[candidateToIndex.get(selectedIndex)] = 1;
+		
+//		System.out.println();
+	}
+	
+	private Set<Integer> sampleKItemsWithReplacement(double[] candidates) {
+		int numCandidates = candidates.length;
+		double[] originalCandidates = candidates.clone();		
+		
+		Set<Integer> selected = new HashSet<Integer>();		 
+		double facilityCost = 0;
+		
+		double[] probs = new double[numCandidates + 1];
+		probs[0] = 0;		
+		double tempSum = 0;
+		for (int f = 0; f < numCandidates; ++f) {
+			tempSum += originalCandidates[f];
+			probs[f + 1] = tempSum / (double) k;
+		}
+		
+		while (facilityCost < k) {	
+			// sampling once per iteration					
+			double r = Math.random();
+			for (int f = 0; f < numCandidates; ++f) {
+				if (r >= probs[f] && r <= probs[f + 1]) {					
+					if (!selected.contains(f)) {
+						selected.add(f);
+						facilityCost++;				
+					}
+					break;
+				}
+			}					
+		}	
+		return selected;
+	}
+	
+	private Set<Integer> sampleKItemsWithoutReplacement(double[] candidates) {
+		int numCandidates = candidates.length;
+		double[] originalCandidates = candidates.clone();		
+		
+		Set<Integer> selected = new HashSet<Integer>();
+		Map<Integer, Integer> swap = new HashMap<Integer, Integer>(); 
+		double facilityCost = 0;
+		int numLeft = numCandidates;
+		while (facilityCost < k) {
+			double[] probs = new double[numLeft + 1];
+			probs[0] = 0;		
+			double tempSum = 0;
+			double leftSum = 0;
+			for (int f = 0; f < numLeft; ++f) 
+				leftSum += originalCandidates[f];
+			for (int f = 0; f < numLeft; ++f) {
+				tempSum += originalCandidates[f];
+				probs[f + 1] = tempSum / leftSum;
+			}
+			
+			// sampling once per iteration					
+			double r = Math.random();
+			for (int f = 0; f < numLeft; ++f) {
+				if (r >= probs[f] && r <= probs[f + 1]) {					
+					if (!swap.containsKey(f))
+						selected.add(f);
+					else
+						selected.add(swap.get(f));
+					originalCandidates[f] = originalCandidates[numLeft - 1];
+					swap.put(f, numLeft - 1);
+					
+					numLeft--;
+					facilityCost++;						
+					break;
+				}
+			}					
+		}	
+		return selected;
+	}
+	
+	
 	
 /*	private static class Unit {
 		int id = 0;

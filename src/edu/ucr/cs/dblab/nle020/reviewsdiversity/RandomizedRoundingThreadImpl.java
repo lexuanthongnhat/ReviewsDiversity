@@ -39,7 +39,6 @@ public class RandomizedRoundingThreadImpl extends RandomizedRounding implements 
 			runRandomizedRoundingPerDoc(docId, docToConceptSentimentPairs.get(docId));
 			
 			Utils.printRunningTime(startTime, "RR finished " + i + ", final cost: " + docToStatisticalResult.get(docId).getFinalCost());
-			startTime = System.currentTimeMillis();
 		}		
 	}
 
