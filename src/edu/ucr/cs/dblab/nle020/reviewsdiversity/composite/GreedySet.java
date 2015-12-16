@@ -45,13 +45,14 @@ public class GreedySet {
 	 * @param sentimentUnits - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected void runGreedyPerDoc(int docId, Collection<? extends SentimentSet> sentimentSets) {
+	protected void runGreedyPerDoc(int docId, List<? extends SentimentSet> sentimentSets) {
 		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);;
 
 //		printInitialization();		
-		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<FullPair, Map<FullPair, Integer>>();	
+		Map<FullPair, Map<FullPair, Integer>> distances = 
+				new HashMap<FullPair, Map<FullPair, Integer>>();	
 		
 
 		List<FullPair> topK = new ArrayList<FullPair>();	
@@ -90,7 +91,7 @@ public class GreedySet {
 		docToStatisticalResult.put(docId, statisticalResult);			
 		
 		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);	
-		gatherFinalResult(runningTime, fullPairSets.size(), statisticalResult, topK);
+		gatherFinalResult(runningTime, sentimentSets, statisticalResult, topK);
 	}	
 	
 	private List<SentimentSet> convertTopKFullPairsToTopKSets(
@@ -235,7 +236,6 @@ public class GreedySet {
 		// Init the root		
 		root.getCustomerMap().clear();
 		for (FullPair fullPair : fullPairs) {
-			//			root.setHost(root);
 			fullPair.setHost(root);
 			
 			int distance = fullPairToCSPair.get(fullPair).calculateRootDistance();
@@ -249,9 +249,10 @@ public class GreedySet {
 		statisticalResult.setNumSets(sentimentSets.size());
 		statisticalResult.setNumPairs(conceptSentimentPairs.size());			
 		
-		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairSets);
+//		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairSets);
 	}
 
+	@SuppressWarnings("unused")
 	private void initNumPotentialUsefulCoverWithThreshold(StatisticalResult statisticalResult, Collection<FullPair> fullPairSets) {
 		int numPotentialUsefulCoverWithThreshold = 0;
 		for (FullPair userFullSet : fullPairSets) {
@@ -283,28 +284,13 @@ public class GreedySet {
 	private void chooseNextPair(PriorityQueue<FullPair> heap, List<FullPair> topK, StatisticalResult statisticalResult) {
 		// Choose next pair
 		FullPair nextPairSet = heap.poll();
-		topK.add(nextPairSet);
-		
-/*		// Update pair of this set
-		for (FullPair fullPairInSet : nextPairSet.getParent().getFullPairs()) {
-			
-			// No change in the cost for this case
-			if (fullPairInSet.getHost().distanceToCustomer(fullPairInSet) == 0 
-					&& !fullPairInSet.getHost().equals(nextPairSet)) {
-				fullPairInSet.getHost().removeCustomer(fullPairInSet);
-				fullPairInSet.setHost(nextPairSet);
-				fullPairInSet.removePotentialHost(nextPairSet);
-			}
-		}*/		
+		topK.add(nextPairSet);	
 
 		Set<FullPair> updatedFullPairs = new HashSet<FullPair>();
 		
 		// Update the customerMap - who it serves, and potentialHosts of servedPairs
 		//		served pairs - ones that have next pair as the closest cover ancestor		
 		for (FullPair servedPair : nextPairSet.getCustomerMap().keySet()) {			
-/*			if (nextPairSet.getParent().getFullPairs().contains(servedPair) 
-					&& servedPair.getHost().distanceToCustomer(servedPair) == 0)
-				continue;*/
 			
 			int distanceFromOldHost = servedPair.getHost().distanceToCustomer(servedPair);
 			int distanceFromNewHost = nextPairSet.distanceToCustomer(servedPair);
@@ -353,9 +339,7 @@ public class GreedySet {
 				servedPair.getPotentialHosts().removeAll(absoleteHosts);
 				statisticalResult.decreaseFinalCost(partialBenefit);
 			}
-		}
-		
-		
+		}		
 		
 		// Update the heap of unchosen pairs
 		for (FullPair updated : updatedFullPairs) {
@@ -366,8 +350,11 @@ public class GreedySet {
 	}
 	
 	
-	private void gatherFinalResult(double runningTime, int datasetSize, StatisticalResult result, List<FullPair> topK) {
-		if (datasetSize <= k) {
+	private void gatherFinalResult(double runningTime, 
+			List<? extends SentimentSet> sentimentSets, 
+			StatisticalResult result, 
+			List<FullPair> topK) {
+		if (sentimentSets.size() <= k) {
 			result.setFinalCost(0);
 			result.setNumUncovered(0);
 			result.setRunningTime(0);
@@ -375,6 +362,29 @@ public class GreedySet {
 		} else {
 			result.setNumUncovered(root.getCustomerMap().size());
 			result.setRunningTime(runningTime);
+			
+			int numEdges = 0;
+			for (int i = 0; i < sentimentSets.size(); ++i) {
+				SentimentSet set = sentimentSets.get(i);
+				for (int j = i + 1; j < sentimentSets.size(); ++j) {
+					SentimentSet otherSet = sentimentSets.get(j);
+					boolean isFinite = false;
+					for (ConceptSentimentPair pair : set.getPairs()) {
+						for (ConceptSentimentPair otherPair : otherSet.getPairs()) {
+							if (pair.calculateDistance(otherPair) != Constants.INVALID_DISTANCE) {
+								isFinite = true;
+								break;
+							}
+						}
+						if (isFinite)
+							break;
+					}
+
+					if (isFinite)
+						++numEdges;
+				}
+			}
+			result.setNumEdges(numEdges);
 		}
 		docToStatisticalResult.put(result.getDocID(), result);
 	}

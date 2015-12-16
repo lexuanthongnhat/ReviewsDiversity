@@ -69,6 +69,7 @@ public class TopPairsProgram {
 	private enum Algorithm 		{GREEDY, ILP, RANDOMIZED_ROUDNING};
 	private enum SetAlgorithm 	{GREEDY_SET, ILP_SET, RANDOMIZED_ROUNDING_SET};
 	public static enum SetOption 		{REVIEW, SENTENCE }; 
+	private enum NumItem 	{NUM_PAIRS, NUM_PAIRS_EDGES};
 	
 	public static void main(String[] args) throws InterruptedException, ExecutionException, IOException {
 		long startTime = System.currentTimeMillis();
@@ -247,8 +248,15 @@ public class TopPairsProgram {
 		String outputPath = outputFolder + "review_diversity_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
 		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
-		outputTimeToCsv(outputFolder + "time_k" + k + "_s" + ((int) (threshold * 10))  + ".csv", 
+		outputTimeToCsv(
+				outputFolder + "time_k" + k + "_s" + ((int) (threshold * 10))  + ".csv",
+				NumItem.NUM_PAIRS,
 				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		outputTimeToCsv(
+				outputFolder + "time_pair_edge_k" + k + "_s" + ((int) (threshold * 10))  + ".csv",
+				NumItem.NUM_PAIRS_EDGES,
+				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		
 		
 		Utils.printRunningTime(startTime, "Finished Top Pairs", true);
 		
@@ -379,6 +387,10 @@ public class TopPairsProgram {
 		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 		
 		outputTimeToCsv(outputFolder + "time_k" + k + "_s" + ((int) (threshold * 10))  + ".csv", 
+				NumItem.NUM_PAIRS,
+				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		outputTimeToCsv(outputFolder + "time_pair_edge_k" + k + "_s" + ((int) (threshold * 10))  + ".csv", 
+				NumItem.NUM_PAIRS_EDGES,
 				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 		
 		Utils.printRunningTime(startTime, "Finished Top " + setOption, true);		
@@ -1074,31 +1086,54 @@ public class TopPairsProgram {
 	
 	private static void outputTimeToCsv(
 			String outputFile,
+			NumItem numItem,
 			Map<Integer, StatisticalResult> docToStatisticalResultGreedy,
 			Map<Integer, StatisticalResult> docToStatisticalResultILP,
 			Map<Integer, StatisticalResult> docToStatisticalResultRR) {
 		
-		Map<Integer, StatisticalResult> numPairsToAverageGreedy = extractNumPairsToTime(docToStatisticalResultGreedy);
-		Map<Integer, StatisticalResult> numPairsToAverageILP = extractNumPairsToTime(docToStatisticalResultILP);
-		Map<Integer, StatisticalResult> numPairsToAverageRR = extractNumPairsToTime(docToStatisticalResultRR);
+		for (Integer docId : docToStatisticalResultGreedy.keySet()) {
+			docToStatisticalResultILP.get(docId).setNumEdges(
+					docToStatisticalResultGreedy.get(docId).getNumEdges());
+			docToStatisticalResultRR.get(docId).setNumEdges(
+					docToStatisticalResultGreedy.get(docId).getNumEdges());
+		}
 		
-		List<Integer> numPairs = new ArrayList<Integer>(numPairsToAverageGreedy.keySet());
-		Collections.sort(numPairs);
+		Map<Integer, StatisticalResult> numToAverageGreedy = 
+				extractNumToAverageTime(numItem, docToStatisticalResultGreedy);
+		Map<Integer, StatisticalResult> numToAverageILP = 
+				extractNumToAverageTime(numItem, docToStatisticalResultILP);
+		Map<Integer, StatisticalResult> numToAverageRR = 
+				extractNumToAverageTime(numItem, docToStatisticalResultRR);
+		
+		List<Integer> nums = new ArrayList<Integer>(numToAverageGreedy.keySet());
+		Collections.sort(nums);
 		
 		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputFile), 
 				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-			writer.write("numPairs, ilp, rr, greedy, ilp setup, rr setup, greedy setup, "
+			
+			int lowerBoundToOutput = 0;
+			int upperBoundToOutput = 0;
+			if (numItem == NumItem.NUM_PAIRS) {
+				writer.write("numPairs, ");
+				lowerBoundToOutput = 30;
+				upperBoundToOutput = 900;
+			} else if (numItem == NumItem.NUM_PAIRS_EDGES) {
+				lowerBoundToOutput = 200;
+				upperBoundToOutput = 6000;
+				writer.write("numPairs+numEdges, ");
+			}
+			writer.write("ilp, rr, greedy, ilp setup, rr setup, greedy setup, "
 					+ "ilp main, rr main, greedy main, ilp, rr's lp");
 			writer.newLine();
-			for (int i = 0; i < numPairs.size(); ++i) {
-				int numPair = numPairs.get(i);
-				if (numPair <= 30 || numPair >= 900)
+			for (int i = 0; i < nums.size(); ++i) {
+				int num = nums.get(i);
+				if (num <= lowerBoundToOutput || num >= upperBoundToOutput)
 					continue;
 				
-				StatisticalResult ilp = numPairsToAverageILP.get(numPair);
-				StatisticalResult rr = numPairsToAverageRR.get(numPair);
-				StatisticalResult greedy = numPairsToAverageGreedy.get(numPair);
-				writer.write(numPair + ", " + ilp.getRunningTime() + ", " + rr.getRunningTime() + ", " + greedy.getRunningTime() + ", "
+				StatisticalResult ilp = numToAverageILP.get(num);
+				StatisticalResult rr = numToAverageRR.get(num);
+				StatisticalResult greedy = numToAverageGreedy.get(num);
+				writer.write(num + ", " + ilp.getRunningTime() + ", " + rr.getRunningTime() + ", " + greedy.getRunningTime() + ", "
 						+ ilp.getPartialTime(PartialTimeIndex.SETUP) + ", " + rr.getPartialTime(PartialTimeIndex.SETUP) + ", "
 						+ greedy.getPartialTime(PartialTimeIndex.SETUP) + ", " + ilp.getPartialTime(PartialTimeIndex.MAIN) + ", " 
 						+ rr.getPartialTime(PartialTimeIndex.MAIN) + ", " + greedy.getPartialTime(PartialTimeIndex.MAIN) + ", "
@@ -1112,38 +1147,49 @@ public class TopPairsProgram {
 		}
 	}
 
-	private static Map<Integer, StatisticalResult> extractNumPairsToTime(
+	private static Map<Integer, StatisticalResult> extractNumToAverageTime(
+			NumItem numItem,
 			Map<Integer, StatisticalResult> docToStatisticalResult) {
-		Map<Integer, StatisticalResult> numPairsToAverageStat = new HashMap<Integer, StatisticalResult>();		
-		Map<Integer, List<StatisticalResult>> numPairsToStats = new HashMap<Integer, List<StatisticalResult>>();
+		Map<Integer, StatisticalResult> numToAverageStat = new HashMap<Integer, StatisticalResult>();		
+		Map<Integer, List<StatisticalResult>> numToStats = new HashMap<Integer, List<StatisticalResult>>();
 		for (Integer docId : docToStatisticalResult.keySet()) {
-			int numPairs = docToStatisticalResult.get(docId).getNumPairs();
-			if (!numPairsToStats.containsKey(numPairs))
-				numPairsToStats.put(numPairs, new ArrayList<StatisticalResult>());
+			int num = 0;
+			if (numItem == NumItem.NUM_PAIRS)
+				num = docToStatisticalResult.get(docId).getNumPairs();
+			else if (numItem == NumItem.NUM_PAIRS_EDGES)
+				num = docToStatisticalResult.get(docId).getNumPairs() 
+							+ docToStatisticalResult.get(docId).getNumEdges();
+				
+			if (!numToStats.containsKey(num))
+				numToStats.put(num, new ArrayList<StatisticalResult>());
 			
-			numPairsToStats.get(numPairs).add(docToStatisticalResult.get(docId));
+			numToStats.get(num).add(docToStatisticalResult.get(docId));
 		}
 		
-		for (Integer numPairs : numPairsToStats.keySet()) {
-			List<StatisticalResult> stats = numPairsToStats.get(numPairs);
-			int num = stats.size();
+		for (Integer num : numToStats.keySet()) {
+			List<StatisticalResult> stats = numToStats.get(num);
+			double numStats = (double) stats.size();
 			StatisticalResult averageStat = new StatisticalResult();
 			stats.stream().forEach(stat -> {
 				averageStat.increaseRunningTime(stat.getRunningTime());
 				averageStat.increasePartialTime(stat);
 			});
 			
-			averageStat.setRunningTime(Utils.rounding(averageStat.getRunningTime() / num, Constants.NUM_DIGITS_IN_TIME));
+			averageStat.setRunningTime(
+					Utils.rounding(averageStat.getRunningTime() / numStats, 
+					Constants.NUM_DIGITS_IN_TIME));
 			for (PartialTimeIndex index : averageStat.getPartialTimes().keySet()) {
 				averageStat.getPartialTimes().put(
 						index, 
-						Utils.rounding(averageStat.getPartialTimes().get(index) / num, Constants.NUM_DIGITS_IN_TIME));
+						Utils.rounding(
+								averageStat.getPartialTimes().get(index) / numStats, 
+								Constants.NUM_DIGITS_IN_TIME));
 			}
 			
-			numPairsToAverageStat.put(numPairs, averageStat);
+			numToAverageStat.put(num, averageStat);
 		}
 		
-		return numPairsToAverageStat;
+		return numToAverageStat;
 	}
 
 	private static StatisticalResult[] summaryStatisticalResultsOfDifferentMethods(

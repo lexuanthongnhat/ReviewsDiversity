@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
-import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class GreedyThreadImpl extends Greedy implements Runnable{
 	

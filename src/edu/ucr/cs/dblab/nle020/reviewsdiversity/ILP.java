@@ -217,17 +217,17 @@ public class ILP {
 			
 			// Optimize the model
 			model.optimize();			
-			
+						
 			// Prepare some statistics, update result					
 			statisticalResult.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
 			if (integralModel)
 				statisticalResult.setOptimalCost(model.get(GRB.DoubleAttr.ObjBound));
 			
-			for (int c = 1; c < numCustomers; ++c) {
+/*			for (int c = 1; c < numCustomers; ++c) {
 				if (connecting[0][c].get(GRB.DoubleAttr.X) == 1.0) {
 					statisticalResult.increaseNumUncovered();
 				}
-			}
+			}*/
 			
 			
 			for (int f = 0; f < numFacilities; ++f) {
@@ -266,70 +266,6 @@ public class ILP {
 		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
 	
-	// TODO - this method is probably out-dated
-	private void checkResult(int[][] distances, int[] facilityOpen, int[][] facilityConnect, StatisticalResult statisticalResult) {
-		int numFacilities = facilityOpen.length;
-		int numCustomers = facilityConnect[0].length;
-		
-		long verifyingCost = 0;	
-		
-		// Test 1
-		for (int c = 0; c < numCustomers; ++c) {
-			int numConnect = 0;
-			for (int f = 0; f < numFacilities; ++f) {
-				if (facilityConnect[f][c] == 1) {
-					verifyingCost += distances[f][c];
-					++numConnect;
-				}					
-			}
-			
-			if (numConnect != 1) {
-				System.err.println("ILP TEST 1 - ERROR at customer " + c);
-				for (int f = 0; f < numFacilities; ++f) {
-					if (facilityConnect[f][c] == 1) {
-						System.err.println("facility[" + f + "][" + c + "] = " + facilityConnect[f][c] 
-								+ ", facilityOpen[" + f + "] = " + facilityOpen[f]);
-					}					
-				}	
-			}
-		}
-
-		
-		for (int f = 0; f < numFacilities; ++f) {
-			if (facilityOpen[f] != 1) {
-
-				for (int c = 0; c < numCustomers; ++c) {
-					if (facilityConnect[f][c] == 1) {
-						System.err.println("ILP TEST 1 - ERROR 2 at facility " + f + ", customer " + c);
-					}					
-				}
-			}
-		}
-		
-		System.out.println("Cost: " + statisticalResult.getFinalCost() + " - Verifying Cost: " + verifyingCost);
-		if (verifyingCost != statisticalResult.getFinalCost())
-			System.err.println("ILP Error at docID " + statisticalResult.getDocID());
-		
-		
-		// Test 2
-		verifyingCost = 0;
-		for (int c = 0; c < numCustomers; ++c) {
-			int min = Constants.INVALID_DISTANCE;
-			for (int f = 0; f < numFacilities; ++f) {
-				if (facilityOpen[f] == 1) {
-					if (distances[f][c] < min)
-						min = distances[f][c];
-				}
-			}			
-			verifyingCost += min;
-		}
-		
-		if (verifyingCost != statisticalResult.getFinalCost())
-			System.err.println("ILP TEST 2 -  Error 2 at docID " + statisticalResult.getDocID() + 
-					":\tCost: " + statisticalResult.getFinalCost() + " - Verifying Cost 2: " + verifyingCost);
-	}
-	
-
 	protected static int[][] initDistances(List<ConceptSentimentPair> conceptSentimentPairs, float sentimentThreshold) {
 		int[][] distances = new int[conceptSentimentPairs.size()][conceptSentimentPairs.size()];
 		

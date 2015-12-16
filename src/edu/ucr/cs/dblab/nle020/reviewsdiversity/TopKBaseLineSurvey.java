@@ -33,8 +33,6 @@ import org.apache.poi.xssf.usermodel.XSSFRichTextString;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-
 import edu.ucr.cs.dblab.nle020.metamap.MetaMapParser;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetThreadImpl;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.TopSetsBaseline;

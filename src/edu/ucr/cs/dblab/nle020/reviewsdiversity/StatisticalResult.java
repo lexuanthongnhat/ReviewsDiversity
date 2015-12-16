@@ -1,8 +1,6 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
@@ -25,6 +23,8 @@ public class StatisticalResult {
 	private int numUsefulCover = 0;							// After Algorithm, Actual ancestor-child relationship/edge, not two pairs of the same CUI
 	private int numPotentialUsefulCover = 0;				// Before Algorithm
 	private int numPotentialUsefulCoverWithThreshold = 0;	// Before Algorithm, care about sentiment cover
+	
+	private int numEdges = 0;					
 
 	private double runningTime = 0;
 	private Map<Constants.PartialTimeIndex, Double> partialTimes = new HashMap<Constants.PartialTimeIndex, Double>();
@@ -223,5 +223,16 @@ public class StatisticalResult {
 	public void setPartialTimes(Map<Constants.PartialTimeIndex, Double> partialTimes) {
 		this.partialTimes = partialTimes;
 	}
+
+	public int getNumEdges() {
+		return numEdges;
+	}
+
+	public void setNumEdges(int numEdges) {
+		this.numEdges = numEdges;
+	}
 	
+	public void increaseNumEdges() {
+		++numEdges;
+	}
 }

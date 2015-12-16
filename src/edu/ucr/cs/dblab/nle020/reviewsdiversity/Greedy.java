@@ -3,7 +3,6 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -12,14 +11,8 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.RecursiveAction;
-import java.util.concurrent.TimeUnit;
-
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class Greedy {
@@ -92,7 +85,7 @@ public class Greedy {
 		docToStatisticalResult.put(docId, statisticalResult);			
 		
 		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);	
-		gatherFinalResult(runningTime, pairs.size(), statisticalResult, topK);
+		gatherFinalResult(runningTime, conceptSentimentPairs, statisticalResult, topK);
 //		Utils.printRunningTime(startTime, "Greedy finished docId " + docId);
 	}	
 	
@@ -111,7 +104,10 @@ public class Greedy {
 		return topKPairsResult;
 	}
 	
-	private void initPairs(List<ConceptSentimentPair> conceptSentimentPairs, List<FullPair> fullPairs, StatisticalResult statisticalResult) {
+	private void initPairs(
+			List<ConceptSentimentPair> conceptSentimentPairs, 
+			List<FullPair> fullPairs, 
+			StatisticalResult statisticalResult) {
 	
 		for (int i = 0 ; i < conceptSentimentPairs.size() ; i++) {
 			
@@ -141,7 +137,8 @@ public class Greedy {
 				
 				int distance = Constants.INVALID_DISTANCE;
 				
-				distance = conceptSentimentPairs.get(i).calculateDistance(conceptSentimentPairs.get(j), threshold);
+				distance = conceptSentimentPairs.get(i)
+						.calculateDistance(conceptSentimentPairs.get(j), threshold);
 				
 				// 2 pairs are in the same branch and sentiment coverable
 				if (distance != Constants.INVALID_DISTANCE) {
@@ -167,28 +164,24 @@ public class Greedy {
 		// Init benefit
 		for (int i = 0; i < fullPairs.size(); i++) {
 			FullPair pair = fullPairs.get(i);
-			pair.setBenefit(pair.getCustomerMap().size() * conceptSentimentPairs.get(i).calculateRootDistance()); 
+			pair.setBenefit(
+					pair.getCustomerMap().size() * conceptSentimentPairs.get(i).calculateRootDistance()); 
 		}
 		
 		long initialCost = 0;
 		// Init the root
-		//root.setCustomerMap(new ConcurrentHashMap<FullPair, Integer>());
 		root.getCustomerMap().clear();
-		for (int i = 0; i < fullPairs.size(); i++) {
-//			root.setHost(root);
-			
+		for (int i = 0; i < fullPairs.size(); i++) {			
 			int distance = conceptSentimentPairs.get(i).calculateRootDistance();
 			root.getCustomerMap().put(fullPairs.get(i), distance);
 			initialCost += distance;
-		}
-		
+		}		
 		
 		// Init result
 		statisticalResult.setInitialCost(initialCost);
 		statisticalResult.setFinalCost(initialCost);
-		statisticalResult.setNumPairs(conceptSentimentPairs.size());
 //		initNumPotentialUsefulCover(result, conceptSentimentPairs);
-		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairs);
+//		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairs);
 	}
 
 	private void initDistances(List<ConceptSentimentPair> conceptSentimentPairs, 
@@ -227,6 +220,7 @@ public class Greedy {
 		}
 	}
 	
+	@SuppressWarnings("unused")
 	private void initNumPotentialUsefulCover(StatisticalResult result, List<ConceptSentimentPair> conceptSentimentPairs) {
 		for (int i = 0; i < conceptSentimentPairs.size() - 1; ++i) {
 			ConceptSentimentPair pair1 = conceptSentimentPairs.get(i);
@@ -241,6 +235,7 @@ public class Greedy {
 		}
 	}
 	
+	@SuppressWarnings("unused")
 	private void initNumPotentialUsefulCoverWithThreshold(StatisticalResult result, List<FullPair> fullPairs) {
 		for (FullPair pair : fullPairs) {
 			if (pair.getCustomerMap() != null) {
@@ -271,7 +266,10 @@ public class Greedy {
 	}
 	
 	// Choose the next pair on top of the heap, then update the RELATED pairs and the heap
-	private void chooseNextPair(PriorityQueue<FullPair> heap, List<FullPair> topK, StatisticalResult statisticalResult) {
+	private void chooseNextPair(
+			PriorityQueue<FullPair> heap, 
+			List<FullPair> topK, 
+			StatisticalResult statisticalResult) {
 		//long startTime = System.currentTimeMillis();
 		// Choose next pair
 		FullPair nextPair = heap.poll();
@@ -355,22 +353,36 @@ public class Greedy {
 			System.err.println("Greedy Error at docID " + statisticalResult.getDocID());
 	}
 
-	private void gatherFinalResult(double runningTime, int datasetSize, StatisticalResult statisticalResult, List<FullPair> topK) {
-		if (datasetSize <= k) {
+	private void gatherFinalResult(double runningTime, 
+			List<ConceptSentimentPair> conceptSentimentPairs, 
+			StatisticalResult statisticalResult, 
+			List<FullPair> topK) {
+		if (conceptSentimentPairs.size() <= k) {
 			statisticalResult.setFinalCost(0);
 			statisticalResult.setNumUncovered(0);
 			statisticalResult.setRunningTime(0);
 			statisticalResult.setNumUsefulCover(0);
 		} else {
-			statisticalResult.setNumUncovered(root.getCustomerMap().size());
 			statisticalResult.setRunningTime(runningTime);
+			statisticalResult.setNumPairs(conceptSentimentPairs.size());
+			statisticalResult.setNumUncovered(root.getCustomerMap().size());
 			
-			for (FullPair pair : topK) {
+			/*for (FullPair pair : topK) {
 				for (FullPair customer : pair.getCustomerMap().keySet()) {
 					if (pair.getCustomerMap().get(customer) != 0)
 						statisticalResult.increaseNumUsefulCover();
 				}
+			}*/
+			
+			int numEdges = 0;
+			for (int i = 0; i < conceptSentimentPairs.size(); ++i) {
+				for (int j = i + 1; j < conceptSentimentPairs.size(); ++j) {
+					if (conceptSentimentPairs.get(i).calculateDistance(conceptSentimentPairs.get(j))
+							!= Constants.INVALID_DISTANCE)
+						++numEdges;
+				}
 			}
+			statisticalResult.setNumEdges(numEdges);
 		}
 		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
@@ -397,6 +409,7 @@ public class Greedy {
 		}
 	}
 	
+	@SuppressWarnings("unused")
 	private class InitPairsRunnable implements Runnable {
 		private List<ConceptSentimentPair> conceptSentimentPairs;
 		private List<FullPair> fullPairs;
@@ -458,94 +471,4 @@ public class Greedy {
 		}		
 	}
 	
-	private class InitPairs extends RecursiveAction {
-		private List<ConceptSentimentPair> conceptSentimentPairs;
-		private List<FullPair> fullPairs;
-		private int startIndex;
-		private int length;
-					
-		public InitPairs(List<ConceptSentimentPair> conceptSentimentPairs,
-				List<FullPair> fullPairs, int startIndex, int length) {
-			super();
-			this.conceptSentimentPairs = conceptSentimentPairs;
-			this.fullPairs = fullPairs;
-			this.startIndex = startIndex;
-			this.length = length;
-		}
-
-		@Override
-		protected void compute() {
-			if (length <= Constants.LENGTH_THRESHOLD) {
-				computeDirectly();
-				return;
-			}
-			
-			int split = length / 2;
-			invokeAll(new InitPairs(conceptSentimentPairs, fullPairs, startIndex, split), 
-					new InitPairs(conceptSentimentPairs, fullPairs, startIndex + split, length - split));
-		}
-		
-		private void computeDirectly() {
-			// Init the customers and potential hosts
-			for (int i = startIndex; i < startIndex + length; ++i) {
-				Utils.printTotalHeapSize("Init customer, iteration " + i);
-				
-				FullPair pair = fullPairs.get(i);			
-				for (int j = i + 1; j < fullPairs.size(); j ++) {
-					FullPair other = fullPairs.get(j);
-									
-					if (Constants.DEBUG_MODE) {
-						conceptSentimentPairs.get(i).testDistance(conceptSentimentPairs.get(j));
-						conceptSentimentPairs.get(j).testDistance(conceptSentimentPairs.get(i));
-					}
-					
-					int distance = Constants.INVALID_DISTANCE;
-					
-					distance = conceptSentimentPairs.get(i).calculateDistance(conceptSentimentPairs.get(j), threshold);
-					
-					// 2 pairs are in the same branch and sentiment coverable
-					if (distance != Constants.INVALID_DISTANCE) {
-						
-						// "pair" is the ancestor of "other"
-						if (distance > 0) {
-							pair.getCustomerMap().put(other, distance);
-							other.getPotentialHosts().add(pair);
-						} else if (distance < 0) {
-							other.getCustomerMap().put(pair, -distance);
-							pair.getPotentialHosts().add(other);
-						} else {
-							pair.getCustomerMap().put(other, distance);
-							other.getPotentialHosts().add(pair);
-							
-							other.getCustomerMap().put(pair, -distance);
-							pair.getPotentialHosts().add(other);
-						}
-					}
-				}
-			}
-		}
-	}
-	
-	/*	private List<PurePair> leaves;
-	private List<PurePair> leavesWithParent;
-	private List<PurePair> ancestors;
-	
-	// KEY: Pair/Facility --> VALUES: Pairs/Customers that the key is able to cover/serve
-	private Map<PurePair, Set<PurePair>> coverMap;
-	
-	// KEY: Pair/Facility --> VALUES: Pairs/Customers that the key currently serves
-	//		The KEY is the closest ancestor that currently cover the VALUES   
-	private Map<PurePair, Set<PurePair>> servingMap;
-	
-	private Map<PurePair, PurePair> pairToCoverMap;
-	
-	private void initLeaves() {
-		
-	}
-	
-	private boolean isLeaf(PurePair p) {
-		boolean result = false;
-		
-		return result;
-	}*/
 }

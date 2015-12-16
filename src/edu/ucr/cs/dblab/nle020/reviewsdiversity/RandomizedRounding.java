@@ -6,28 +6,18 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
-import gurobi.GRB;
-import gurobi.GRBEnv;
-import gurobi.GRBException;
-import gurobi.GRBLinExpr;
-import gurobi.GRBModel;
-import gurobi.GRBVar;
 
 public class RandomizedRounding {
 	protected int k = 0;
@@ -241,6 +231,7 @@ public class RandomizedRounding {
 		Utils.printRunningTime(startTime, "Finished Randomized Rounding");
 	}
 	
+	@SuppressWarnings("unused")
 	private void sampleKItems(double[] facilityOpen, boolean withReplacement) {
 		int numFacilities = facilityOpen.length;		
 		double[] originalOpen = facilityOpen.clone();
@@ -413,6 +404,7 @@ public class RandomizedRounding {
 	}
 */	
 	
+	@SuppressWarnings("unused")
 	private boolean rollTheDice(double probability) {
 		if (Math.random() < probability)
 			return true;
