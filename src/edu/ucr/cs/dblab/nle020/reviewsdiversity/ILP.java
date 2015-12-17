@@ -19,7 +19,6 @@ import gurobi.GRBException;
 import gurobi.GRBLinExpr;
 import gurobi.GRBModel;
 import gurobi.GRBVar;
-
 /**
  * Integer Linear Programming Algorithm
  * @author Thong Nhat
@@ -242,9 +241,12 @@ public class ILP {
 			}						
 					
 			model.update();
-		//	long startTime = System.nanoTime();
+			long startTime = System.nanoTime();
 			// Optimize the model
-			model.optimize();			
+			model.optimize();
+			statisticalResult.addPartialTime(
+					PartialTimeIndex.LP, 
+					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 	//		System.out.println(Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 						
 			// Prepare some statistics, update result					
@@ -266,10 +268,10 @@ public class ILP {
 					}
 				}
 			}
-			statisticalResult.addPartialTime(
+	/*		statisticalResult.addPartialTime(
 					PartialTimeIndex.LP,
 					Utils.rounding(1000 * model.get(GRB.DoubleAttr.Runtime), 
-							Constants.NUM_DIGITS_IN_TIME));
+							Constants.NUM_DIGITS_IN_TIME));*/
 	//		System.out.println("Model running time: " + 1000 * model.get(GRB.DoubleAttr.Runtime));
 			
 			model.dispose();

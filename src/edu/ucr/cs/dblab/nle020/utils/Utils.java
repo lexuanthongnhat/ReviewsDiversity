@@ -3,6 +3,8 @@ package edu.ucr.cs.dblab.nle020.utils;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
@@ -14,9 +16,13 @@ import java.util.Set;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
-
 public class Utils {
+	/** Get CPU time in nanoseconds. */
+	public static long getCpuTime( ) {
+	    ThreadMXBean bean = ManagementFactory.getThreadMXBean( );
+	    return bean.isCurrentThreadCpuTimeSupported( ) ?
+	        bean.getCurrentThreadCpuTime( ) : 0L;
+	}
 	
 	public static void printRunningTime(long startTime, String message, boolean... useErr) {
 
@@ -41,6 +47,13 @@ public class Utils {
 	public static double runningTimeInMs(long startTime, int numDigits) {
 		return rounding(
 					(double) (System.nanoTime() - startTime) / 1000000.0f, 
+					numDigits
+				);
+	}
+	
+	public static double runningCpuTimeInMs(long startTimeInNano, long stopTimeInNano, int numDigits) {
+		return rounding(
+					(double) (stopTimeInNano - startTimeInNano) / 1000000.0f, 
 					numDigits
 				);
 	}

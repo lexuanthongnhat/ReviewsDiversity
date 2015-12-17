@@ -1,5 +1,7 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -11,6 +13,7 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
@@ -70,7 +73,9 @@ public class Greedy {
 		}
 		statisticalResult.addPartialTime(
 				PartialTimeIndex.MAIN,
-				Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));	
+				Utils.runningTimeInMs(
+						startPartialTime, 
+						Constants.NUM_DIGITS_IN_TIME));	
 				
 		if (Constants.DEBUG_MODE)
 			checkResult(topK, distances, statisticalResult);
@@ -79,12 +84,15 @@ public class Greedy {
 		List<ConceptSentimentPair> topKPairsResult = convertTopKFullPairsToTopKPairs(conceptSentimentPairs, topK);
 		statisticalResult.addPartialTime(
 				PartialTimeIndex.GET_TOPK, 
-				Utils.runningTimeInMs(startPartialTime, Constants.NUM_DIGITS_IN_TIME));
+				Utils.runningTimeInMs(
+						startPartialTime,  
+						Constants.NUM_DIGITS_IN_TIME));
 		
 		docToTopKPairsResult.put(docId, topKPairsResult);
 		docToStatisticalResult.put(docId, statisticalResult);			
 		
-		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);	
+		double runningTime = Utils.runningTimeInMs(
+				startTime, Constants.NUM_DIGITS_IN_TIME);	
 		gatherFinalResult(runningTime, conceptSentimentPairs, statisticalResult, topK);
 //		Utils.printRunningTime(startTime, "Greedy finished docId " + docId);
 	}	

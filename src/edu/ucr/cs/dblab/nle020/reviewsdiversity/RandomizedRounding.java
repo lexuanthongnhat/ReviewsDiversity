@@ -100,7 +100,6 @@ public class RandomizedRounding {
 			StatisticalResult statisticalResult,
 			Constants.LPMethod method){
 		long startTime = System.nanoTime();		
-		int numFacilities = facilityToCustomerAndDistance.keySet().size();
 		
 		Map<Integer, Double> openedFacilities = new HashMap<Integer, Double>();
 		Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection = new HashMap<Integer, Map<Integer, Double>>();
