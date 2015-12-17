@@ -188,10 +188,12 @@ public class RandomizedRounding {
 						openedFacilityToCustomerAndConnection.put(facility, new HashMap<Integer, Double>());
 					openedFacilityToCustomerAndConnection.get(facility).put(customer, 1.0);
 				} else {			
-					if (facilityToCustomerAndDistance.get(facility).get(customer) < customerToMinDistance.get(customer)) {
+					if (facilityToCustomerAndDistance.get(facility).get(customer) 
+							< customerToMinDistance.get(customer)) {
 						if (!openedFacilityToCustomerAndConnection.containsKey(facility))
 							openedFacilityToCustomerAndConnection.put(facility, new HashMap<Integer, Double>());
 						
+						customerToMinDistance.put(customer,	facilityToCustomerAndDistance.get(facility).get(customer));
 						openedFacilityToCustomerAndConnection.get(facility).put(customer, 1.0);
 					}
 				}
