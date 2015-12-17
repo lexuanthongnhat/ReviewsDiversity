@@ -76,8 +76,8 @@ public class TopPairsProgram {
 //		getDatasetStatistics();
 		
 		topPairsExperiment();
-		topSetsExperiment(SetOption.REVIEW);
-		topSetsExperiment(SetOption.SENTENCE);
+//		topSetsExperiment(SetOption.REVIEW);
+//		topSetsExperiment(SetOption.SENTENCE);
 		
 //		topPairsSyntheticExperiment();
 		Utils.printRunningTime(startTime, "Finished evaluation");

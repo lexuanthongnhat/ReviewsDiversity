@@ -2,6 +2,7 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.composite;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -51,13 +52,14 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 		if (sentimentSets.size() <= k) {
 			topKSets = sentimentSets;
 		} else {
-			int[][] distances = ILPSet.initDistances(threshold, sentimentSets, pairs, statisticalResult);
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = 
+					ILPSet.initDistances(threshold, sentimentSets, pairs, statisticalResult);
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.SETUP, 
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 			
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
-					doRandomizedRounding(distances, statisticalResult, method);
+					doRandomizedRounding(facilityToCustomerAndDistance, statisticalResult, method);
 			
 			long startPartialTime = System.nanoTime();
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();

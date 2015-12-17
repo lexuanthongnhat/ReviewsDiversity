@@ -105,8 +105,6 @@ public class ILP {
 			Constants.LPMethod method) {
 		long startTime = System.nanoTime();
 		
-		int numFacilities = facilityToCustomerAndDistance.keySet().size();
-		
 		Map<Integer, Double> openedFacilities = new HashMap<Integer, Double>();
 		Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection = new HashMap<Integer, Map<Integer, Double>>();
 		boolean integralModel = true;
@@ -122,8 +120,8 @@ public class ILP {
 //		System.out.println(Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 		// Get top K by original order
 		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
-		for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
-			if (openedFacilities.get(f) == 1.0) {
+		for (Integer f : openedFacilities.keySet()) {			// Start from "1" because the first is the root
+			if (f > 0 && openedFacilities.get(f) == 1.0) {
 				topKByOriginalOrders.add(f - 1);
 			}
 		}
@@ -133,11 +131,12 @@ public class ILP {
 	
 	/**
 	 * Building and executing ILP/LP model
-	 * @param distances - input the distances between facility-customer
+	 * @param k - number of selected items
 	 * @param method - input MLP solver
 	 * @param integralModel - input to choose whether it's ILP or just LP 
-	 * @param facilityOpen - output of facility opening indicator
-	 * @param facilityConnect - output of facility-customer connection
+	 * @param facilityToCustomerAndDistance - input the distances between facility-customer
+	 * @param openedFacilities - output of facility opening indicator
+	 * @param openedFacilityToCustomerAndConnection - output of facility-customer connection
 	 * @param statisticalResult - output of objective
 	 */
 	public static void executeModel(
@@ -206,7 +205,7 @@ public class ILP {
 			// Constraint: open k + 1 facilities, including the root
 			GRBLinExpr kFacilities = new GRBLinExpr();
 			for (int f = 0; f < numFacilities; ++f) {
-				kFacilities.addTerm(1.0, open.get(0));
+				kFacilities.addTerm(1.0, open.get(f));
 			}
 			model.addConstr(kFacilities, GRB.EQUAL, k + 1, "kFacilities");
 			
@@ -224,7 +223,8 @@ public class ILP {
 				}
 			}
 			GRBLinExpr connectingToOneFacility = new GRBLinExpr();
-			for (Integer c : customerToFacilities.keySet()) {				
+			for (Integer c : customerToFacilities.keySet()) {	
+				connectingToOneFacility = new GRBLinExpr();
 				for (Integer f : customerToFacilities.get(c)) {
 					connectingToOneFacility.addTerm(1.0, connecting.get(f).get(c));
 				}
@@ -236,16 +236,16 @@ public class ILP {
 			 * 				x(f, c) <= x(f)
 			 */
 			for (Integer f : facilityToCustomerAndDistance.keySet()) {
-				Map<Integer, Integer> customerToDistance = facilityToCustomerAndDistance.get(f);				
-				for (Integer c : customerToDistance.keySet()) {	
+				for (Integer c : facilityToCustomerAndDistance.get(f).keySet()) {	
 					model.addConstr(connecting.get(f).get(c), GRB.LESS_EQUAL, open.get(f), "onlyToOpenedFacility_f" + f + "_c" + "c");
 				}
 			}						
-			
+					
 			model.update();
-			
+		//	long startTime = System.nanoTime();
 			// Optimize the model
 			model.optimize();			
+	//		System.out.println(Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 						
 			// Prepare some statistics, update result					
 			statisticalResult.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
@@ -270,7 +270,7 @@ public class ILP {
 					PartialTimeIndex.LP,
 					Utils.rounding(1000 * model.get(GRB.DoubleAttr.Runtime), 
 							Constants.NUM_DIGITS_IN_TIME));
-			//System.out.println("Model running time: " + 1000 * model.get(GRB.DoubleAttr.Runtime));
+	//		System.out.println("Model running time: " + 1000 * model.get(GRB.DoubleAttr.Runtime));
 			
 			model.dispose();
 			env.dispose();
@@ -294,7 +294,10 @@ public class ILP {
 		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
 	
-	protected static Map<Integer, Map<Integer, Integer>> initDistances(List<ConceptSentimentPair> conceptSentimentPairs, float sentimentThreshold) {
+	protected static Map<Integer, Map<Integer, Integer>> initDistances(
+			List<ConceptSentimentPair> conceptSentimentPairs, 
+			float sentimentThreshold) {
+		
 		Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = new HashMap<Integer, Map<Integer, Integer>>();
 		
 		// The root
@@ -308,6 +311,9 @@ public class ILP {
 		// Normal pairs
 		for (int i = 1; i < conceptSentimentPairs.size(); ++i) {
 			ConceptSentimentPair pair1 = conceptSentimentPairs.get(i);
+			if (!facilityToCustomerAndDistance.containsKey(i))
+				facilityToCustomerAndDistance.put(i, new HashMap<Integer, Integer>());
+			facilityToCustomerAndDistance.get(i).put(i, 0);
 			
 			for (int j = i + 1; j < conceptSentimentPairs.size(); ++j) {
 				ConceptSentimentPair pair2 = conceptSentimentPairs.get(j);				
@@ -324,20 +330,16 @@ public class ILP {
 				}
 											
 				if (distance != Constants.INVALID_DISTANCE) {
-					if (distance > 0) {
-						if (facilityToCustomerAndDistance.containsKey(i))
-							facilityToCustomerAndDistance.put(i, new HashMap<Integer, Integer>());
+					if (distance > 0) {			
 						
 						facilityToCustomerAndDistance.get(i).put(j, distance);
 					} else if (distance < 0) {
-						if (facilityToCustomerAndDistance.containsKey(j))
+						if (!facilityToCustomerAndDistance.containsKey(j))
 							facilityToCustomerAndDistance.put(j, new HashMap<Integer, Integer>());
 						
 						facilityToCustomerAndDistance.get(j).put(i, -distance);
 					} else if (distance == 0) {
-						if (facilityToCustomerAndDistance.containsKey(i))
-							facilityToCustomerAndDistance.put(i, new HashMap<Integer, Integer>());
-						if (facilityToCustomerAndDistance.containsKey(j))
+						if (!facilityToCustomerAndDistance.containsKey(j))
 							facilityToCustomerAndDistance.put(j, new HashMap<Integer, Integer>());
 						
 						facilityToCustomerAndDistance.get(i).put(j, distance);

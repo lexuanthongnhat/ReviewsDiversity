@@ -71,13 +71,13 @@ public class RandomizedRounding {
 		if (pairs.size() <= k + 1) {
 			topKPairs = pairs;
 		} else {
-			int[][] distances = ILP.initDistances(pairs, threshold);
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = ILP.initDistances(pairs, threshold);			
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.SETUP,
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
 			
 			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
-					doRandomizedRounding(distances, statisticalResult, method);	
+					doRandomizedRounding(facilityToCustomerAndDistance, statisticalResult, method);	
 			
 			long startPartialTime = System.nanoTime();
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
@@ -95,35 +95,45 @@ public class RandomizedRounding {
 		gatherFinalResult(runningTime, pairs.size(), statisticalResult);
 	}
 		
-	protected StatisticalResultAndTopKByOriginalOrder doRandomizedRounding(int[][] distances, StatisticalResult statisticalResult,
+	protected StatisticalResultAndTopKByOriginalOrder doRandomizedRounding(
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance, 
+			StatisticalResult statisticalResult,
 			Constants.LPMethod method){
 		long startTime = System.nanoTime();		
-		int numFacilities = distances.length;
-		int numCustomers = distances[0].length;
+		int numFacilities = facilityToCustomerAndDistance.keySet().size();
 		
-		double[] facilityOpen = new double[numFacilities];
-		double[][] facilityConnect = new double[numFacilities][numCustomers];
+		Map<Integer, Double> openedFacilities = new HashMap<Integer, Double>();
+		Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection = new HashMap<Integer, Map<Integer, Double>>();
 		boolean integralModel = false;
-		ILP.executeModel(distances, k, method, integralModel, facilityOpen, facilityConnect, statisticalResult);
+		ILP.executeModel(
+				k, method, integralModel, 
+				facilityToCustomerAndDistance, 
+				openedFacilities, 
+				openedFacilityToCustomerAndConnection, 
+				statisticalResult);
+		
 		statisticalResult.addPartialTime(
 				PartialTimeIndex.MAIN,
 				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
 						
 		
 		boolean needRandomizedRounding = false;
-		for (int f = 0; f < numFacilities; ++f) {
-			if (facilityOpen[f] > 0 && facilityOpen[f] < 1) { 
+		for (Integer f : openedFacilities.keySet()) {
+			if (openedFacilities.get(f) > 0 && openedFacilities.get(f) < 1) { 
 				needRandomizedRounding = true;
 				break;
 			}
 			
-			for (int c = 0; c < numCustomers; ++c) {
-				if (distances[f][c] != Constants.INVALID_DISTANCE) {
-					if (facilityConnect[f][c] > 0 && facilityConnect[f][c] < 1) {
-						needRandomizedRounding = true;
-						break;
-					}
+			if (!openedFacilityToCustomerAndConnection.keySet().contains(f))
+				continue;
+			
+			for (Integer c : openedFacilityToCustomerAndConnection.get(f).keySet()) {				
+				if (openedFacilityToCustomerAndConnection.get(f).get(c) > 0 && 
+						openedFacilityToCustomerAndConnection.get(f).get(c) < 1) {
+					needRandomizedRounding = true;
+					break;
 				}
+				
 			}
 			if (needRandomizedRounding)
 				break;
@@ -132,7 +142,12 @@ public class RandomizedRounding {
 		if (needRandomizedRounding) {
 		//	outputToFileForDebug(distances, facilityOpen, facilityConnect, result, DESKTOP_FOLDER + "rr_debug.txt");
 			startTime = System.nanoTime();
-			roundingRandomly(distances, facilityOpen, facilityConnect, statisticalResult);
+			roundingRandomly(
+					facilityToCustomerAndDistance, 
+					openedFacilities, 
+					openedFacilityToCustomerAndConnection,
+					statisticalResult);
+			
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.RR,
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
@@ -140,8 +155,8 @@ public class RandomizedRounding {
 					
 		// Get top K by original order
 		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
-		for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
-			if (facilityOpen[f] == 1.0) {
+		for (Integer f : openedFacilities.keySet()) {			// Start from "1" because the first is the root
+			if (f > 0 && openedFacilities.get(f) == 1.0) {
 				topKByOriginalOrders.add(f - 1);
 			}
 		}
@@ -150,143 +165,63 @@ public class RandomizedRounding {
 	}
 	
 	// Output: update facilityOpen, facilityConnect, statisticalResult
-	private void roundingRandomly(int[][] distances, double[] facilityOpen, double[][] facilityConnect,
+	private void roundingRandomly(			
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance,
+			Map<Integer, Double> openedFacilities,
+			Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection,
 			StatisticalResult statisticalResult) {
 		long startTime = System.currentTimeMillis();
 		System.out.println("Starting Randomized Rounding ...");
 		
 		boolean withReplacement = false;
-		sampleKItemsFaster(facilityOpen, withReplacement);
+		sampleKItemsFaster(openedFacilities, withReplacement);
+			
+		// Assign customer to the closest opened facility
+		Map<Integer, Integer> customerToMinDistance = new HashMap<Integer, Integer>();
+		openedFacilityToCustomerAndConnection.clear();
+		for (Integer facility : openedFacilities.keySet()) {
+			for (Integer customer : facilityToCustomerAndDistance.get(facility).keySet()) {
+				if (!customerToMinDistance.containsKey(customer)) {
+					customerToMinDistance.put(customer, facilityToCustomerAndDistance.get(facility).get(customer));
 					
-		int numFacilities = facilityOpen.length;
-		int numCustomers = facilityConnect[0].length;
-		
-		double[][] originalConnect = new double[numFacilities][];
-		for (int f = 0; f < numFacilities; ++f)
-			originalConnect[f] = facilityConnect[f].clone();		
-		for (int f = 0; f < numFacilities; ++f) 
-			for (int c = 0; c < numCustomers; ++c) 
-				facilityConnect[f][c] = 0;
+					if (!openedFacilityToCustomerAndConnection.containsKey(facility))
+						openedFacilityToCustomerAndConnection.put(facility, new HashMap<Integer, Double>());
+					openedFacilityToCustomerAndConnection.get(facility).put(customer, 1.0);
+				} else {			
+					if (facilityToCustomerAndDistance.get(facility).get(customer) < customerToMinDistance.get(customer)) {
+						if (!openedFacilityToCustomerAndConnection.containsKey(facility))
+							openedFacilityToCustomerAndConnection.put(facility, new HashMap<Integer, Double>());
+						
+						openedFacilityToCustomerAndConnection.get(facility).put(customer, 1.0);
+					}
+				}
+			}
+		}
 		
 		// Assign customers to the closest selected facility 
 		double assignmentCost = 0.0f;
-		for (int c = 0; c < numCustomers; ++c) {
-			int facility = 0;
-			int minD = distances[0][c];
-			for (int f = 0; f < numFacilities; ++f) {
-				if (distances[f][c] != Constants.INVALID_DISTANCE 
-						&& facilityOpen[f] == 1 && distances[f][c] < minD) {
-					facility = f;
-					minD = distances[f][c];
-				}
-			}
-			assignmentCost += minD;
-			facilityConnect[facility][c] = 1;
+		for (Integer c : customerToMinDistance.keySet()) {
+			assignmentCost += customerToMinDistance.get(c);
 		}		
-	
-		/*		// assign customer to the closest selected facility using Unit Data Structure
- 		List<Unit> customers = new ArrayList<Unit>(); 
-		for (int c = 0; c < numCustomers; ++c) {
-			Unit customer = new Unit(c);
-			for (int f = 0; f < numFacilities; ++f) {
-				if (distances[f][c] != Constants.INVALID_DISTANCE)
-					customer.addAncestor(new Unit(f, distances[f][c]));
-			}
-			customers.add(customer);
-		}
-		
-		Set<Integer> unassignedCustomers = new HashSet<Integer>();
-		for (Unit customer : customers) {
-			boolean isAssigned = false;
-			while (!customer.getAncestors().isEmpty()) {
-				Unit facility = customer.getAncestors().poll();
-				if (facilityOpen[facility.id] == 1) {
-					facilityConnect[facility.id][customer.id] = 1;
-					assignmentCost += distances[facility.id][customer.id];
-					isAssigned = true;
-					break;
-				}
-			}
-			
-			if (!isAssigned)
-				unassignedCustomers.add(customer.id);
-		}		
-		
-		// Assign the remaining customers to the root
-		if (unassignedCustomers.size() > 0) {
-			for (Integer c : unassignedCustomers) {
-				facilityConnect[0][c] = 1.0f;
-				assignmentCost += distances[0][c];									
-			}
-		}*/
-		
 		statisticalResult.setFinalCost(assignmentCost);
-		statisticalResult.setNumFacilities(k);
-		
-		int numUncovered = 0;
-		for (int c = 0; c < numCustomers; ++c)
-			if (facilityConnect[0][c] == 1)
-				++numUncovered;					
-		statisticalResult.setNumUncovered(numUncovered);
-		Utils.printRunningTime(startTime, "Finished Randomized Rounding");
-	}
 	
-	@SuppressWarnings("unused")
-	private void sampleKItems(double[] facilityOpen, boolean withReplacement) {
-		int numFacilities = facilityOpen.length;		
-		double[] originalOpen = facilityOpen.clone();
-		
-		for (int f = 0; f < numFacilities; ++f)
-			facilityOpen[f] = 0;
-		facilityOpen[0] = 1;		
-		double facilityCost = 0.0f;
-
-		double[] probs = new double[numFacilities];
-		probs[0] = 0;
-		double tempSum = 0;
-		for (int f = 1; f < numFacilities; ++f) {
-			tempSum += originalOpen[f];
-			probs[f] = tempSum / (double) k;
-		}
-		// sampling once per iteration
-		while (facilityCost < k) {			
-			double r = Math.random();
-			for (int f = 1; f < numFacilities; ++f) {
-				if (originalOpen[f] > 0) 
-					if (r >= probs[f - 1] && r <= probs[f]) {
-						if (facilityOpen[f] == 0) {
-							facilityOpen[f] = 1;
-							facilityCost++;							
-						}
-						break;
-					}
-			}					
-		}	
+		Utils.printRunningTime(startTime, "Finished Randomized Rounding");
 	}	
 	
-	private void sampleKItemsFaster(double[] facilityOpen, boolean withReplacement) {
-		int numFacilities = facilityOpen.length;						
-
-		int numCandidate = 0;
-		for (int f = 1; f < numFacilities; ++f) {
-			if (facilityOpen[f] > 0)
-				++numCandidate;
+	private void sampleKItemsFaster(Map<Integer, Double> openedFacilities, boolean withReplacement) {
+		int numCandidates = openedFacilities.size();		
+		double[] candidates = new double[numCandidates - 1];
+		Map<Integer, Integer> indexToFacility = new HashMap<Integer, Integer>();
+		int index = 0;
+		for (Integer f : openedFacilities.keySet()) {
+			if (f > 0) {
+				indexToFacility.put(index, f);
+				candidates[index] = openedFacilities.get(f);
+				++index;
+			}
 		}
-		
-		double[] candidates = new double[numCandidate];
-		Map<Integer, Integer> candidateToIndex = new HashMap<Integer, Integer>();
-		int caIndex = 0;
-		for (int f = 1; f < numFacilities; ++f) {
-			if (facilityOpen[f] > 0) {
-				candidates[caIndex] = facilityOpen[f];
-				candidateToIndex.put(caIndex, f);
-				++caIndex;
-			}				
-		}
-		
-		for (int f = 0; f < numFacilities; ++f)
-			facilityOpen[f] = 0;
-		facilityOpen[0] = 1;
+		openedFacilities.clear();
+		openedFacilities.put(0, 1.0);
 		
 		Set<Integer> selected = new HashSet<Integer>();		
 		if (withReplacement)
@@ -295,7 +230,7 @@ public class RandomizedRounding {
 			selected = sampleKItemsWithoutReplacement(candidates);
 		
 		for (Integer selectedIndex : selected)
-			facilityOpen[candidateToIndex.get(selectedIndex)] = 1;
+			openedFacilities.put(indexToFacility.get(selectedIndex), 1.0);
 		
 //		System.out.println();
 	}
