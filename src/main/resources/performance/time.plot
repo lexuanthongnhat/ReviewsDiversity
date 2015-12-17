@@ -29,7 +29,8 @@ set xtics border nomirror offset character 0, 0, 0 autojustify textcolor rgb 'bl
 set ytics textcolor rgb 'black'
 set mxtics 2
 
-set xlabel "Number of Pairs"
+set xlabel "Number of Pairs + Edges"
+#set xlabel "Number of Pairs"
 set ylabel "Average Time (ms)"
 #set xrange [1 : 22]
 #set yrange [0 : 1] noreverse nowriteback
@@ -39,7 +40,8 @@ do for [folder in "'Top Pairs/' 'Top REVIEW/' 'Top SENTENCE/'"] {
 		do for [sentiment in "1 3"] {
 			set title "k=" . k . ", sentiment threshold = 0." . sentiment
 			subfolder='k' . k . "_threshold0." . sentiment . "/"
-			filename = "time_" . 'k' . k . "_s" . sentiment
+#			filename = "time_" . 'k' . k . "_s" . sentiment
+			filename = "time_pair_edge_" . 'k' . k . "_s" . sentiment
 			set output folder . subfolder . filename . ".pdf"
 			plot folder . subfolder . filename . '.csv' using 1:2 title column with lines, \
 				'' u 1:3 title column with lines, \

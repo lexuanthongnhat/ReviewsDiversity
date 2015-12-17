@@ -1,7 +1,11 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -70,12 +74,13 @@ public class ILP {
 		if (pairs.size() <= k + 1) {
 			topKPairs = pairs;
 		} else {
-			int[][] distances = initDistances(pairs, threshold);			
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = initDistances(pairs, threshold);			
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.SETUP,
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 			
-			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = doILP(distances, statisticalResult, LPMethod.AUTOMATIC);
+			StatisticalResultAndTopKByOriginalOrder statisticalResultAndTopKByOriginalOrder = 
+					doILP(facilityToCustomerAndDistance, statisticalResult, LPMethod.AUTOMATIC);
 			
 			long startPartialTime = System.nanoTime();
 			statisticalResult = statisticalResultAndTopKByOriginalOrder.getStatisticalResult();
@@ -94,17 +99,22 @@ public class ILP {
 		gatherFinalResult(runningTime, pairs.size(), statisticalResult);		
 	}
 	
-	protected StatisticalResultAndTopKByOriginalOrder doILP(int[][] distances, StatisticalResult statisticalResult,
-			Constants.LPMethod method){
+	protected StatisticalResultAndTopKByOriginalOrder doILP(
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance,
+			StatisticalResult statisticalResult,
+			Constants.LPMethod method) {
 		long startTime = System.nanoTime();
 		
-		int numFacilities = distances.length;
-		int numCustomers = distances[0].length;
+		int numFacilities = facilityToCustomerAndDistance.keySet().size();
 		
-		double[] facilityOpen = new double[numFacilities];
-		double[][] facilityConnect = new double[numFacilities][numCustomers];
+		Map<Integer, Double> openedFacilities = new HashMap<Integer, Double>();
+		Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection = new HashMap<Integer, Map<Integer, Double>>();
 		boolean integralModel = true;
-		executeModel(distances, k, LPMethod.AUTOMATIC, integralModel, facilityOpen, facilityConnect, statisticalResult);
+		executeModel(k, LPMethod.AUTOMATIC, integralModel, 
+				facilityToCustomerAndDistance,
+				openedFacilities,
+				openedFacilityToCustomerAndConnection,
+				statisticalResult);
 		
 		statisticalResult.addPartialTime(
 				PartialTimeIndex.MAIN,
@@ -113,7 +123,7 @@ public class ILP {
 		// Get top K by original order
 		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
 		for (int f = 1; f < numFacilities; ++f) {			// Start from "1" because the first is the root
-			if (facilityOpen[f] == 1.0) {
+			if (openedFacilities.get(f) == 1.0) {
 				topKByOriginalOrders.add(f - 1);
 			}
 		}
@@ -131,14 +141,14 @@ public class ILP {
 	 * @param statisticalResult - output of objective
 	 */
 	public static void executeModel(
-			int[][]distances, int k, Constants.LPMethod method, boolean integralModel, 
-			double[] facilityOpen,
-			double[][] facilityConnect,
+			int k, Constants.LPMethod method, boolean integralModel,
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance,
+			Map<Integer, Double> openedFacilities,
+			Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection,
 			StatisticalResult statisticalResult) {
 		
 		try {
-			int numFacilities = distances.length;			// Including the root
-			int numCustomers = distances[0].length;			
+			int numFacilities = facilityToCustomerAndDistance.keySet().size();			// Including the root
 			
 			GRBEnv env = new GRBEnv();
 			env.set(GRB.IntParam.OutputFlag, 0);
@@ -149,44 +159,54 @@ public class ILP {
 			model.set(GRB.StringAttr.ModelName, "Non-Metric Uncapacitated Facility");
 			
 			// Facility open indicator
-			GRBVar[] open = new GRBVar[numFacilities];
-			
+			List<GRBVar> open = new ArrayList<GRBVar>();			
 			if (integralModel) 
 				for (int f = 0; f < numFacilities; ++f) {
-					open[f] = model.addVar(0, 1, 0, GRB.BINARY, "open" + f);
+					open.add(model.addVar(0, 1, 0, GRB.BINARY, "open" + f));
 				}
 			else
 				for (int f = 0; f < numFacilities; ++f) {
-					open[f] = model.addVar(0, 1, 0, GRB.CONTINUOUS, "open" + f);
+					open.add(model.addVar(0, 1, 0, GRB.CONTINUOUS, "open" + f));
 				}
 			
 			// Facility - Customer connecting indicator
-			GRBVar[][] connecting = new GRBVar[numFacilities][numCustomers];
-			if (integralModel)
-				for (int f = 0; f < numFacilities; ++f) {
-					for (int c = 0; c < numCustomers; ++c) {
-						if (distances[f][c] != Constants.INVALID_DISTANCE)
-							connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.BINARY, "connecting" + f + "to" + c);
+			Map<Integer, Map<Integer, GRBVar>> connecting = new HashMap<Integer, Map<Integer, GRBVar>>();
+			if (integralModel) {
+				for (Integer f : facilityToCustomerAndDistance.keySet()) {					
+					Map<Integer, Integer> customerToDistance = facilityToCustomerAndDistance.get(f);
+					if (customerToDistance.size() > 0)
+						connecting.put(f, new HashMap<Integer, GRBVar>());
+					
+					for (Integer c : customerToDistance.keySet()) {						
+						connecting.get(f).put(
+								c, 
+								model.addVar(0, 1, customerToDistance.get(c), GRB.BINARY, "connecting" + f + "to" + c));
 					}
 				}
-			else
-				for (int f = 0; f < numFacilities; ++f) {
-					for (int c = 0; c < numCustomers; ++c) {
-						if (distances[f][c] != Constants.INVALID_DISTANCE)
-							connecting[f][c] = model.addVar(0, 1, distances[f][c], GRB.CONTINUOUS, "connecting" + f + "to" + c);
+			} else {
+				for (Integer f : facilityToCustomerAndDistance.keySet()) {					
+					Map<Integer, Integer> customerToDistance = facilityToCustomerAndDistance.get(f);
+					if (customerToDistance.size() > 0)
+						connecting.put(f, new HashMap<Integer, GRBVar>());
+					
+					for (Integer c : customerToDistance.keySet()) {						
+						connecting.get(f).put(
+								c, 
+								model.addVar(0, 1, customerToDistance.get(c), GRB.CONTINUOUS, "connecting" + f + "to" + c));
 					}
 				}
+			}
 			
 			model.set(GRB.IntAttr.ModelSense, 1);		// Minimization
 			model.update();
 			
 			// Constraint: open the root by default
-			model.addConstr(open[0], GRB.EQUAL, 1.0, "defaultRoot");
+			model.addConstr(open.get(0), GRB.EQUAL, 1.0, "defaultRoot");
 			
 			// Constraint: open k + 1 facilities, including the root
 			GRBLinExpr kFacilities = new GRBLinExpr();
 			for (int f = 0; f < numFacilities; ++f) {
-				kFacilities.addTerm(1.0, open[f]);
+				kFacilities.addTerm(1.0, open.get(0));
 			}
 			model.addConstr(kFacilities, GRB.EQUAL, k + 1, "kFacilities");
 			
@@ -194,12 +214,19 @@ public class ILP {
 			 * Constraint: connecting each customer to only one facility
 			 * 				Sum_f x(f, c) = 1
 			 */			
+			Map<Integer, Set<Integer>> customerToFacilities = new HashMap<Integer, Set<Integer>>();
+			for (Integer f : facilityToCustomerAndDistance.keySet()) {
+				Map<Integer, Integer> customerToDistance = facilityToCustomerAndDistance.get(f);				
+				for (Integer c : customerToDistance.keySet()) {
+					if (!customerToFacilities.containsKey(c))
+						customerToFacilities.put(c, new HashSet<Integer>());
+					customerToFacilities.get(c).add(f);
+				}
+			}
 			GRBLinExpr connectingToOneFacility = new GRBLinExpr();
-			for (int c = 0; c < numCustomers; ++c) {
-				connectingToOneFacility = new GRBLinExpr();
-				for (int f = 0; f < numFacilities; ++f) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE)
-						connectingToOneFacility.addTerm(1.0, connecting[f][c]);
+			for (Integer c : customerToFacilities.keySet()) {				
+				for (Integer f : customerToFacilities.get(c)) {
+					connectingToOneFacility.addTerm(1.0, connecting.get(f).get(c));
 				}
 				model.addConstr(connectingToOneFacility, GRB.EQUAL, 1.0, "connectingToOneFacility" + c);
 			}
@@ -208,12 +235,14 @@ public class ILP {
 			 * Constraint: only connect customer to opened facility
 			 * 				x(f, c) <= x(f)
 			 */
-			for (int f = 0; f < numFacilities; ++f) {
-				for (int c = 0; c < numCustomers; ++c) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE)
-						model.addConstr(connecting[f][c], GRB.LESS_EQUAL, open[f], "onlyToOpenedFacility_f" + f + "_c" + "c");
+			for (Integer f : facilityToCustomerAndDistance.keySet()) {
+				Map<Integer, Integer> customerToDistance = facilityToCustomerAndDistance.get(f);				
+				for (Integer c : customerToDistance.keySet()) {	
+					model.addConstr(connecting.get(f).get(c), GRB.LESS_EQUAL, open.get(f), "onlyToOpenedFacility_f" + f + "_c" + "c");
 				}
 			}						
+			
+			model.update();
 			
 			// Optimize the model
 			model.optimize();			
@@ -223,18 +252,17 @@ public class ILP {
 			if (integralModel)
 				statisticalResult.setOptimalCost(model.get(GRB.DoubleAttr.ObjBound));
 			
-/*			for (int c = 1; c < numCustomers; ++c) {
-				if (connecting[0][c].get(GRB.DoubleAttr.X) == 1.0) {
-					statisticalResult.increaseNumUncovered();
-				}
-			}*/
-			
 			
 			for (int f = 0; f < numFacilities; ++f) {
-				facilityOpen[f] = open[f].get(GRB.DoubleAttr.X);
-				for (int c = 0; c < numCustomers; ++c) {
-					if (distances[f][c] != Constants.INVALID_DISTANCE) {
-						facilityConnect[f][c] = connecting[f][c].get(GRB.DoubleAttr.X);
+				if (open.get(f).get(GRB.DoubleAttr.X) > 0) {
+					openedFacilities.put(f, open.get(f).get(GRB.DoubleAttr.X));
+					openedFacilityToCustomerAndConnection.put(f, new HashMap<Integer, Double>());
+					for (Integer c : connecting.get(f).keySet()) {
+						if (connecting.get(f).get(c).get(GRB.DoubleAttr.X) > 0) {
+							openedFacilityToCustomerAndConnection.get(f).put(
+									c, 
+									connecting.get(f).get(c).get(GRB.DoubleAttr.X));
+						}
 					}
 				}
 			}
@@ -266,16 +294,15 @@ public class ILP {
 		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
 	
-	protected static int[][] initDistances(List<ConceptSentimentPair> conceptSentimentPairs, float sentimentThreshold) {
-		int[][] distances = new int[conceptSentimentPairs.size()][conceptSentimentPairs.size()];
+	protected static Map<Integer, Map<Integer, Integer>> initDistances(List<ConceptSentimentPair> conceptSentimentPairs, float sentimentThreshold) {
+		Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = new HashMap<Integer, Map<Integer, Integer>>();
 		
 		// The root
-		distances[0][0] = 0;
+		facilityToCustomerAndDistance.put(0, new HashMap<Integer, Integer>());
+		facilityToCustomerAndDistance.get(0).put(0, 0);
 		for (int j = 1; j < conceptSentimentPairs.size(); ++j) {
 			ConceptSentimentPair normalPair = conceptSentimentPairs.get(j);				
-				
-			distances[0][j] = normalPair.calculateRootDistance();
-			distances[j][0] = Constants.INVALID_DISTANCE;
+			facilityToCustomerAndDistance.get(0).put(j, normalPair.calculateRootDistance());
 		}
 		
 		// Normal pairs
@@ -290,32 +317,37 @@ public class ILP {
 					pair1.testDistance(pair2);
 					pair2.testDistance(pair1);
 				}
-				
-				
+								
 				int temp = pair1.calculateDistance(pair2, sentimentThreshold);
 				if (temp != Constants.INVALID_DISTANCE) {
 					distance = temp;
 				}
-				
-				
-				if (distance == Constants.INVALID_DISTANCE) {
-					distances[i][j] = Constants.INVALID_DISTANCE;
-					distances[j][i] = Constants.INVALID_DISTANCE;
-				} else if (distance > 0) {
-					distances[i][j] = distance;
-					distances[j][i] = Constants.INVALID_DISTANCE;
-				} else if (distance < 0) {
-					distances[i][j] = Constants.INVALID_DISTANCE;
-					distances[j][i] = -distance;
-				} else if (distance == 0) {
-					distances[i][j] = 0;
-					distances[j][i] = 0;
+											
+				if (distance != Constants.INVALID_DISTANCE) {
+					if (distance > 0) {
+						if (facilityToCustomerAndDistance.containsKey(i))
+							facilityToCustomerAndDistance.put(i, new HashMap<Integer, Integer>());
+						
+						facilityToCustomerAndDistance.get(i).put(j, distance);
+					} else if (distance < 0) {
+						if (facilityToCustomerAndDistance.containsKey(j))
+							facilityToCustomerAndDistance.put(j, new HashMap<Integer, Integer>());
+						
+						facilityToCustomerAndDistance.get(j).put(i, -distance);
+					} else if (distance == 0) {
+						if (facilityToCustomerAndDistance.containsKey(i))
+							facilityToCustomerAndDistance.put(i, new HashMap<Integer, Integer>());
+						if (facilityToCustomerAndDistance.containsKey(j))
+							facilityToCustomerAndDistance.put(j, new HashMap<Integer, Integer>());
+						
+						facilityToCustomerAndDistance.get(i).put(j, distance);
+						facilityToCustomerAndDistance.get(j).put(i, -distance);
+					}
 				}
 			}
 		}
-		
-		
-		return distances;
+				
+		return facilityToCustomerAndDistance;
 	}
 	
 	public static class StatisticalResultAndTopKByOriginalOrder{
