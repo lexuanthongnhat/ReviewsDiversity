@@ -34,6 +34,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import edu.ucr.cs.dblab.nle020.ontology.SnomedGraphBuilder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetThreadImpl;
@@ -54,7 +55,8 @@ public class TopPairsProgram {
 	private static int k = Constants.K;
 	private static float threshold = Constants.THRESHOLD;
 	
-	private static boolean RANDOMIZE_DOCS = false;
+	static boolean RANDOMIZE_DOCS = false;
+	private static int NUM_TRIALS = 5;
 	private static Set<Integer> randomIndices = Utils.randomIndices(1000, Constants.NUM_DOCTORS_TO_EXPERIMENT);
 	private final static int NUM_DOCTORS_TO_EXPERIMENT = Constants.NUM_DOCTORS_TO_EXPERIMENT;
 	
@@ -75,12 +77,83 @@ public class TopPairsProgram {
 		long startTime = System.currentTimeMillis();
 //		getDatasetStatistics();
 		
+//		examineProblemSizes();
 		topPairsExperiment();
-		topSetsExperiment(SetOption.REVIEW);
-		topSetsExperiment(SetOption.SENTENCE);
+//		topSetsExperiment(SetOption.REVIEW);
+//		topSetsExperiment(SetOption.SENTENCE);
 		
 //		topPairsSyntheticExperiment();
 		Utils.printRunningTime(startTime, "Finished evaluation");
+	}
+	
+	public static void examineProblemSizes() {
+		String outputFolder = "src/main/resources/";
+		String outputFileNamePrefix = "problem_size";
+				
+		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = 
+				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
+			
+		float[] thresholds = new float[] {0.1f, 0.3f};
+		for (float threshold : thresholds) {
+			Map<Integer, List<Integer>> numPairToNumEdges = new HashMap<Integer, List<Integer>>();
+			Map<Integer, Double> numPairToAverageNumEdge = new HashMap<Integer, Double>();
+			
+			for (Integer docId : docToConceptSentimentPairs.keySet()) {
+				List<ConceptSentimentPair> conceptSentimentPairs = docToConceptSentimentPairs.get(docId);
+				
+				List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+				ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
+				root.addDewey(SnomedGraphBuilder.ROOT_DEWEY);
+				pairs.add(root);
+				pairs.addAll(conceptSentimentPairs);
+				
+				Map<Integer, Map<Integer, Integer>> ancestorToSuccessorAndDistance = 
+						FiniteDistanceInitilizer.initFiniteDistances(pairs, threshold);
+				
+				int numPairs = pairs.size();
+				int numEdges = 0;
+				for (Integer ancestor : ancestorToSuccessorAndDistance.keySet()) {
+					numEdges += ancestorToSuccessorAndDistance.get(ancestor).size();
+				}
+				
+				if (!numPairToNumEdges.containsKey(numPairs)){
+					numPairToNumEdges.put(numPairs, new ArrayList<Integer>());
+					numPairToAverageNumEdge.put(numPairs, 0.0);
+				}
+				
+				numPairToNumEdges.get(numPairs).add(numEdges);
+				numPairToAverageNumEdge.put(numPairs, numPairToAverageNumEdge.get(numPairs) + numEdges);
+			}
+			
+			
+			for (Integer numPairs : numPairToAverageNumEdge.keySet()) {				
+				numPairToAverageNumEdge.put(numPairs, 
+						numPairToAverageNumEdge.get(numPairs) / (double) numPairToNumEdges.get(numPairs).size()); 
+			}
+			
+			StringBuilder output = new StringBuilder();	
+			output.append("#number of pairs, number of edges, detail\n");
+			List<Integer> sortedNumPairs = new ArrayList<Integer>(numPairToAverageNumEdge.keySet());
+			Collections.sort(sortedNumPairs);
+			for (int i = 0; i < sortedNumPairs.size(); ++i) {
+				int numPair = sortedNumPairs.get(i);
+				output.append(numPair + ", " 
+							+ numPairToAverageNumEdge.get(numPair) + ", ");
+				for (Integer numEdges : numPairToNumEdges.get(numPair)) {
+					output.append(numEdges + " ");					
+				}
+				output.append("\n");
+			}
+			
+			try (BufferedWriter writer = Files.newBufferedWriter(
+					Paths.get(outputFolder + outputFileNamePrefix + "_" + threshold + ".csv"), 
+					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+				writer.write(output.toString());
+				writer.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 	
 	public static void getDatasetStatistics() {
@@ -168,10 +241,11 @@ public class TopPairsProgram {
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
 		// TODO - the first "3" is always slower than the other numbers 
-		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-//		int[] ks = new int[] {3, 10};
-		float[] thresholds = new float[] {0.1f, 0.3f};
-//		float[] thresholds = new float[] {0.3f};
+//		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
+		int[] ks = new int[] {3, 10, 15};
+//		float[] thresholds = new float[] {0.1f, 0.3f};
+		float[] thresholds = new float[] {0.3f};
+		
 		for (int numChoosen : ks) {
 			k = numChoosen;
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
@@ -188,10 +262,21 @@ public class TopPairsProgram {
 		outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER, "top-pair");
 	}
 
+	/**
+	 * 
+	 * @param outputFolder
+	 * @return array of size 3 of average result for 3 algorithms, also output csv file
+	 * @throws InterruptedException
+	 * @throws ExecutionException
+	 */
 	private static StatisticalResult[] topPairsExperiment(String outputFolder) throws InterruptedException, ExecutionException {
-		long startTime = System.currentTimeMillis();		
+		long startTime = System.currentTimeMillis();	
 		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
 		printInitialization(docToConceptSentimentPairs);
+		
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedyAverage = new ConcurrentHashMap<Integer, StatisticalResult>();
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILPAverage = new ConcurrentHashMap<Integer, StatisticalResult>();
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultRRAverage = new ConcurrentHashMap<Integer, StatisticalResult>();
 		
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedy = new ConcurrentHashMap<Integer, StatisticalResult>();
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILP = new ConcurrentHashMap<Integer, StatisticalResult>();
@@ -206,61 +291,83 @@ public class TopPairsProgram {
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToTopPairsResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);
 				
-		runTopPairsAlgoMultiThreads(Algorithm.GREEDY, Constants.NUM_THREADS_ALGORITHM, docToConceptSentimentPairs, 
-				docToStatisticalResultGreedy, docToTopKPairsResultGreedy);
-		outputStatisticalResultToJson(outputPrefix + "_greedy.txt", docToStatisticalResultGreedy);
-		outputTopKToJson(outputPrefix + "_greedy_pair.txt", docToTopKPairsResultGreedy);
-		
-		runTopPairsAlgoMultiThreads(Algorithm.ILP, Constants.NUM_THREADS_ALGORITHM, docToConceptSentimentPairs, 
-				docToStatisticalResultILP, docToTopKPairsResultILP);
-		outputStatisticalResultToJson(outputPrefix + "_ilp.txt", docToStatisticalResultILP);
-		outputTopKToJson(outputPrefix + "_ilp_pair.txt", docToTopKPairsResultILP);
-		
-		if (Constants.FIND_BEST_LP_METHOD) {
-			LPMethod[] methods = new LPMethod[] {LPMethod.AUTOMATIC, LPMethod.BARRIER, 
-					LPMethod.CONCURRENT, LPMethod.DETERMINISTIC_CONCURRENT,
-					LPMethod.DUAL_SIMPLEX, LPMethod.PRIMAL_SIMPLEX};
-			Map<LPMethod, Long> methodToTime = new HashMap<LPMethod, Long>();
-			for (LPMethod method : methods) {		
-				long startTime2 = System.currentTimeMillis();
+		for (int trial = 0; trial < NUM_TRIALS; ++trial) {			
+			runTopPairsAlgoMultiThreads(Algorithm.GREEDY, Constants.NUM_THREADS_ALGORITHM, docToConceptSentimentPairs, 
+					docToStatisticalResultGreedy, docToTopKPairsResultGreedy);
+			outputStatisticalResultToJson(outputPrefix + "_greedy.txt", docToStatisticalResultGreedy);
+			outputTopKToJson(outputPrefix + "_greedy_pair.txt", docToTopKPairsResultGreedy);
+			
+			runTopPairsAlgoMultiThreads(Algorithm.ILP, Constants.NUM_THREADS_ALGORITHM, docToConceptSentimentPairs, 
+					docToStatisticalResultILP, docToTopKPairsResultILP);
+			outputStatisticalResultToJson(outputPrefix + "_ilp.txt", docToStatisticalResultILP);
+			outputTopKToJson(outputPrefix + "_ilp_pair.txt", docToTopKPairsResultILP);
+			
+			if (Constants.FIND_BEST_LP_METHOD) {
+				LPMethod[] methods = new LPMethod[] {LPMethod.AUTOMATIC, LPMethod.BARRIER, 
+						LPMethod.CONCURRENT, LPMethod.DETERMINISTIC_CONCURRENT,
+						LPMethod.DUAL_SIMPLEX, LPMethod.PRIMAL_SIMPLEX};
+				Map<LPMethod, Long> methodToTime = new HashMap<LPMethod, Long>();
+				for (LPMethod method : methods) {		
+					long startTime2 = System.currentTimeMillis();
+					runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUDNING, Constants.NUM_THREADS_ALGORITHM, 
+							docToConceptSentimentPairs, docToStatisticalResultRR, docToTopKPairsResultRR, method);
+					outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
+	
+					methodToTime.put(method, System.currentTimeMillis() - startTime2);
+				}
+				LPMethod bestMethod = null;
+				long min = Long.MAX_VALUE;
+				for (LPMethod method : methodToTime.keySet()) {
+					if (methodToTime.get(method) < min) {
+						min = methodToTime.get(method);
+						bestMethod = method;
+					}
+				}
+				System.err.println("Best LP Method: " + bestMethod + ", number " + bestMethod.method());
+			} else {
 				runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUDNING, Constants.NUM_THREADS_ALGORITHM, 
-						docToConceptSentimentPairs, docToStatisticalResultRR, docToTopKPairsResultRR, method);
+						docToConceptSentimentPairs, docToStatisticalResultRR, docToTopKPairsResultRR);
 				outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
-
-				methodToTime.put(method, System.currentTimeMillis() - startTime2);
+				outputTopKToJson(outputPrefix + "_rr_pair.txt", docToTopKPairsResultRR);
 			}
-			LPMethod bestMethod = null;
-			long min = Long.MAX_VALUE;
-			for (LPMethod method : methodToTime.keySet()) {
-				if (methodToTime.get(method) < min) {
-					min = methodToTime.get(method);
-					bestMethod = method;
+			
+			if (docToStatisticalResultGreedyAverage.isEmpty()) {
+				docToStatisticalResultGreedyAverage.putAll(docToStatisticalResultGreedy);
+				docToStatisticalResultILPAverage.putAll(docToStatisticalResultILP);
+				docToStatisticalResultRRAverage.putAll(docToStatisticalResultRR);
+			} else {
+				for (Integer docId : docToStatisticalResultGreedy.keySet()) {
+					docToStatisticalResultGreedyAverage.get(docId).aggregateAnother(docToStatisticalResultGreedy.get(docId));
+					docToStatisticalResultILPAverage.get(docId).aggregateAnother(docToStatisticalResultILP.get(docId));
+					docToStatisticalResultRRAverage.get(docId).aggregateAnother(docToStatisticalResultRR.get(docId));
 				}
 			}
-			System.err.println("Best LP Method: " + bestMethod + ", number " + bestMethod.method());
-		} else {
-			runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUDNING, Constants.NUM_THREADS_ALGORITHM, 
-					docToConceptSentimentPairs, docToStatisticalResultRR, docToTopKPairsResultRR);
-			outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
-			outputTopKToJson(outputPrefix + "_rr_pair.txt", docToTopKPairsResultRR);
+		}
+		
+		for (Integer docId : docToStatisticalResultGreedy.keySet()) {
+			docToStatisticalResultGreedyAverage.get(docId).averagingBy(NUM_TRIALS);
+			docToStatisticalResultILPAverage.get(docId).averagingBy(NUM_TRIALS);
+			docToStatisticalResultRRAverage.get(docId).averagingBy(NUM_TRIALS);
 		}
 		
 		String outputPath = outputFolder + "review_diversity_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
-		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		outputStatisticalResultToExcel(outputPath, isSet, 
+				docToStatisticalResultGreedyAverage, docToStatisticalResultILPAverage, docToStatisticalResultRRAverage);
 		outputTimeToCsv(
 				outputFolder + "time_k" + k + "_s" + ((int) (threshold * 10))  + ".csv",
 				NumItem.NUM_PAIRS,
-				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+				docToStatisticalResultGreedyAverage, docToStatisticalResultILPAverage, docToStatisticalResultRRAverage);
 		outputTimeToCsv(
 				outputFolder + "time_pair_edge_k" + k + "_s" + ((int) (threshold * 10))  + ".csv",
 				NumItem.NUM_PAIRS_EDGES,
-				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+				docToStatisticalResultGreedyAverage, docToStatisticalResultILPAverage, docToStatisticalResultRRAverage);
 		
 		
 		Utils.printRunningTime(startTime, "Finished Top Pairs", true);
 		
-		return summaryStatisticalResultsOfDifferentMethods(docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		return summaryStatisticalResultsOfDifferentMethods(
+				docToStatisticalResultGreedyAverage, docToStatisticalResultILPAverage, docToStatisticalResultRRAverage);
 	}
 	
 
@@ -924,7 +1031,7 @@ public class TopPairsProgram {
 	}
 	
 	// Make sure: each conceptSentimentPair of a doctor has an unique hashcode
-	private static Map<Integer, List<ConceptSentimentPair>> importDocToConceptSentimentPairs(String path, boolean getSomeRandomItems) {
+	static Map<Integer, List<ConceptSentimentPair>> importDocToConceptSentimentPairs(String path, boolean getSomeRandomItems) {
 		Map<Integer, List<ConceptSentimentPair>> result = new HashMap<Integer, List<ConceptSentimentPair>>();
 		
 		List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);
@@ -1127,7 +1234,8 @@ public class TopPairsProgram {
 			writer.newLine();
 			for (int i = 0; i < nums.size(); ++i) {
 				int num = nums.get(i);
-				if (num <= lowerBoundToOutput || num >= upperBoundToOutput)
+				//if (num <= lowerBoundToOutput || num >= upperBoundToOutput)
+				if (num <= lowerBoundToOutput)
 					continue;
 				
 				StatisticalResult ilp = numToAverageILP.get(num);
@@ -1192,6 +1300,13 @@ public class TopPairsProgram {
 		return numToAverageStat;
 	}
 
+	/**
+	 * Averaging results into array of size 3
+	 * @param docToStatisticalResultGreedy
+	 * @param docToStatisticalResultILP
+	 * @param docToStatisticalResultRR
+	 * @return array of average result for 3 algorithms
+	 */
 	private static StatisticalResult[] summaryStatisticalResultsOfDifferentMethods(
 			Map<Integer, StatisticalResult> docToStatisticalResultGreedy,
 			Map<Integer, StatisticalResult> docToStatisticalResultILP,

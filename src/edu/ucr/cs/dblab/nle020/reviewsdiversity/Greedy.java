@@ -1,7 +1,5 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -52,7 +50,8 @@ public class Greedy {
 
 //		printInitialization();		
 		List<FullPair> pairs = new ArrayList<FullPair>();
-		initPairs(conceptSentimentPairs, pairs, statisticalResult);
+		//initPairs(conceptSentimentPairs, pairs, statisticalResult);
+		FiniteDistanceInitilizer.initFullPairs(conceptSentimentPairs, pairs, statisticalResult);
 		
 		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<FullPair, Map<FullPair, Integer>>();	
 		if (Constants.DEBUG_MODE)

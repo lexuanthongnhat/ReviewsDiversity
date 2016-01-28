@@ -73,7 +73,15 @@ public class ILP {
 		if (pairs.size() <= k + 1) {
 			topKPairs = pairs;
 		} else {
-			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = initDistances(pairs, threshold);			
+//			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = initDistances(pairs, threshold);
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = 
+					FiniteDistanceInitilizer.initFiniteDistances(pairs, threshold);
+/*			int temp = 0;
+			for (int facility : facilityToCustomerAndDistance.keySet()) {
+				temp += facilityToCustomerAndDistance.get(facility).size();
+			}
+			statisticalResult.setNumEdges(temp);*/
+			
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.SETUP,
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
@@ -93,7 +101,7 @@ public class ILP {
 
 		docToStatisticalResult.put(docId, statisticalResult);
 		docToTopKPairsResult.put(docId, topKPairs);
-		
+
 		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);
 		gatherFinalResult(runningTime, pairs.size(), statisticalResult);		
 	}
@@ -211,6 +219,7 @@ public class ILP {
 			/* 
 			 * Constraint: connecting each customer to only one facility
 			 * 				Sum_f x(f, c) = 1
+			 * number = number of location/pairs
 			 */			
 			Map<Integer, Set<Integer>> customerToFacilities = new HashMap<Integer, Set<Integer>>();
 			for (Integer f : facilityToCustomerAndDistance.keySet()) {
@@ -233,6 +242,7 @@ public class ILP {
 			/*
 			 * Constraint: only connect customer to opened facility
 			 * 				x(f, c) <= x(f)
+			 * number = number of edges
 			 */
 			for (Integer f : facilityToCustomerAndDistance.keySet()) {
 				for (Integer c : facilityToCustomerAndDistance.get(f).keySet()) {	
@@ -241,13 +251,13 @@ public class ILP {
 			}						
 					
 			model.update();
+			
 			long startTime = System.nanoTime();
 			// Optimize the model
 			model.optimize();
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.LP, 
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
-	//		System.out.println(Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 						
 			// Prepare some statistics, update result					
 			statisticalResult.setFinalCost(model.get(GRB.DoubleAttr.ObjVal));
@@ -268,11 +278,19 @@ public class ILP {
 					}
 				}
 			}
-	/*		statisticalResult.addPartialTime(
-					PartialTimeIndex.LP,
-					Utils.rounding(1000 * model.get(GRB.DoubleAttr.Runtime), 
-							Constants.NUM_DIGITS_IN_TIME));*/
-	//		System.out.println("Model running time: " + 1000 * model.get(GRB.DoubleAttr.Runtime));
+	
+			/*if (statisticalResult.getNumPairs() + statisticalResult.getNumEdges() + 1 != model.get(GRB.IntAttr.NumVars)
+					|| statisticalResult.getNumPairs() + statisticalResult.getNumEdges() + 3 != model.get(GRB.IntAttr.NumConstrs)) {
+				System.out.println(statisticalResult);
+				System.out.println("# variables: " + model.get(GRB.IntAttr.NumVars));		
+				System.out.println("# linear constraints: " + model.get(GRB.IntAttr.NumConstrs));
+				System.out.println("# nonzeros: " + model.get(GRB.IntAttr.NumNZs));
+			}
+			
+			if (model.get(GRB.IntAttr.NumQConstrs) > 0 || model.get(GRB.IntAttr.NumSOS) > 0) {
+				System.out.println("# quaratic constraints: " + model.get(GRB.IntAttr.NumQConstrs));
+				System.out.println("# sos constraints: " + model.get(GRB.IntAttr.NumSOS));
+			}*/
 			
 			model.dispose();
 			env.dispose();

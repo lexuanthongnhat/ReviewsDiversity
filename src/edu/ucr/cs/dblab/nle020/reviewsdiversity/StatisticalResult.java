@@ -29,6 +29,31 @@ public class StatisticalResult {
 	private double runningTime = 0;
 	private Map<Constants.PartialTimeIndex, Double> partialTimes = new HashMap<Constants.PartialTimeIndex, Double>();
 
+	public void aggregateAnother(StatisticalResult other) {
+		this.finalCost 		+= other.finalCost;
+		
+		this.numUncovered 	+= other.numUncovered;
+		
+		this.runningTime 	+= other.runningTime;
+		for (Constants.PartialTimeIndex index : partialTimes.keySet()) {
+			this.partialTimes.put(index, this.partialTimes.get(index) + other.partialTimes.get(index));
+		}
+	}
+	
+	public StatisticalResult averagingBy(int numTrials) {
+		double temp = (double) numTrials;
+		this.finalCost 		/= temp;
+		
+		this.numUncovered 	/= temp;
+		
+		this.runningTime 	/= temp;
+		for (Constants.PartialTimeIndex index : partialTimes.keySet()) {
+			this.partialTimes.put(index, this.partialTimes.get(index)/temp);
+		}
+		
+		return this;
+	}
+	
 	public StatisticalResult(){}
 	
 	public StatisticalResult(int k, float threshold, double finalCost, double runningTime) {
@@ -79,7 +104,8 @@ public class StatisticalResult {
 	public String toString() {
 		return "StatisticalResult [docID=" + docID + ", k=" + k
 				+ ", threshold=" + threshold + ", finalCost=" + finalCost
-				+ ", numPairs=" + numPairs + ", runningTime=" + runningTime
+				+ ", numPairs=" + numPairs + ", numEdges=" + numEdges
+				+ ", runningTime=" + runningTime
 				+ ", partialTimes=" + partialTimes + "]";
 	}
 

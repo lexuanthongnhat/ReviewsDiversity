@@ -71,7 +71,9 @@ public class RandomizedRounding {
 		if (pairs.size() <= k + 1) {
 			topKPairs = pairs;
 		} else {
-			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = ILP.initDistances(pairs, threshold);			
+//			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = ILP.initDistances(pairs, threshold);	
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = 
+					FiniteDistanceInitilizer.initFiniteDistances(pairs, threshold);
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.SETUP,
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
