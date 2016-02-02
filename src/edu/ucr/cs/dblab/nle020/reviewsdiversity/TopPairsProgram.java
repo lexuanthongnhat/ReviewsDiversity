@@ -86,156 +86,6 @@ public class TopPairsProgram {
 		Utils.printRunningTime(startTime, "Finished evaluation");
 	}
 	
-	public static void examineProblemSizes() {
-		String outputFolder = "src/main/resources/";
-		String outputFileNamePrefix = "problem_size";
-				
-		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = 
-				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
-			
-		float[] thresholds = new float[] {0.1f, 0.3f};
-		for (float threshold : thresholds) {
-			Map<Integer, List<Integer>> numPairToNumEdges = new HashMap<Integer, List<Integer>>();
-			Map<Integer, Double> numPairToAverageNumEdge = new HashMap<Integer, Double>();
-			
-			for (Integer docId : docToConceptSentimentPairs.keySet()) {
-				List<ConceptSentimentPair> conceptSentimentPairs = docToConceptSentimentPairs.get(docId);
-				
-				List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
-				ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
-				root.addDewey(SnomedGraphBuilder.ROOT_DEWEY);
-				pairs.add(root);
-				pairs.addAll(conceptSentimentPairs);
-				
-				Map<Integer, Map<Integer, Integer>> ancestorToSuccessorAndDistance = 
-						FiniteDistanceInitilizer.initFiniteDistances(pairs, threshold);
-				
-				int numPairs = pairs.size();
-				int numEdges = 0;
-				for (Integer ancestor : ancestorToSuccessorAndDistance.keySet()) {
-					numEdges += ancestorToSuccessorAndDistance.get(ancestor).size();
-				}
-				
-				if (!numPairToNumEdges.containsKey(numPairs)){
-					numPairToNumEdges.put(numPairs, new ArrayList<Integer>());
-					numPairToAverageNumEdge.put(numPairs, 0.0);
-				}
-				
-				numPairToNumEdges.get(numPairs).add(numEdges);
-				numPairToAverageNumEdge.put(numPairs, numPairToAverageNumEdge.get(numPairs) + numEdges);
-			}
-			
-			
-			for (Integer numPairs : numPairToAverageNumEdge.keySet()) {				
-				numPairToAverageNumEdge.put(numPairs, 
-						numPairToAverageNumEdge.get(numPairs) / (double) numPairToNumEdges.get(numPairs).size()); 
-			}
-			
-			StringBuilder output = new StringBuilder();	
-			output.append("#number of pairs, number of edges, detail\n");
-			List<Integer> sortedNumPairs = new ArrayList<Integer>(numPairToAverageNumEdge.keySet());
-			Collections.sort(sortedNumPairs);
-			for (int i = 0; i < sortedNumPairs.size(); ++i) {
-				int numPair = sortedNumPairs.get(i);
-				output.append(numPair + ", " 
-							+ numPairToAverageNumEdge.get(numPair) + ", ");
-				for (Integer numEdges : numPairToNumEdges.get(numPair)) {
-					output.append(numEdges + " ");					
-				}
-				output.append("\n");
-			}
-			
-			try (BufferedWriter writer = Files.newBufferedWriter(
-					Paths.get(outputFolder + outputFileNamePrefix + "_" + threshold + ".csv"), 
-					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-				writer.write(output.toString());
-				writer.flush();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
-	}
-	
-	public static void getDatasetStatistics() {
-		String outputPath = "src/main/resources/dataset-statistics.txt";
-		String output = "";
-				
-		Map<Integer, List<SentimentSet>> docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, false);
-		List<Integer> counts = new ArrayList<Integer>();
-		for (List<SentimentSet> reviews : docToSentimentSets.values()) 
-			counts.add(reviews.size());
-		output = output + updateStatistics(counts, "#reviews");
-		
-		docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH, false);
-		counts = new ArrayList<Integer>();
-		for (List<SentimentSet> sentences : docToSentimentSets.values()) 
-			counts.add(sentences.size());
-		output = output + updateStatistics(counts, "#sentences");
-		docToSentimentSets = null;
-		
-		Map<Integer, List<ConceptSentimentPair>> docToPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, false);
-		counts = new ArrayList<Integer>();
-		for (List<ConceptSentimentPair> pairs : docToPairs.values()) 
-			counts.add(pairs.size());
-		output = output + updateStatistics(counts, "#pairs");
-		docToPairs = null;
-		
-		// Raw data
-		List<RawReview> rawReviews = PairExtractor.getReviews(Constants.REVIEWS_PATH);
-		Map<Integer, List<RawReview>> docToRawReviews = new HashMap<Integer, List<RawReview>>();
-		for (RawReview rawReview : rawReviews) {
-			if (!docToRawReviews.containsKey(rawReview.getDocID()))
-				docToRawReviews.put(rawReview.getDocID(), new ArrayList<RawReview>());
-			docToRawReviews.get(rawReview.getDocID()).add(rawReview);
-		}
-		counts = new ArrayList<Integer>();
-		for (List<RawReview> reviews : docToRawReviews.values()) 
-			counts.add(reviews.size());
-		output = output + updateStatistics(counts, "#raw reviews");
-		
-		Map<RawReview, Integer> rawReviewToSentenceCount = new HashMap<RawReview, Integer>();
-		for (RawReview rawReview : rawReviews) {
-			int sentenceCount = SentimentCalculator.breakingIntoSentences(rawReview.getBody(), true).size();
-			rawReviewToSentenceCount.put(rawReview, sentenceCount);
-		}
-		counts = new ArrayList<Integer>();
-		for (RawReview rawReview : rawReviews) 
-			counts.add(rawReviewToSentenceCount.get(rawReview));
-		output = output + updateStatistics(counts, "#raw setences/raw review");
-		
-		Map<Integer, Integer> docToSentenceCount = new HashMap<Integer, Integer>();
-		for (RawReview rawReview : rawReviews) {
-			int docId = rawReview.getDocID();
-			if (!docToSentenceCount.containsKey(docId))
-				docToSentenceCount.put(docId, 0);
-			docToSentenceCount.put(docId, docToSentenceCount.get(docId) + rawReviewToSentenceCount.get(rawReview));
-		}
-		counts = new ArrayList<Integer>();
-		counts.addAll(docToSentenceCount.values());
-		output = output + updateStatistics(counts, "#raw sentences");
-		
-		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
-				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-			writer.write(output);
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		System.out.println("Find the output at \"" + outputPath + "\"");
-	}
-	
-	public static String updateStatistics(List<Integer> counts, String heading) {
-		double min = 0;
-		double max = 0;
-		double average = 0;
-		
-		average = counts.stream().collect(Collectors.averagingDouble(count -> (double) count));
-		Collections.sort(counts);
-		min = counts.get(0);
-		max = counts.get(counts.size() - 1);
-		return heading + ": min " + min + ", max " + max + ", average " + average + "\n";		
-	}
-
 	private static void topPairsExperiment() throws InterruptedException, ExecutionException, IOException {
 		
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
@@ -505,6 +355,156 @@ public class TopPairsProgram {
 		return summaryStatisticalResultsOfDifferentMethods(docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 	}
 			
+	public static void examineProblemSizes() {
+		String outputFolder = "src/main/resources/";
+		String outputFileNamePrefix = "problem_size";
+				
+		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = 
+				importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
+			
+		float[] thresholds = new float[] {0.1f, 0.3f};
+		for (float threshold : thresholds) {
+			Map<Integer, List<Integer>> numPairToNumEdges = new HashMap<Integer, List<Integer>>();
+			Map<Integer, Double> numPairToAverageNumEdge = new HashMap<Integer, Double>();
+			
+			for (Integer docId : docToConceptSentimentPairs.keySet()) {
+				List<ConceptSentimentPair> conceptSentimentPairs = docToConceptSentimentPairs.get(docId);
+				
+				List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+				ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
+				root.addDewey(SnomedGraphBuilder.ROOT_DEWEY);
+				pairs.add(root);
+				pairs.addAll(conceptSentimentPairs);
+				
+				Map<Integer, Map<Integer, Integer>> ancestorToSuccessorAndDistance = 
+						FiniteDistanceInitilizer.initFiniteDistances(pairs, threshold);
+				
+				int numPairs = pairs.size();
+				int numEdges = 0;
+				for (Integer ancestor : ancestorToSuccessorAndDistance.keySet()) {
+					numEdges += ancestorToSuccessorAndDistance.get(ancestor).size();
+				}
+				
+				if (!numPairToNumEdges.containsKey(numPairs)){
+					numPairToNumEdges.put(numPairs, new ArrayList<Integer>());
+					numPairToAverageNumEdge.put(numPairs, 0.0);
+				}
+				
+				numPairToNumEdges.get(numPairs).add(numEdges);
+				numPairToAverageNumEdge.put(numPairs, numPairToAverageNumEdge.get(numPairs) + numEdges);
+			}
+			
+			
+			for (Integer numPairs : numPairToAverageNumEdge.keySet()) {				
+				numPairToAverageNumEdge.put(numPairs, 
+						numPairToAverageNumEdge.get(numPairs) / (double) numPairToNumEdges.get(numPairs).size()); 
+			}
+			
+			StringBuilder output = new StringBuilder();	
+			output.append("#number of pairs, number of edges, detail\n");
+			List<Integer> sortedNumPairs = new ArrayList<Integer>(numPairToAverageNumEdge.keySet());
+			Collections.sort(sortedNumPairs);
+			for (int i = 0; i < sortedNumPairs.size(); ++i) {
+				int numPair = sortedNumPairs.get(i);
+				output.append(numPair + ", " 
+							+ numPairToAverageNumEdge.get(numPair) + ", ");
+				for (Integer numEdges : numPairToNumEdges.get(numPair)) {
+					output.append(numEdges + " ");					
+				}
+				output.append("\n");
+			}
+			
+			try (BufferedWriter writer = Files.newBufferedWriter(
+					Paths.get(outputFolder + outputFileNamePrefix + "_" + threshold + ".csv"), 
+					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+				writer.write(output.toString());
+				writer.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public static void getDatasetStatistics() {
+		String outputPath = "src/main/resources/dataset-statistics.txt";
+		String output = "";
+				
+		Map<Integer, List<SentimentSet>> docToSentimentSets = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, false);
+		List<Integer> counts = new ArrayList<Integer>();
+		for (List<SentimentSet> reviews : docToSentimentSets.values()) 
+			counts.add(reviews.size());
+		output = output + updateStatistics(counts, "#reviews");
+		
+		docToSentimentSets = importDocToSentimentSentences(DOC_TO_REVIEWS_PATH, false);
+		counts = new ArrayList<Integer>();
+		for (List<SentimentSet> sentences : docToSentimentSets.values()) 
+			counts.add(sentences.size());
+		output = output + updateStatistics(counts, "#sentences");
+		docToSentimentSets = null;
+		
+		Map<Integer, List<ConceptSentimentPair>> docToPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, false);
+		counts = new ArrayList<Integer>();
+		for (List<ConceptSentimentPair> pairs : docToPairs.values()) 
+			counts.add(pairs.size());
+		output = output + updateStatistics(counts, "#pairs");
+		docToPairs = null;
+		
+		// Raw data
+		List<RawReview> rawReviews = PairExtractor.getReviews(Constants.REVIEWS_PATH);
+		Map<Integer, List<RawReview>> docToRawReviews = new HashMap<Integer, List<RawReview>>();
+		for (RawReview rawReview : rawReviews) {
+			if (!docToRawReviews.containsKey(rawReview.getDocID()))
+				docToRawReviews.put(rawReview.getDocID(), new ArrayList<RawReview>());
+			docToRawReviews.get(rawReview.getDocID()).add(rawReview);
+		}
+		counts = new ArrayList<Integer>();
+		for (List<RawReview> reviews : docToRawReviews.values()) 
+			counts.add(reviews.size());
+		output = output + updateStatistics(counts, "#raw reviews");
+		
+		Map<RawReview, Integer> rawReviewToSentenceCount = new HashMap<RawReview, Integer>();
+		for (RawReview rawReview : rawReviews) {
+			int sentenceCount = SentimentCalculator.breakingIntoSentences(rawReview.getBody(), true).size();
+			rawReviewToSentenceCount.put(rawReview, sentenceCount);
+		}
+		counts = new ArrayList<Integer>();
+		for (RawReview rawReview : rawReviews) 
+			counts.add(rawReviewToSentenceCount.get(rawReview));
+		output = output + updateStatistics(counts, "#raw setences/raw review");
+		
+		Map<Integer, Integer> docToSentenceCount = new HashMap<Integer, Integer>();
+		for (RawReview rawReview : rawReviews) {
+			int docId = rawReview.getDocID();
+			if (!docToSentenceCount.containsKey(docId))
+				docToSentenceCount.put(docId, 0);
+			docToSentenceCount.put(docId, docToSentenceCount.get(docId) + rawReviewToSentenceCount.get(rawReview));
+		}
+		counts = new ArrayList<Integer>();
+		counts.addAll(docToSentenceCount.values());
+		output = output + updateStatistics(counts, "#raw sentences");
+		
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+			writer.write(output);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("Find the output at \"" + outputPath + "\"");
+	}
+
+	public static String updateStatistics(List<Integer> counts, String heading) {
+		double min = 0;
+		double max = 0;
+		double average = 0;
+		
+		average = counts.stream().collect(Collectors.averagingDouble(count -> (double) count));
+		Collections.sort(counts);
+		min = counts.get(0);
+		max = counts.get(counts.size() - 1);
+		return heading + ": min " + min + ", max " + max + ", average " + average + "\n";		
+	}
+
 	private static ConcurrentMap<Integer, List<SetResult>> convertTopKSetsMapToSetResultMap(
 			ConcurrentMap<Integer, List<SentimentSet>> docToTopSentimentSets) {
 		ConcurrentMap<Integer, List<SetResult>> docToSetResults = new ConcurrentHashMap<Integer, List<SetResult>>();

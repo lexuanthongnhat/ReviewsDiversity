@@ -111,86 +111,6 @@ public class Greedy {
 		return topKPairsResult;
 	}
 	
-	private void initPairs(
-			List<ConceptSentimentPair> conceptSentimentPairs, 
-			List<FullPair> fullPairs, 
-			StatisticalResult statisticalResult) {
-	
-		for (int i = 0 ; i < conceptSentimentPairs.size() ; i++) {
-			
-			// TODO - note that fullPair is identified using hashcode of only id -> id must be unique
-			fullPairs.add(new FullPair(conceptSentimentPairs.get(i).getId() + "_s" + conceptSentimentPairs.get(i).getSentiment()));
-		}		
-		
-		// Init the host
-		for (int i = 0; i < fullPairs.size(); i++) {
-			FullPair pair = fullPairs.get(i);			
-			pair.getCustomerMap().put(pair, 0);					// It can serve itself	
-			pair.getPotentialHosts().add(pair);
-			pair.setHost(root);			
-		}
-		
-		for (int i = 0; i < fullPairs.size() - 1; i++) {
-//			Utils.printTotalHeapSize("Init customer, iteration " + i);
-			
-			FullPair pair = fullPairs.get(i);			
-			for (int j = i + 1; j < fullPairs.size(); j ++) {
-				FullPair other = fullPairs.get(j);
-								
-				if (Constants.DEBUG_MODE) {
-					conceptSentimentPairs.get(i).testDistance(conceptSentimentPairs.get(j));
-					conceptSentimentPairs.get(j).testDistance(conceptSentimentPairs.get(i));
-				}
-				
-				int distance = Constants.INVALID_DISTANCE;
-				
-				distance = conceptSentimentPairs.get(i)
-						.calculateDistance(conceptSentimentPairs.get(j), threshold);
-				
-				// 2 pairs are in the same branch and sentiment coverable
-				if (distance != Constants.INVALID_DISTANCE) {
-					
-					// "pair" is the ancestor of "other"
-					if (distance > 0) {
-						pair.getCustomerMap().put(other, distance);
-						other.getPotentialHosts().add(pair);
-					} else if (distance < 0) {
-						other.getCustomerMap().put(pair, -distance);
-						pair.getPotentialHosts().add(other);
-					} else {
-						pair.getCustomerMap().put(other, distance);
-						other.getPotentialHosts().add(pair);
-						
-						other.getCustomerMap().put(pair, -distance);
-						pair.getPotentialHosts().add(other);
-					}
-				}
-			}
-		}
-		
-		// Init benefit
-		for (int i = 0; i < fullPairs.size(); i++) {
-			FullPair pair = fullPairs.get(i);
-			pair.setBenefit(
-					pair.getCustomerMap().size() * conceptSentimentPairs.get(i).calculateRootDistance()); 
-		}
-		
-		long initialCost = 0;
-		// Init the root
-		root.getCustomerMap().clear();
-		for (int i = 0; i < fullPairs.size(); i++) {			
-			int distance = conceptSentimentPairs.get(i).calculateRootDistance();
-			root.getCustomerMap().put(fullPairs.get(i), distance);
-			initialCost += distance;
-		}		
-		
-		// Init result
-		statisticalResult.setInitialCost(initialCost);
-		statisticalResult.setFinalCost(initialCost);
-//		initNumPotentialUsefulCover(result, conceptSentimentPairs);
-//		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairs);
-	}
-
 	private void initDistances(List<ConceptSentimentPair> conceptSentimentPairs, 
 			Map<FullPair, Map<FullPair, Integer>> distances, List<FullPair> fullPairs) {
 		
@@ -336,7 +256,9 @@ public class Greedy {
 		//Utils.printRunningTime(startTime, "Finished a nextPair iteration");
 	}
 	
-	private void checkResult(List<FullPair> topK, Map<FullPair, Map<FullPair, Integer>> distances, StatisticalResult statisticalResult) {
+	private void checkResult(
+			List<FullPair> topK, Map<FullPair, Map<FullPair, Integer>> distances, 
+			StatisticalResult statisticalResult) {
 	
 		long verifyingCost = 0;
 	

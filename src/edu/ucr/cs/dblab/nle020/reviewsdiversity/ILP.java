@@ -314,63 +314,7 @@ public class ILP {
 		docToStatisticalResult.put(statisticalResult.getDocID(), statisticalResult);
 	}
 	
-	protected static Map<Integer, Map<Integer, Integer>> initDistances(
-			List<ConceptSentimentPair> conceptSentimentPairs, 
-			float sentimentThreshold) {
-		
-		Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = new HashMap<Integer, Map<Integer, Integer>>();
-		
-		// The root
-		facilityToCustomerAndDistance.put(0, new HashMap<Integer, Integer>());
-		facilityToCustomerAndDistance.get(0).put(0, 0);
-		for (int j = 1; j < conceptSentimentPairs.size(); ++j) {
-			ConceptSentimentPair normalPair = conceptSentimentPairs.get(j);				
-			facilityToCustomerAndDistance.get(0).put(j, normalPair.calculateRootDistance());
-		}
-		
-		// Normal pairs
-		for (int i = 1; i < conceptSentimentPairs.size(); ++i) {
-			ConceptSentimentPair pair1 = conceptSentimentPairs.get(i);
-			if (!facilityToCustomerAndDistance.containsKey(i))
-				facilityToCustomerAndDistance.put(i, new HashMap<Integer, Integer>());
-			facilityToCustomerAndDistance.get(i).put(i, 0);
-			
-			for (int j = i + 1; j < conceptSentimentPairs.size(); ++j) {
-				ConceptSentimentPair pair2 = conceptSentimentPairs.get(j);				
-				int distance = Constants.INVALID_DISTANCE;	
-
-				if (Constants.DEBUG_MODE) {
-					pair1.testDistance(pair2);
-					pair2.testDistance(pair1);
-				}
-								
-				int temp = pair1.calculateDistance(pair2, sentimentThreshold);
-				if (temp != Constants.INVALID_DISTANCE) {
-					distance = temp;
-				}
-											
-				if (distance != Constants.INVALID_DISTANCE) {
-					if (distance > 0) {			
-						
-						facilityToCustomerAndDistance.get(i).put(j, distance);
-					} else if (distance < 0) {
-						if (!facilityToCustomerAndDistance.containsKey(j))
-							facilityToCustomerAndDistance.put(j, new HashMap<Integer, Integer>());
-						
-						facilityToCustomerAndDistance.get(j).put(i, -distance);
-					} else if (distance == 0) {
-						if (!facilityToCustomerAndDistance.containsKey(j))
-							facilityToCustomerAndDistance.put(j, new HashMap<Integer, Integer>());
-						
-						facilityToCustomerAndDistance.get(i).put(j, distance);
-						facilityToCustomerAndDistance.get(j).put(i, -distance);
-					}
-				}
-			}
-		}
-				
-		return facilityToCustomerAndDistance;
-	}
+	
 	
 	public static class StatisticalResultAndTopKByOriginalOrder{
 		StatisticalResult statisticalResult;

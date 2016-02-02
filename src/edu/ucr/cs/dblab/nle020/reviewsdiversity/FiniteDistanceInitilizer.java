@@ -1,7 +1,6 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,6 +13,7 @@ import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class FiniteDistanceInitilizer {
 	static protected float threshold = 0.3f;
+	
 	/**
 	 * Calculate pair of pairs with finite distance
 	 * @param conceptSentimentPairs - list of concept-sentiment pairs, suppose the first element is the root
@@ -75,6 +75,12 @@ public class FiniteDistanceInitilizer {
 		return ancestorToSuccessorAndDistance;
 	}
 
+	/**
+	 * Initialize the finite distances between pairs for Greedy algorithm
+	 * @param conceptSentimentPairs - input
+	 * @param fullPairs - output: the data structure holding information for Greedy
+	 * @param statisticalResult - output: hold some statistics about the problem
+	 */
 	public static void initFullPairs(
 			List<ConceptSentimentPair> conceptSentimentPairs, 
 			List<FullPair> fullPairs, 
@@ -126,6 +132,7 @@ public class FiniteDistanceInitilizer {
 		statisticalResult.setFinalCost(initialCost);
 	}	
 	
+	// Original method from Greedy
 	private static void initPairs(
 			List<ConceptSentimentPair> conceptSentimentPairs, 
 			List<FullPair> fullPairs, 
@@ -206,6 +213,65 @@ public class FiniteDistanceInitilizer {
 //		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairs);
 	}
 	
+	// Original method from ILP
+	protected static Map<Integer, Map<Integer, Integer>> initDistances(
+			List<ConceptSentimentPair> conceptSentimentPairs, 
+			float sentimentThreshold) {
+		
+		Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = new HashMap<Integer, Map<Integer, Integer>>();
+		
+		// The root
+		facilityToCustomerAndDistance.put(0, new HashMap<Integer, Integer>());
+		facilityToCustomerAndDistance.get(0).put(0, 0);
+		for (int j = 1; j < conceptSentimentPairs.size(); ++j) {
+			ConceptSentimentPair normalPair = conceptSentimentPairs.get(j);				
+			facilityToCustomerAndDistance.get(0).put(j, normalPair.calculateRootDistance());
+		}
+		
+		// Normal pairs
+		for (int i = 1; i < conceptSentimentPairs.size(); ++i) {
+			ConceptSentimentPair pair1 = conceptSentimentPairs.get(i);
+			if (!facilityToCustomerAndDistance.containsKey(i))
+				facilityToCustomerAndDistance.put(i, new HashMap<Integer, Integer>());
+			facilityToCustomerAndDistance.get(i).put(i, 0);
+			
+			for (int j = i + 1; j < conceptSentimentPairs.size(); ++j) {
+				ConceptSentimentPair pair2 = conceptSentimentPairs.get(j);				
+				int distance = Constants.INVALID_DISTANCE;	
+
+				if (Constants.DEBUG_MODE) {
+					pair1.testDistance(pair2);
+					pair2.testDistance(pair1);
+				}
+								
+				int temp = pair1.calculateDistance(pair2, sentimentThreshold);
+				if (temp != Constants.INVALID_DISTANCE) {
+					distance = temp;
+				}
+											
+				if (distance != Constants.INVALID_DISTANCE) {
+					if (distance > 0) {			
+						
+						facilityToCustomerAndDistance.get(i).put(j, distance);
+					} else if (distance < 0) {
+						if (!facilityToCustomerAndDistance.containsKey(j))
+							facilityToCustomerAndDistance.put(j, new HashMap<Integer, Integer>());
+						
+						facilityToCustomerAndDistance.get(j).put(i, -distance);
+					} else if (distance == 0) {
+						if (!facilityToCustomerAndDistance.containsKey(j))
+							facilityToCustomerAndDistance.put(j, new HashMap<Integer, Integer>());
+						
+						facilityToCustomerAndDistance.get(i).put(j, distance);
+						facilityToCustomerAndDistance.get(j).put(i, -distance);
+					}
+				}
+			}
+		}
+				
+		return facilityToCustomerAndDistance;
+	}
+	
 	private static Map<String, Map<String, Integer>> findDeweyToAncesetors(
 			Set<String> deweys) {
 		Map<String, Map<String, Integer>> deweyToAncestorAndDistance = new HashMap<String, Map<String, Integer>>();
@@ -283,10 +349,12 @@ public class FiniteDistanceInitilizer {
 		
 		for (Integer docId : docToConceptSentimentPairs.keySet()) {
 			//compareInitDistances(docToConceptSentimentPairs, docId);
-			compareInitPairs(docToConceptSentimentPairs, docId);
+			//compareInitPairs(docToConceptSentimentPairs, docId);
 		}
 	}
+	
 
+	@SuppressWarnings("unused")
 	private static void compareInitPairs(
 			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs,
 			Integer docId) {
@@ -331,6 +399,7 @@ public class FiniteDistanceInitilizer {
 		}
 	}
 	
+	@SuppressWarnings("unused")
 	private static void compareInitDistances(
 			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs,
 			Integer docId) {
@@ -347,7 +416,7 @@ public class FiniteDistanceInitilizer {
 		Utils.printRunningTime(startTime, "New init");
 
 		startTime = System.currentTimeMillis();
-		Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = ILP.initDistances(pairs, 0.3f);
+		Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = initDistances(pairs, 0.3f);
 		Utils.printRunningTime(startTime, "Old init");
 		
 		for (Integer facility : facilityToCustomerAndDistance.keySet()) {
