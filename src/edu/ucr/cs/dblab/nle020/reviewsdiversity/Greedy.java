@@ -51,7 +51,7 @@ public class Greedy {
 //		printInitialization();		
 		List<FullPair> pairs = new ArrayList<FullPair>();
 		//initPairs(conceptSentimentPairs, pairs, statisticalResult);
-		FiniteDistanceInitilizer.initFullPairs(conceptSentimentPairs, pairs, statisticalResult);
+		FiniteDistanceInitializer.initFullPairs(conceptSentimentPairs, pairs, statisticalResult);
 		
 		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<FullPair, Map<FullPair, Integer>>();	
 		if (Constants.DEBUG_MODE)

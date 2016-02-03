@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentMap;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP.StatisticalResultAndTopKByOriginalOrder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.FiniteDistanceInitializer;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.RandomizedRounding;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
@@ -53,7 +54,8 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 			topKSets = sentimentSets;
 		} else {
 			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = 
-					ILPSet.initDistances(threshold, sentimentSets, pairs, statisticalResult);
+					FiniteDistanceInitializer
+							.initFiniteDistancesFromSetIndexToPairIndex(threshold, sentimentSets, pairs, statisticalResult);
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.SETUP, 
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));

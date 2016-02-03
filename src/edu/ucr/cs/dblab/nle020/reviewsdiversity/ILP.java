@@ -75,7 +75,7 @@ public class ILP {
 		} else {
 //			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = initDistances(pairs, threshold);
 			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = 
-					FiniteDistanceInitilizer.initFiniteDistances(pairs, threshold);
+					FiniteDistanceInitializer.initFiniteDistancesFromPairIndexToPairIndex(pairs, threshold);
 /*			int temp = 0;
 			for (int facility : facilityToCustomerAndDistance.keySet()) {
 				temp += facilityToCustomerAndDistance.get(facility).size();

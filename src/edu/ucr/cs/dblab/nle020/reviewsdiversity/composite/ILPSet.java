@@ -1,7 +1,6 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity.composite;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -9,6 +8,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.FiniteDistanceInitializer;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.ILP;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
@@ -54,7 +54,8 @@ public class ILPSet extends ILP {
 			topKSets = sentimentSets;
 		} else {
 			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = 
-					initDistances(threshold, sentimentSets, pairs, statisticalResult);
+					FiniteDistanceInitializer
+						.initFiniteDistancesFromSetIndexToPairIndex(threshold, sentimentSets, pairs, statisticalResult);
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.SETUP, 
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
@@ -76,66 +77,5 @@ public class ILPSet extends ILP {
 		docToTopKSetsResult.put(docId, topKSets);
 		double runningTime = Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME);
 		gatherFinalResult(runningTime, sentimentSets.size() + 1, statisticalResult);		
-	}
-	
-	/**
-	 * init the distances between the sets, root and the concept sentiment pairs
-	 * @param sentimentSets
-	 * @param conceptSentimentPairs
-	 * @return array of length [sentimentSets.size() + 1 ] * conceptSentimentPairs.size()
-	 * <br> +1 for the root, result[0] is the distance array of the root
-	 */
-	protected static Map<Integer, Map<Integer, Integer>> initDistances(
-			float sentimentThreshold, 
-			List<SentimentSet> sentimentSets, 
-			List<ConceptSentimentPair> conceptSentimentPairs, 
-			StatisticalResult statisticalResult) {
-		
-		Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance =
-				new HashMap<Integer, Map<Integer, Integer>>();
-//		int[][] distances = new int[sentimentSets.size() + 1][conceptSentimentPairs.size() + 1];
-		
-		conceptSentimentPairs.add(0, root);
-		
-		// The root
-		facilityToCustomerAndDistance.put(0, new HashMap<Integer, Integer>());
-		facilityToCustomerAndDistance.get(0).put(0, 0);
-//		int initialCost = 0;
-		
-		for (int j = 1; j < conceptSentimentPairs.size(); ++j) {
-			ConceptSentimentPair pair = conceptSentimentPairs.get(j);				
-				
-			facilityToCustomerAndDistance.get(0).put(j, pair.calculateRootDistance());
-//			initialCost += pair.calculateRootDistance(); 
-		}
-//		statisticalResult.setInitialCost(initialCost);		
-		
-		// The sets
-		for (int s = 0; s < sentimentSets.size(); ++s) {
-			int sIndex = s + 1;
-			facilityToCustomerAndDistance.put(sIndex, new HashMap<Integer, Integer>());
-			
-			SentimentSet set = sentimentSets.get(s);
-			for (int p = 1; p < conceptSentimentPairs.size(); ++p) {
-				ConceptSentimentPair pair = conceptSentimentPairs.get(p);
-				
-				if (set.getPairs().contains(pair)) {
-					facilityToCustomerAndDistance.get(sIndex).put(p, 0);
-				} else {
-					int min = Constants.INVALID_DISTANCE;
-					for (ConceptSentimentPair pairInSet : set.getPairs()) {
-						int distance = pairInSet.calculateDistance(pair, sentimentThreshold);
-						
-						if (distance >= 0 && distance < min) 
-							min = distance;
-					}
-					if (min != Constants.INVALID_DISTANCE && min >= 0)
-						facilityToCustomerAndDistance.get(sIndex).put(p, min);
-				}
-			}
-		}
-		
-		
-		return facilityToCustomerAndDistance;
 	}
 }

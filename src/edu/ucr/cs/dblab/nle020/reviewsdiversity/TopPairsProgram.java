@@ -56,7 +56,7 @@ public class TopPairsProgram {
 	private static float threshold = Constants.THRESHOLD;
 	
 	static boolean RANDOMIZE_DOCS = false;
-	private static int NUM_TRIALS = 5;
+	private static int NUM_TRIALS = 20;
 	private static Set<Integer> randomIndices = Utils.randomIndices(1000, Constants.NUM_DOCTORS_TO_EXPERIMENT);
 	private final static int NUM_DOCTORS_TO_EXPERIMENT = Constants.NUM_DOCTORS_TO_EXPERIMENT;
 	
@@ -78,9 +78,10 @@ public class TopPairsProgram {
 //		getDatasetStatistics();
 		
 //		examineProblemSizes();
+		
 		topPairsExperiment();
-//		topSetsExperiment(SetOption.REVIEW);
-//		topSetsExperiment(SetOption.SENTENCE);
+		topSetsExperiment(SetOption.REVIEW);
+		topSetsExperiment(SetOption.SENTENCE);
 		
 //		topPairsSyntheticExperiment();
 		Utils.printRunningTime(startTime, "Finished evaluation");
@@ -91,8 +92,8 @@ public class TopPairsProgram {
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
 		// TODO - the first "3" is always slower than the other numbers 
-//		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-		int[] ks = new int[] {3, 10, 15};
+		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
+//		int[] ks = new int[] {3, 10};
 //		float[] thresholds = new float[] {0.1f, 0.3f};
 		float[] thresholds = new float[] {0.3f};
 		
@@ -124,9 +125,9 @@ public class TopPairsProgram {
 		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
 		printInitialization(docToConceptSentimentPairs);
 		
-		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedyAverage = new ConcurrentHashMap<Integer, StatisticalResult>();
-		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILPAverage = new ConcurrentHashMap<Integer, StatisticalResult>();
-		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultRRAverage = new ConcurrentHashMap<Integer, StatisticalResult>();
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedyFinal = new ConcurrentHashMap<Integer, StatisticalResult>();
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILPFinal = new ConcurrentHashMap<Integer, StatisticalResult>();
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultRRFinal = new ConcurrentHashMap<Integer, StatisticalResult>();
 		
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedy = new ConcurrentHashMap<Integer, StatisticalResult>();
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILP = new ConcurrentHashMap<Integer, StatisticalResult>();
@@ -181,43 +182,37 @@ public class TopPairsProgram {
 				outputTopKToJson(outputPrefix + "_rr_pair.txt", docToTopKPairsResultRR);
 			}
 			
-			if (docToStatisticalResultGreedyAverage.isEmpty()) {
-				docToStatisticalResultGreedyAverage.putAll(docToStatisticalResultGreedy);
-				docToStatisticalResultILPAverage.putAll(docToStatisticalResultILP);
-				docToStatisticalResultRRAverage.putAll(docToStatisticalResultRR);
+			if (docToStatisticalResultGreedyFinal.isEmpty()) {
+				docToStatisticalResultGreedyFinal.putAll(docToStatisticalResultGreedy);
+				docToStatisticalResultILPFinal.putAll(docToStatisticalResultILP);
+				docToStatisticalResultRRFinal.putAll(docToStatisticalResultRR);
 			} else {
 				for (Integer docId : docToStatisticalResultGreedy.keySet()) {
-					docToStatisticalResultGreedyAverage.get(docId).aggregateAnother(docToStatisticalResultGreedy.get(docId));
-					docToStatisticalResultILPAverage.get(docId).aggregateAnother(docToStatisticalResultILP.get(docId));
-					docToStatisticalResultRRAverage.get(docId).aggregateAnother(docToStatisticalResultRR.get(docId));
+					docToStatisticalResultGreedyFinal.get(docId).switchToMin(docToStatisticalResultGreedy.get(docId));
+					docToStatisticalResultILPFinal.get(docId).switchToMin(docToStatisticalResultILP.get(docId));
+					docToStatisticalResultRRFinal.get(docId).switchToMin(docToStatisticalResultRR.get(docId));
 				}
 			}
-		}
-		
-		for (Integer docId : docToStatisticalResultGreedy.keySet()) {
-			docToStatisticalResultGreedyAverage.get(docId).averagingBy(NUM_TRIALS);
-			docToStatisticalResultILPAverage.get(docId).averagingBy(NUM_TRIALS);
-			docToStatisticalResultRRAverage.get(docId).averagingBy(NUM_TRIALS);
-		}
+		}			
 		
 		String outputPath = outputFolder + "review_diversity_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
 		outputStatisticalResultToExcel(outputPath, isSet, 
-				docToStatisticalResultGreedyAverage, docToStatisticalResultILPAverage, docToStatisticalResultRRAverage);
+				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 		outputTimeToCsv(
 				outputFolder + "time_k" + k + "_s" + ((int) (threshold * 10))  + ".csv",
 				NumItem.NUM_PAIRS,
-				docToStatisticalResultGreedyAverage, docToStatisticalResultILPAverage, docToStatisticalResultRRAverage);
+				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 		outputTimeToCsv(
 				outputFolder + "time_pair_edge_k" + k + "_s" + ((int) (threshold * 10))  + ".csv",
 				NumItem.NUM_PAIRS_EDGES,
-				docToStatisticalResultGreedyAverage, docToStatisticalResultILPAverage, docToStatisticalResultRRAverage);
+				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 		
 		
 		Utils.printRunningTime(startTime, "Finished Top Pairs", true);
 		
 		return summaryStatisticalResultsOfDifferentMethods(
-				docToStatisticalResultGreedyAverage, docToStatisticalResultILPAverage, docToStatisticalResultRRAverage);
+				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 	}
 	
 
@@ -274,9 +269,9 @@ public class TopPairsProgram {
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
 		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-//		int[] ks = new int[] {5};
-		float[] thresholds = new float[] {0.1f, 0.3f};
-//		float[] thresholds = new float[] {0.3f};
+//		int[] ks = new int[] {3, 10};
+//		float[] thresholds = new float[] {0.1f, 0.3f};
+		float[] thresholds = new float[] {0.3f};
 		for (int numChoosen : ks) {
 			k = numChoosen;
 			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
@@ -297,6 +292,10 @@ public class TopPairsProgram {
 	private static StatisticalResult[] topSetsExperiment(SetOption setOption, String outputFolder) {
 		long startTime = System.currentTimeMillis();		
 		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<Integer, List<SentimentSet>>();		
+		
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedyFinal = new ConcurrentHashMap<Integer, StatisticalResult>();
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILPFinal = new ConcurrentHashMap<Integer, StatisticalResult>();
+		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultRRFinal = new ConcurrentHashMap<Integer, StatisticalResult>();
 		
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultGreedy = new ConcurrentHashMap<Integer, StatisticalResult>();
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResultILP = new ConcurrentHashMap<Integer, StatisticalResult>();
@@ -323,36 +322,53 @@ public class TopPairsProgram {
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToStatisticalResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
 				
-		runTopSetsAlgoMultiThreads(SetAlgorithm.GREEDY_SET, Constants.NUM_THREADS_ALGORITHM, docToSentimentSets, 
-				docToStatisticalResultGreedy, docToTopKSetsGreedy);
-		outputStatisticalResultToJson(outputPrefix + "_greedy.txt",	docToStatisticalResultGreedy);
-		outputTopKToJson(outputPrefix + "_greedy_set.txt", convertTopKSetsMapToSetResultMap(docToTopKSetsGreedy));
-		
-		runTopSetsAlgoMultiThreads(SetAlgorithm.ILP_SET, Constants.NUM_THREADS_ALGORITHM, docToSentimentSets, 
-				docToStatisticalResultILP, docToTopKSetsILP);
-		outputStatisticalResultToJson(outputPrefix + "_ilp.txt", docToStatisticalResultILP);
-		outputTopKToJson(outputPrefix + "_ilp_set.txt", convertTopKSetsMapToSetResultMap(docToTopKSetsILP));
-		
-		runTopSetsAlgoMultiThreads(SetAlgorithm.RANDOMIZED_ROUNDING_SET, Constants.NUM_THREADS_ALGORITHM, docToSentimentSets, 
-				docToStatisticalResultRR, docToTopKSetsRR);
-		outputStatisticalResultToJson(outputPrefix + "_rr.txt",	docToStatisticalResultRR);
-		outputTopKToJson(outputPrefix + "_rr_set.txt", convertTopKSetsMapToSetResultMap(docToTopKSetsRR));
+		for (int trial = 0; trial < NUM_TRIALS; ++trial) {	
+			runTopSetsAlgoMultiThreads(SetAlgorithm.GREEDY_SET, Constants.NUM_THREADS_ALGORITHM, docToSentimentSets, 
+					docToStatisticalResultGreedy, docToTopKSetsGreedy);
+			outputStatisticalResultToJson(outputPrefix + "_greedy.txt",	docToStatisticalResultGreedy);
+			outputTopKToJson(outputPrefix + "_greedy_set.txt", convertTopKSetsMapToSetResultMap(docToTopKSetsGreedy));
+			
+			runTopSetsAlgoMultiThreads(SetAlgorithm.ILP_SET, Constants.NUM_THREADS_ALGORITHM, docToSentimentSets, 
+					docToStatisticalResultILP, docToTopKSetsILP);
+			outputStatisticalResultToJson(outputPrefix + "_ilp.txt", docToStatisticalResultILP);
+			outputTopKToJson(outputPrefix + "_ilp_set.txt", convertTopKSetsMapToSetResultMap(docToTopKSetsILP));
+			
+			runTopSetsAlgoMultiThreads(SetAlgorithm.RANDOMIZED_ROUNDING_SET, Constants.NUM_THREADS_ALGORITHM, docToSentimentSets, 
+					docToStatisticalResultRR, docToTopKSetsRR);
+			outputStatisticalResultToJson(outputPrefix + "_rr.txt",	docToStatisticalResultRR);
+			outputTopKToJson(outputPrefix + "_rr_set.txt", convertTopKSetsMapToSetResultMap(docToTopKSetsRR));
+			
+			
+			if (docToStatisticalResultGreedyFinal.isEmpty()) {
+				docToStatisticalResultGreedyFinal.putAll(docToStatisticalResultGreedy);
+				docToStatisticalResultILPFinal.putAll(docToStatisticalResultILP);
+				docToStatisticalResultRRFinal.putAll(docToStatisticalResultRR);
+			} else {
+				for (Integer docId : docToStatisticalResultGreedy.keySet()) {
+					docToStatisticalResultGreedyFinal.get(docId).switchToMin(docToStatisticalResultGreedy.get(docId));
+					docToStatisticalResultILPFinal.get(docId).switchToMin(docToStatisticalResultILP.get(docId));
+					docToStatisticalResultRRFinal.get(docId).switchToMin(docToStatisticalResultRR.get(docId));
+				}
+			}
+		}
 				
 		String outputPath = outputFolder + "review_diversity_" + setOption + 
 										"_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = true;
-		outputStatisticalResultToExcel(outputPath, isSet, docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		outputStatisticalResultToExcel(outputPath, isSet, 
+				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 		
 		outputTimeToCsv(outputFolder + "time_k" + k + "_s" + ((int) (threshold * 10))  + ".csv", 
 				NumItem.NUM_PAIRS,
-				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 		outputTimeToCsv(outputFolder + "time_pair_edge_k" + k + "_s" + ((int) (threshold * 10))  + ".csv", 
 				NumItem.NUM_PAIRS_EDGES,
-				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 		
 		Utils.printRunningTime(startTime, "Finished Top " + setOption, true);		
 
-		return summaryStatisticalResultsOfDifferentMethods(docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
+		return summaryStatisticalResultsOfDifferentMethods(
+				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 	}
 			
 	public static void examineProblemSizes() {
@@ -377,7 +393,7 @@ public class TopPairsProgram {
 				pairs.addAll(conceptSentimentPairs);
 				
 				Map<Integer, Map<Integer, Integer>> ancestorToSuccessorAndDistance = 
-						FiniteDistanceInitilizer.initFiniteDistances(pairs, threshold);
+						FiniteDistanceInitializer.initFiniteDistancesFromPairIndexToPairIndex(pairs, threshold);
 				
 				int numPairs = pairs.size();
 				int numEdges = 0;

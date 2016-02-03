@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.FiniteDistanceInitializer;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.FullPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
@@ -51,13 +52,12 @@ public class GreedySet {
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);;
 
 //		printInitialization();		
-		Map<FullPair, Map<FullPair, Integer>> distances = 
-				new HashMap<FullPair, Map<FullPair, Integer>>();	
-		
 
 		List<FullPair> topK = new ArrayList<FullPair>();	
 		List<FullPair> fullPairSets = new ArrayList<FullPair>();
-		initPairs(sentimentSets, fullPairSets, statisticalResult, distances);
+		FiniteDistanceInitializer.initFullPairs(threshold, sentimentSets, fullPairSets, statisticalResult);
+		
+		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<FullPair, Map<FullPair, Integer>>();
 		if (Constants.DEBUG_MODE)
 			initDistances(fullPairSets, distances);		
 		
@@ -160,96 +160,6 @@ public class GreedySet {
 				distances.get(fullPairSet).put(customer, fullPairSet.distanceToCustomer(customer));
 			}
 		}
-	}
-
-	private void initPairs(Collection<? extends SentimentSet> sentimentSets, 
-				Collection<FullPair> fullPairSets, StatisticalResult statisticalResult, 
-				Map<FullPair, Map<FullPair, Integer>> distances) {
-		Map<SentimentSet, FullPair> setToFullPairSet = new HashMap<SentimentSet, FullPair>();
-		// Init fullPairSets corresponding to sentimentSets
-		for (SentimentSet set : sentimentSets) {
-			FullPair fullPairSet = new FullPair(set.getId(), set);
-			fullPairSets.add(fullPairSet);
-			setToFullPairSet.put(set, fullPairSet);
-		}			
-		
-		Map<FullPair, ConceptSentimentPair> fullPairToCSPair = new HashMap<FullPair, ConceptSentimentPair>();
-		Map<ConceptSentimentPair, FullPair> csPairToFullPair = new HashMap<ConceptSentimentPair, FullPair>();
-		
-		List<FullPair> fullPairs = new ArrayList<FullPair>();
-		List<ConceptSentimentPair> conceptSentimentPairs = new ArrayList<ConceptSentimentPair>();
-		for (SentimentSet set : sentimentSets) {
-			set.getFullPairs().clear();
-			for (ConceptSentimentPair csPair : set.getPairs()) {
-				if (!conceptSentimentPairs.contains(csPair)) { 
-					conceptSentimentPairs.add(csPair);
-					
-					FullPair fullPair = new FullPair(csPair.getId() + "_s" + csPair.getSentiment());					
-					fullPairs.add(fullPair);
-					
-					fullPairToCSPair.put(fullPair, csPair);
-					csPairToFullPair.put(csPair, fullPair);
-					
-					set.addFullPair(fullPair);
-				} else {
-					set.addFullPair(csPairToFullPair.get(csPair));
-				}
-			}				
-		}
-		
-	
-		for (SentimentSet set : sentimentSets) {
-			FullPair fullPairSet = setToFullPairSet.get(set);
-
-			for (FullPair fullPair : fullPairs) {
-				if (set.getFullPairs().contains(fullPair)) {
-					fullPair.addPotentialHost(fullPairSet);
-					fullPairSet.addCustomer(fullPair, 0);
-					
-					fullPairSet.increaseBenefit(fullPairToCSPair.get(fullPair).calculateRootDistance());
-				} else {
-
-					int min = Constants.INVALID_DISTANCE;					
-//					FullPair potentialHost = null;
-
-					for (FullPair fullPairInSet : set.getFullPairs()) {
-						int distance = fullPairToCSPair.get(fullPairInSet).calculateDistance(fullPairToCSPair.get(fullPair), threshold);
-						if (distance < min && distance >= 0) {
-							min = distance;
-//							potentialHost = fullPairInSet;
-						}
-					}
-
-					if (min >= 0 && min < Constants.INVALID_DISTANCE) {
-						fullPairSet.addCustomer(fullPair, min);
-						fullPair.addPotentialHost(fullPairSet);
-						
-//						fullPairSet.increaseBenefit(fullPairToCSPair.get(potentialHost).calculateRootDistance());
-						fullPairSet.increaseBenefit(fullPairToCSPair.get(fullPair).calculateRootDistance() - min);
-					}
-				}
-			}
-		}
-
-
-		long initialCost = 0;
-		// Init the root		
-		root.getCustomerMap().clear();
-		for (FullPair fullPair : fullPairs) {
-			fullPair.setHost(root);
-			
-			int distance = fullPairToCSPair.get(fullPair).calculateRootDistance();
-			root.addCustomer(fullPair, distance);
-			initialCost += distance;
-		}
-
-		// Init result
-		statisticalResult.setInitialCost(initialCost);
-		statisticalResult.setFinalCost(initialCost);
-		statisticalResult.setNumSets(sentimentSets.size());
-		statisticalResult.setNumPairs(conceptSentimentPairs.size());			
-		
-//		initNumPotentialUsefulCoverWithThreshold(statisticalResult, fullPairSets);
 	}
 
 	@SuppressWarnings("unused")

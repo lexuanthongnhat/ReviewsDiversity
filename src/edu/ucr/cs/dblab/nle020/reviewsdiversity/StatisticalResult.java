@@ -40,6 +40,18 @@ public class StatisticalResult {
 		}
 	}
 	
+	public void switchToMin(StatisticalResult other) {
+		if (other.runningTime < this.runningTime) {
+			
+			this.runningTime = other.runningTime;
+			for (Constants.PartialTimeIndex index : partialTimes.keySet()) {
+				this.partialTimes.put(index, other.partialTimes.get(index));				
+			}
+			
+			this.finalCost = other.finalCost;
+		}
+	}
+	
 	public StatisticalResult averagingBy(int numTrials) {
 		double temp = (double) numTrials;
 		this.finalCost 		/= temp;
