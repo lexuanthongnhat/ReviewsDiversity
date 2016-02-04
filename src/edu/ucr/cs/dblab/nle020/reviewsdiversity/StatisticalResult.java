@@ -41,7 +41,8 @@ public class StatisticalResult {
 	}
 	
 	public void switchToMin(StatisticalResult other) {
-		if (other.runningTime < this.runningTime) {
+		if (other.runningTime < this.runningTime) { 
+	//			|| other.partialTimes.get(PartialTimeIndex.SETUP) < this.partialTimes.get(PartialTimeIndex.SETUP)) {
 			
 			this.runningTime = other.runningTime;
 			for (Constants.PartialTimeIndex index : partialTimes.keySet()) {
@@ -50,6 +51,11 @@ public class StatisticalResult {
 			
 			this.finalCost = other.finalCost;
 		}
+		
+		Double otherSetupTime = other.partialTimes.get(PartialTimeIndex.SETUP);
+		Double thisSetupTime = this.partialTimes.get(PartialTimeIndex.SETUP);
+		if (otherSetupTime != null && thisSetupTime != null && otherSetupTime < thisSetupTime)
+			this.partialTimes.put(PartialTimeIndex.SETUP, otherSetupTime);
 	}
 	
 	public StatisticalResult averagingBy(int numTrials) {

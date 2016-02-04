@@ -80,8 +80,8 @@ public class TopPairsProgram {
 //		examineProblemSizes();
 		
 		topPairsExperiment();
-		topSetsExperiment(SetOption.REVIEW);
-		topSetsExperiment(SetOption.SENTENCE);
+//		topSetsExperiment(SetOption.REVIEW);
+//		topSetsExperiment(SetOption.SENTENCE);
 		
 //		topPairsSyntheticExperiment();
 		Utils.printRunningTime(startTime, "Finished evaluation");
@@ -92,8 +92,8 @@ public class TopPairsProgram {
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();		
 		
 		// TODO - the first "3" is always slower than the other numbers 
-		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-//		int[] ks = new int[] {3, 10};
+//		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
+		int[] ks = new int[] {3, 10, 15};
 //		float[] thresholds = new float[] {0.1f, 0.3f};
 		float[] thresholds = new float[] {0.3f};
 		

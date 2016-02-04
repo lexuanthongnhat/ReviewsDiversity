@@ -1,7 +1,14 @@
 package edu.ucr.cs.dblab.nle020.ontology;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 
@@ -77,5 +84,35 @@ public class DeweyUtils {
 			result = longer.length - shorter.length;
 		
 		return result;
+	}
+
+	public static void main(String[] args) {
+		String inputFilePath = "src/edu/ucr/cs/dblab/nle020/ontology/snomed_deweys.txt";
+		
+		int dagHeight = 0;
+		int maxNumDeweys = 0;
+		List<Integer> numDeweys = new ArrayList<Integer>();
+		
+		try (BufferedReader reader = Files.newBufferedReader(Paths.get(inputFilePath))) {
+			String line = null;
+			while ((line = reader.readLine()) != null) {
+				String[] deweys = line.split("\t")[1].split(",");
+				int numDewey = deweys.length;
+				numDeweys.add(numDewey);
+				if (maxNumDeweys < numDewey)
+					maxNumDeweys = numDewey;
+				
+				for (String dewey : deweys) {
+					String[] levels = dewey.split("\\.");
+					if (dagHeight < levels.length)
+						dagHeight = levels.length;
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("dagHeight = " + dagHeight + ", maxNumDeweys = " + maxNumDeweys 
+				+ ", average of numDewey = " + numDeweys.stream().collect(Collectors.averagingInt(dewey -> dewey)));
 	}
 }
