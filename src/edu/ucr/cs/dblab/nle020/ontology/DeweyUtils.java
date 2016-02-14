@@ -5,9 +5,12 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
@@ -87,6 +90,10 @@ public class DeweyUtils {
 	}
 
 	public static void main(String[] args) {
+		showDeweyStatistics();
+	}
+	
+	private static void showDeweyStatistics() {
 		String inputFilePath = "src/edu/ucr/cs/dblab/nle020/ontology/snomed_deweys.txt";
 		
 		int dagHeight = 0;

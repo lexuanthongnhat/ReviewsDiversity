@@ -1,12 +1,21 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import edu.stanford.nlp.sentiment.SentimentTraining;
 import edu.ucr.cs.dblab.nle020.ontology.SnomedGraphBuilder;
@@ -79,6 +88,174 @@ public class FiniteDistanceInitializer {
 	}
 
 	/**
+	 * Faster way to initiate finite distances, don't count duplicate ancestor of concept
+	 * @param conceptSentimentPairs
+	 * @param sentimentThreshold
+	 * @param noRoot
+	 * @return
+	 */
+	public static Map<Integer, Map<Integer, Integer>> initFiniteDistancesFromPairIndexToPairIndex2(
+			List<ConceptSentimentPair> conceptSentimentPairs, 
+			float sentimentThreshold,
+			boolean... noRoot) {
+		
+		Map<Integer, Map<Integer, Integer>> ancestorToSuccessorAndDistance = new HashMap<Integer, Map<Integer, Integer>>();
+		
+		Map<String, Set<ConceptSentimentPair>> conceptToPairs = new HashMap<String, Set<ConceptSentimentPair>>();
+		Map<String, Set<String>> conceptToDeweys = new HashMap<String, Set<String>>();
+		mapFromConceptToPairsAndDeweys(
+				conceptSentimentPairs, 
+				conceptToPairs, conceptToDeweys);
+
+		Map<String, Set<String>> deweyToConcepts = new HashMap<String, Set<String>>();
+		for (String cui : conceptToDeweys.keySet()) {
+			for (String dewey : conceptToDeweys.get(cui)) {
+				if (!deweyToConcepts.containsKey(dewey))
+					deweyToConcepts.put(dewey, new HashSet<String>());
+				deweyToConcepts.get(dewey).add(cui);
+			}
+		}
+			
+		Map<String, Set<String>> conceptToAncestorConcepts = findAncestorConcepts(conceptToDeweys, deweyToConcepts);		
+		conceptToAncestorConcepts.remove(Constants.ROOT_CUI);
+		
+		Map<ConceptSentimentPair, Integer> pairToIndex = new HashMap<ConceptSentimentPair, Integer>();
+		for (int i = 0; i < conceptSentimentPairs.size(); ++i) {
+			pairToIndex.put(conceptSentimentPairs.get(i), i);
+			ancestorToSuccessorAndDistance.put(i, new HashMap<Integer, Integer>());
+			ancestorToSuccessorAndDistance.get(i).put(i, 0);
+		}
+				
+		// The root
+		if (noRoot.length == 0 || !noRoot[0]) {
+			for (int j = 1; j < conceptSentimentPairs.size(); ++j) {
+				ConceptSentimentPair normalPair = conceptSentimentPairs.get(j);				
+				ancestorToSuccessorAndDistance.get(0).put(j, normalPair.calculateRootDistance());
+			}		
+		}
+		
+		// Normal pairs
+		for (int successorIndex = 0; successorIndex < conceptSentimentPairs.size(); ++successorIndex) {		
+			ConceptSentimentPair successorPair = conceptSentimentPairs.get(successorIndex);
+			Map<Integer, Integer> ancestorIndexToDistance = new HashMap<Integer, Integer>(); 
+			String concept = successorPair.getCui();
+			
+			Set<String> ancestorConcepts = conceptToAncestorConcepts.get(concept);
+			if (ancestorConcepts == null) continue;
+			for (String ancestorConcept : ancestorConcepts) {
+				for (ConceptSentimentPair ancestorPair : conceptToPairs.get(ancestorConcept)) {
+					int ancestorIndex = pairToIndex.get(ancestorPair);
+					if (!successorPair.equals(ancestorPair) 
+							|| !ancestorIndexToDistance.containsKey(ancestorIndex)) {
+						int distanceFromAncestorToSuccessor = 
+								ancestorPair.calculateDistance(successorPair, sentimentThreshold);
+						if (distanceFromAncestorToSuccessor != Constants.INVALID_DISTANCE)
+							ancestorToSuccessorAndDistance.get(ancestorIndex)
+									.put(successorIndex, distanceFromAncestorToSuccessor);
+					}
+				}				
+			}
+		}
+				
+		return ancestorToSuccessorAndDistance;
+	}
+	
+	
+	private static Map<String, Set<String>> findAncestorConcepts(
+			Map<String, Set<String>> conceptToDeweys,
+			Map<String, Set<String>> deweyToConcepts) {
+		Map<String, Set<String>> conceptToAncestorConcepts = new HashMap<String, Set<String>>();
+		
+		for (String concept : conceptToDeweys.keySet()) {
+			Set<String> ancestorConcepts = new HashSet<String>();
+			Set<String> deweys = conceptToDeweys.get(concept);
+			
+			boolean nextDewey = false;
+			for (String dewey : deweys) {
+				if (nextDewey) nextDewey = false;
+								
+				ancestorConcepts.addAll(deweyToConcepts.get(dewey));
+				int indexOfLastDot = dewey.length();
+				
+				// Loop over potential ancestors, indexOfLastDot > 1 to discard the root
+				while ((indexOfLastDot = dewey.substring(0, indexOfLastDot).lastIndexOf(".")) > 0 
+						&& indexOfLastDot > 1) {									
+					String ancestorDewey = dewey.substring(0, indexOfLastDot);
+					Set<String> ancestorCandidates = deweyToConcepts.get(ancestorDewey);
+					
+					if (deweys.contains(ancestorDewey)) {
+						// Ancestors of ancestorDewey was/will be cared, no need to do anything 
+						nextDewey = true;
+						break;
+					} else if ( ancestorCandidates == null) 
+						continue;
+					else
+						ancestorConcepts.addAll(ancestorCandidates);						
+				}
+				
+				if (nextDewey)
+					continue;
+			}
+	//		ancestorConcepts.remove(concept);
+			conceptToAncestorConcepts.put(concept, ancestorConcepts);
+		}
+		
+		return conceptToAncestorConcepts;
+	}
+
+
+	private static void mapFromConceptToPairsAndDeweys(
+			List<ConceptSentimentPair> conceptSentimentPairs,
+			Map<String, Set<ConceptSentimentPair>> conceptToPairs,
+			Map<String, Set<String>> conceptToDeweys) {
+				
+		for (ConceptSentimentPair pair : conceptSentimentPairs) {
+			String cui = pair.getCui();
+			if (!conceptToPairs.containsKey(cui)) {
+				conceptToPairs.put(cui, new HashSet<ConceptSentimentPair>());
+				conceptToDeweys.put(cui, new HashSet<String>(pair.getDeweys()));
+			}
+			conceptToPairs.get(cui).add(pair);
+		}
+	}
+
+
+	private static Map<ConceptSentimentPair, Set<ConceptSentimentPair>> findAncestors(
+			List<ConceptSentimentPair> conceptSentimentPairs,
+			Map<String, Set<ConceptSentimentPair>> deweyToPairs,
+			boolean... noRoot) {
+		
+		Map<ConceptSentimentPair, Set<ConceptSentimentPair>> pairToAncestors = 
+				new HashMap<ConceptSentimentPair, Set<ConceptSentimentPair>>();
+		
+		int i = 0;
+		if (noRoot.length == 0 || !noRoot[0])
+			i = 1;
+		
+		for (; i < conceptSentimentPairs.size(); ++i) {
+			ConceptSentimentPair pair = conceptSentimentPairs.get(i);
+			pairToAncestors.put(pair, new HashSet<ConceptSentimentPair>());
+			Set<ConceptSentimentPair> ancestors = pairToAncestors.get(pair);
+			
+			for (String dewey : pair.getDeweys()) {				
+				int indexOfLastDot = dewey.length();
+				while ((indexOfLastDot = dewey.substring(0, indexOfLastDot).lastIndexOf(".")) > 0) {									
+					String ancestorDewey = dewey.substring(0, indexOfLastDot);
+					Set<ConceptSentimentPair> ancestorCandidates = deweyToPairs.get(ancestorDewey);
+					
+					if (ancestorCandidates == null) 
+						continue;
+					else
+						ancestors.addAll(ancestorCandidates);						
+				}
+			}
+		}
+		
+		return pairToAncestors;
+	}
+
+
+	/**
 	 * Initialize the finite distances between pairs for Greedy algorithm
 	 * @param conceptSentimentPairs - input
 	 * @param fullPairs - output: the data structure holding information for Greedy
@@ -97,7 +274,7 @@ public class FiniteDistanceInitializer {
 		}		
 				
 		Map<Integer, Map<Integer, Integer>> ancestorToSuccessorAndDistance = 
-				initFiniteDistancesFromPairIndexToPairIndex(conceptSentimentPairs, statisticalResult.getThreshold(), true);
+				initFiniteDistancesFromPairIndexToPairIndex2(conceptSentimentPairs, statisticalResult.getThreshold(), true);
 		
 		// Init the host
 		for (int i = 0; i < fullPairs.size(); i++) {
@@ -187,6 +364,67 @@ public class FiniteDistanceInitializer {
 	}
 	
 	/**
+	 * Find all finite distances between pair of pairs
+	 * This method is used for computing finite distance from set to pair
+	 * @param conceptSentimentPairs - list of concept-sentiment pairs, suppose the first element is not the root
+	 * @param sentimentThreshold - coverage threshold on sentiment 
+	 * @return Map: Ancestor Pair --> <Successor Pair, Distance>
+	 */
+	private static Map<ConceptSentimentPair, Map<ConceptSentimentPair, Integer>> getFiniteDistancesFromPairToPair2(
+			List<ConceptSentimentPair> conceptSentimentPairs, 
+			float sentimentThreshold) {
+		
+		Map<ConceptSentimentPair, Map<ConceptSentimentPair, Integer>> ancestorToSuccessorAndDistance = 
+				new HashMap<ConceptSentimentPair, Map<ConceptSentimentPair, Integer>>();
+		
+		Map<String, Set<ConceptSentimentPair>> conceptToPairs = new HashMap<String, Set<ConceptSentimentPair>>();
+		Map<String, Set<String>> conceptToDeweys = new HashMap<String, Set<String>>();
+		mapFromConceptToPairsAndDeweys(
+				conceptSentimentPairs, 
+				conceptToPairs, conceptToDeweys);
+
+		Map<String, Set<String>> deweyToConcepts = new HashMap<String, Set<String>>();
+		for (String cui : conceptToDeweys.keySet()) {
+			for (String dewey : conceptToDeweys.get(cui)) {
+				if (!deweyToConcepts.containsKey(dewey))
+					deweyToConcepts.put(dewey, new HashSet<String>());
+				deweyToConcepts.get(dewey).add(cui);
+			}
+		}
+			
+		Map<String, Set<String>> conceptToAncestorConcepts = findAncestorConcepts(conceptToDeweys, deweyToConcepts);		
+		conceptToAncestorConcepts.remove(Constants.ROOT_CUI);
+		
+		for (ConceptSentimentPair pair : conceptSentimentPairs) {
+			ancestorToSuccessorAndDistance.put(pair, new HashMap<ConceptSentimentPair, Integer>());
+			ancestorToSuccessorAndDistance.get(pair).put(pair, 0);
+		}		
+		
+		// Normal pairs
+		for (ConceptSentimentPair successorPair : conceptSentimentPairs) {		
+			Map<ConceptSentimentPair, Integer> ancestorPairToDistance = new HashMap<ConceptSentimentPair, Integer>(); 
+			String concept = successorPair.getCui();
+			
+			Set<String> ancestorConcepts = conceptToAncestorConcepts.get(concept);
+			if (ancestorConcepts == null) continue;
+			for (String ancestorConcept : ancestorConcepts) {
+				for (ConceptSentimentPair ancestorPair : conceptToPairs.get(ancestorConcept)) {
+					if (!successorPair.equals(ancestorPair) 
+							|| !ancestorPairToDistance.containsKey(ancestorPair)) {
+						int distanceFromAncestorToSuccessor = 
+								ancestorPair.calculateDistance(successorPair, sentimentThreshold);
+						if (distanceFromAncestorToSuccessor != Constants.INVALID_DISTANCE)
+							ancestorToSuccessorAndDistance.get(ancestorPair)
+									.put(successorPair, distanceFromAncestorToSuccessor);
+					}
+				}				
+			}
+		}
+				
+		return ancestorToSuccessorAndDistance;
+	}
+	
+	/**
 	 * Init the finite distances from the (sets, root) to the concept-sentiment pairs
 	 * @param sentimentSets
 	 * @param conceptSentimentPairs
@@ -217,7 +455,7 @@ public class FiniteDistanceInitializer {
 		statisticalResult.setInitialCost(initialCost);		
 		
 		Map<ConceptSentimentPair, Map<ConceptSentimentPair, Integer>> ancestorPairToSuccessorPairAndDistance
-				= getFiniteDistancesFromPairToPair(conceptSentimentPairs, sentimentThreshold);
+				= getFiniteDistancesFromPairToPair2(conceptSentimentPairs, sentimentThreshold);
 		
 		Map<ConceptSentimentPair, Set<Integer>> pairToIndices = 
 				new HashMap<ConceptSentimentPair, Set<Integer>>();
@@ -300,7 +538,7 @@ public class FiniteDistanceInitializer {
 		}
 		
 		Map<ConceptSentimentPair, Map<ConceptSentimentPair, Integer>> ancestorPairToSuccessorPairAndDistance
-				= getFiniteDistancesFromPairToPair(conceptSentimentPairs, sentimentThreshold);
+				= getFiniteDistancesFromPairToPair2(conceptSentimentPairs, sentimentThreshold);
 		
 		
 		for (SentimentSet set : sentimentSets) {
@@ -720,9 +958,201 @@ public class FiniteDistanceInitializer {
 		//testInitDistances();
 		//testInitPairs();
 		//testSetInitFiniteDistances();
-		testInitFullPairSets ();
+		//testInitFullPairSets ();
+		//testScalability(20);
+		numAncestorAverage();
 	}
 	
+	private static void numAncestorAverage() {
+		String inputFilePath = "src/edu/ucr/cs/dblab/nle020/ontology/snomed_deweys.txt";
+		
+		Map<String, Set<String>> conceptToDeweys = new HashMap<String, Set<String>>();
+	
+		try (BufferedReader reader = Files.newBufferedReader(Paths.get(inputFilePath))) {
+			String line = null;
+			while ((line = reader.readLine()) != null) {
+				String[] columns = line.split("\t");
+				String concept = columns[0];
+				String[] deweys = columns[1].split(",");
+				
+				conceptToDeweys.put(concept, new HashSet<>(Arrays.asList(deweys)));
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		Map<String, Set<String>> deweyToConcepts = new HashMap<String, Set<String>>();
+		for (String cui : conceptToDeweys.keySet()) {
+			for (String dewey : conceptToDeweys.get(cui)) {
+				if (!deweyToConcepts.containsKey(dewey))
+					deweyToConcepts.put(dewey, new HashSet<String>());
+				deweyToConcepts.get(dewey).add(cui);
+			}
+		}
+		
+		Map<String, Set<String>> conceptToAncestorConcepts = findAncestorConcepts(conceptToDeweys, deweyToConcepts);
+		
+		Map<Integer, Integer> numAncestorAverageToCount = new HashMap<Integer, Integer>();
+		int sum = 0;
+		int count = 0;
+		for (String concept : conceptToAncestorConcepts.keySet()) {
+			Integer numAncestors = conceptToAncestorConcepts.get(concept).size();			
+			if (!numAncestorAverageToCount.containsKey(numAncestors))
+				numAncestorAverageToCount.put(numAncestors, 1);
+			else
+				numAncestorAverageToCount.put(numAncestors, numAncestorAverageToCount.get(numAncestors) + 1);
+			
+			sum += numAncestors;
+			++count;
+		}
+		outputIntegerToNumberMapToCsv(numAncestorAverageToCount, 
+				"src/main/resources/num_ancestor_average_to_count_whole_ontology.csv", 
+				"# ancestor", "count");
+		System.out.println("The average number of ancestor in the whole ontology is: " + (double) sum / (double) count);
+		System.out.println("There are " + conceptToDeweys.keySet().size() + " concepts, " 
+					+ deweyToConcepts.keySet().size() + " deweys id");
+	}
+	
+	private static void testScalability(int numTrials) {
+		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs = 
+				TopPairsProgram.importDocToConceptSentimentPairs(
+						TopPairsProgram.DOC_TO_REVIEWS_PATH, 
+						TopPairsProgram.RANDOMIZE_DOCS);
+		
+		Map<Integer, List<Double>> numAncestorsToTimes = new HashMap<Integer, List<Double>>();
+		
+		Map<Integer, Double> docIdToRunningTime = new HashMap<Integer, Double>();
+		Map<Integer, Integer> docIdToNumAncestors = new HashMap<Integer, Integer>();
+		
+		Map<Integer, Integer> numAncestorAverageToCount = new HashMap<Integer, Integer>();
+		
+		for (int trial = 0; trial < numTrials; trial++) {
+			for (Integer docId : docToConceptSentimentPairs.keySet()) {
+				List<ConceptSentimentPair> conceptSentimentPairs = docToConceptSentimentPairs.get(docId);			
+				List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+				ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
+				root.addDewey(SnomedGraphBuilder.ROOT_DEWEY);
+				pairs.add(root);
+				pairs.addAll(conceptSentimentPairs);											
+				
+				Double runningTime = 1e10;
+				long startTime = System.nanoTime();
+				initFiniteDistancesFromPairIndexToPairIndex2(pairs, 0.3f);
+				runningTime = (double)(System.nanoTime() - startTime) / (double) 1e6;
+				
+				if (!docIdToRunningTime.containsKey(docId) 
+						|| (docIdToRunningTime.get(docId) > runningTime))
+					docIdToRunningTime.put(docId, runningTime);										
+			}
+		}
+		
+		// numAncestors information
+		for (Integer docId : docToConceptSentimentPairs.keySet()) {
+			List<ConceptSentimentPair> conceptSentimentPairs = docToConceptSentimentPairs.get(docId);			
+			List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+			ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
+			root.addDewey(SnomedGraphBuilder.ROOT_DEWEY);
+			pairs.add(root);
+			pairs.addAll(conceptSentimentPairs);	
+			
+			int numAncestors = 0;
+			Map<String, Set<ConceptSentimentPair>> conceptToPairs = new HashMap<String, Set<ConceptSentimentPair>>();
+			Map<String, Set<String>> conceptToDeweys = new HashMap<String, Set<String>>();
+			mapFromConceptToPairsAndDeweys(
+					conceptSentimentPairs, 
+					conceptToPairs, conceptToDeweys);
+
+			Map<String, Set<String>> deweyToConcepts = new HashMap<String, Set<String>>();
+			for (String cui : conceptToDeweys.keySet()) {
+				for (String dewey : conceptToDeweys.get(cui)) {
+					if (!deweyToConcepts.containsKey(dewey))
+						deweyToConcepts.put(dewey, new HashSet<String>());
+					deweyToConcepts.get(dewey).add(cui);
+				}
+			}
+				
+			Map<String, Set<String>> conceptToAncestorConcepts = findAncestorConcepts(conceptToDeweys, deweyToConcepts);
+			
+			for (int successorIndex = 0; successorIndex < conceptSentimentPairs.size(); ++successorIndex) {		
+				ConceptSentimentPair successorPair = conceptSentimentPairs.get(successorIndex);			 
+				String concept = successorPair.getCui();
+				
+				Set<String> ancestorConcepts = conceptToAncestorConcepts.get(concept);
+				if (ancestorConcepts == null) continue;
+				for (String ancestorConcept : ancestorConcepts) {
+					numAncestors += conceptToPairs.get(ancestorConcept).size();
+				}
+			}	
+			numAncestors += pairs.size();			
+			if (!numAncestorsToTimes.containsKey(numAncestors))
+				numAncestorsToTimes.put(numAncestors, new ArrayList<Double>());			
+			docIdToNumAncestors.put(docId, numAncestors);
+			
+			int numAncestorAverage = numAncestors / pairs.size();
+			if (numAncestors % pairs.size() > pairs.size()/2)
+				numAncestorAverage++;
+			if (!numAncestorAverageToCount.containsKey(numAncestorAverage))
+				numAncestorAverageToCount.put(numAncestorAverage, 1);
+			else
+				numAncestorAverageToCount.put(numAncestorAverage, numAncestorAverageToCount.get(numAncestorAverage) + 1);
+		}
+		
+		for (Integer docId : docIdToNumAncestors.keySet()) {
+			numAncestorsToTimes.get(docIdToNumAncestors.get(docId)).add(docIdToRunningTime.get(docId));
+		}		
+		Map<Integer, Double> numAncestorsToTimeAverage = new HashMap<Integer, Double>();
+		for (Integer numAncestors : numAncestorsToTimes.keySet()) {
+			numAncestorsToTimeAverage.put(
+					numAncestors, 
+					numAncestorsToTimes.get(numAncestors).stream().collect(Collectors.averagingDouble(time -> time)));
+		}
+		outputIntegerToNumberMapToCsv(numAncestorsToTimeAverage, 
+				"src/main/resources/num_ancestor_to_time_average.csv", 
+				"# ancestor", "time average");
+		
+		outputIntegerToNumberMapToCsv(numAncestorAverageToCount, 
+				"src/main/resources/num_ancestor_average_to_count.csv", 
+				"# ancestor average", "count");
+		
+		System.out.println();
+	}
+
+	private static void outputIntegerToNumberMapToCsv(
+			Map<Integer, ? extends Number> keyToValue,
+			String outputPath,
+			String... titles) {
+		
+		List<Integer> sortedKeys = new ArrayList<Integer>(keyToValue.keySet());
+		Collections.sort(sortedKeys);
+		
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
+				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+			
+			if (titles.length > 0) {
+				for (int i = 0; i < titles.length; ++i)
+					writer.write(titles[i] + ",");
+				writer.newLine();
+			}
+			for (Integer key : sortedKeys) {
+				writer.write(key + ", " + keyToValue.get(key));
+				writer.newLine();
+				writer.flush();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private static Integer getNumDeweys(
+			List<ConceptSentimentPair> conceptSentimentPairs) {
+		Set<String> deweys = new HashSet<String>();
+		
+		for (ConceptSentimentPair pair : conceptSentimentPairs)
+			deweys.addAll(pair.getDeweys());
+		
+		return deweys.size();
+	}
+
 	private static void testSetInitFiniteDistances () {
 		Map<Integer, List<SentimentSet>> docToSentimentSets = 
 				TopPairsProgram.importDocToSentimentReviews(
@@ -848,6 +1278,8 @@ public class FiniteDistanceInitializer {
 						TopPairsProgram.RANDOMIZE_DOCS);
 		
 		for (Integer docId : docToConceptSentimentPairs.keySet()) {
+			if (docId == 1011725)
+				System.out.println();
 			List<ConceptSentimentPair> conceptSentimentPairs = docToConceptSentimentPairs.get(docId);
 			
 			List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
@@ -856,13 +1288,13 @@ public class FiniteDistanceInitializer {
 			pairs.add(root);
 			pairs.addAll(conceptSentimentPairs);
 			
-			long startTime = System.currentTimeMillis();
-			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistanceNew = initFiniteDistancesFromPairIndexToPairIndex(pairs, 0.3f);
-			Utils.printRunningTime(startTime, "New init");
+//			long startTime = System.currentTimeMillis();
+			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistanceNew = initFiniteDistancesFromPairIndexToPairIndex2(pairs, 0.3f);
+//			Utils.printRunningTime(startTime, "New init");
 	
-			startTime = System.currentTimeMillis();
+//			startTime = System.currentTimeMillis();
 			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = initDistances(pairs, 0.3f);
-			Utils.printRunningTime(startTime, "Old init");
+//			Utils.printRunningTime(startTime, "Old init");
 			
 			for (Integer facility : facilityToCustomerAndDistance.keySet()) {
 				for (Integer customer : facilityToCustomerAndDistance.get(facility).keySet()) {

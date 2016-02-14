@@ -73,7 +73,7 @@ public class RandomizedRounding {
 		} else {
 //			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = ILP.initDistances(pairs, threshold);	
 			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance = 
-					FiniteDistanceInitializer.initFiniteDistancesFromPairIndexToPairIndex(pairs, threshold);
+					FiniteDistanceInitializer.initFiniteDistancesFromPairIndexToPairIndex2(pairs, threshold);
 			statisticalResult.addPartialTime(
 					PartialTimeIndex.SETUP,
 					Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
