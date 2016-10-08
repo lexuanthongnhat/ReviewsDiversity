@@ -1,0 +1,5 @@
+numpy==1.11.1
+scipy==0.18.1
+scikit-learn==0.18
+testfixtures==4.10.1
+gensim==0.13.2
