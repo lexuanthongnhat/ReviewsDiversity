@@ -1,4 +1,4 @@
-package edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset;
+package edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.sentexp;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -138,6 +138,8 @@ public class SentimentExperiment {
 				predictedSentimentDir + "prediction_lasso.txt");
 		Map<Integer, Double> orderToSentimentTest = importSentimentFromRegression(
 				predictedSentimentDir + "prediction_bayesian_ridge.txt");
+		Map<Integer, Double> orderToSentimentTest2 = importSentimentFromRegression(
+				predictedSentimentDir + "prediction_elastic_net.txt");
 				
 		Map<Integer, Double> orderToSentimentCombinationWithRidge = new HashMap<Integer, Double>();
 		Map<Integer, Double> orderToSentimentCombinationWithLasso = new HashMap<Integer, Double>();
@@ -171,7 +173,8 @@ public class SentimentExperiment {
 		}
 		
 		Map<String, Map<Integer, Double>> methodToSentiments = new HashMap<>();
-		methodToSentiments.put("Dictionary", orderToSentimentDictionary);
+		String baseline = "Dictionary";
+		methodToSentiments.put(baseline, orderToSentimentDictionary);
 		methodToSentiments.put("Ridge", orderToSentimentRidge);
 		methodToSentiments.put("Lasso", orderToSentimentLasso);
 		methodToSentiments.put("Combination With Ridge", orderToSentimentCombinationWithRidge);
@@ -181,6 +184,7 @@ public class SentimentExperiment {
 		methodToSentiments.put("Predict As Media", orderToSentimentMedian);
 		methodToSentiments.put("Predict As " + Math.round(optimalSentiment), orderToOptimalSentiment);
 		methodToSentiments.put("Bayesian Ridge", orderToSentimentTest);
+		methodToSentiments.put("Elastic Net", orderToSentimentTest2);
 		
 		Map<String, ErrorStatistic> methodToErrorStats = methodToSentiments.entrySet().stream()
 				.collect(Collectors.toMap(
@@ -188,9 +192,11 @@ public class SentimentExperiment {
 						e -> new ErrorStatistic(calculateError(orderToSurveySentiment, e.getValue()))));
 		
 		StringBuilder outputCsvBuilder = new StringBuilder(
-				"Method, Absolute Error Mean, Absolute Error Standard Deviation\n");		
+				"Method, Absolute Error Mean, Absolute Error Standard Deviation, Compare to Dictionary (Mean)\n");
+		double baselineErrorMean = methodToErrorStats.get(baseline).mean;
 		methodToErrorStats.forEach((method, stats) -> outputCsvBuilder
-				.append(method + ", " + stats.mean + ", " + stats.sd + "\n"));		
+				.append(method + ", " + stats.mean + ", " + stats.sd 
+						+ ", " + (stats.mean / baselineErrorMean) + "\n"));		
 		
 		System.out.println(outputCsvBuilder.toString());
 		try (BufferedWriter writer = Files.newBufferedWriter(
@@ -310,29 +316,6 @@ public class SentimentExperiment {
 		for (Integer order : orderToSentiment.keySet()) {
 			errors.add(shortenSentiment(Math.abs(orderToSentiment.get(order)
 																 - orderToSurveySentiment.get(order))));
-		}
-		return errors;
-	}
-	
-	/**
-	 * Get the absolute error for each concept in sentence.
-	 * It means, an sentence (order) can have multiple words, each has a sentiment 
-	 * @param orderToSurveySentiments
-	 * @param orderToSentiment
-	 * @return errors: list of absolute errors
-	 */
-	private static List<Double> calculateErrorAtConceptLevel(
-			Map<Integer, List<Double>> orderToSurveySentiments,
-			Map<Integer, Double> orderToSentiment) {
-		
-		List<Double> errors = new ArrayList<Double>();
-		for (Integer order : orderToSentiment.keySet()) {
-			double sentencePrediction = orderToSentiment.get(order);
-			List<Double> sentenceErrors = orderToSurveySentiments.get(order).stream()
-					.map(error -> Math.abs(sentencePrediction - error))
-					.collect(Collectors.toList());
-			
-			errors.addAll(sentenceErrors);
 		}
 		return errors;
 	}

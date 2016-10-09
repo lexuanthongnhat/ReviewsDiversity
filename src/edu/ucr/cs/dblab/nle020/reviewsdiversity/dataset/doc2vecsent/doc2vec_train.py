@@ -49,30 +49,38 @@ sources = {
         review_dir + 'train-four-star-reviews.txt':'TRAIN_FOUR_STAR'}
 sentences = LabeledLineSentence(sources)
 
-# Setup doc2vec models
+# Setup doc2vec models 
+start_time = default_timer()
+num_dim = 400
 cores = multiprocessing.cpu_count()
 name_to_models = {
-        "dm_concat": Doc2Vec(dm=1, dm_concat=1, size=200, window=10,
-            sample=1e-4, hs=0, negative=5, min_count=2, workers=cores),
-        "dm_mean": Doc2Vec(dm=1, dm_mean=1, size=200, window=10,
-            sample=1e-4, hs=0, negative=5, min_count=2, workers=cores),
-        "dbow": Doc2Vec(dm=0, size=200, window=10,
+        "dm_concat": Doc2Vec(dm=1, dm_concat=1, size=num_dim, window=10,
             sample=1e-4, hs=0, negative=5, min_count=2, workers=cores)
+#        "dm_mean": Doc2Vec(dm=1, dm_mean=1, size=num_dim, window=10,
+#            sample=1e-4, hs=0, negative=5, min_count=2, workers=cores),
+#        "dbow": Doc2Vec(dm=0, size=num_dim, window=10,
+#            sample=1e-4, hs=0, negative=5, min_count=2, workers=cores)
         }
 
 name_to_models["dm_concat"].build_vocab(sentences.to_array())
-for name, model in name_to_models.iteritems():
-    if name != "dm_concat":
-        model.reset_from(name_to_models["dm_concat"])
+#for name, model in name_to_models.iteritems():
+#    if name != "dbow":
+#        model.reset_from(name_to_models["dbow"])
+print "Time to setup model's dataset: {} s".format(default_timer() - start_time)
 
 # Train doc2vec models
-num_epoch = 20
+num_epoch = 10
 start_time = default_timer()
+previous_epoch_time = default_timer()
 for name, model in name_to_models.iteritems():
     print "Training doc2vec using model {} . . .".format(name)
     for epoch in range(num_epoch):
     	sentences.sentences_perm()
     	model.train(sentences.sentences) 
+        current_epoch_time = default_timer()
+        print "Model {} finished epoch {} in {} s".format(name, epoch,
+                (current_epoch_time - previous_epoch_time))
+        previous_epoch_time = current_epoch_time
 
     print model.most_similar(positive=["great"])
     print "{} time: {} s".format(name, default_timer() - start_time)
