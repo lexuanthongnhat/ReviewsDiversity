@@ -160,7 +160,7 @@ public class SentimentExperiment {
 				(method, stat) -> outputCsvBuilder.append(method + ", " + stat.accuracy + ", " 
 																								  + (stat.accuracy / baselineAccuracy) + "\n"));
 		
-		System.out.println(outputCsvBuilder.toString());
+    outputEvaluationResult(predictedSentimentDir, "comparison_class.csv", outputCsvBuilder);
 	}
 
 	private static void evaluateAsContinuousSentiment(
@@ -189,8 +189,15 @@ public class SentimentExperiment {
 																									+ ", " + (stats.mean / baselineErrorMean)
 																									+ "\n"));		
 		
-		System.out.println(outputCsvBuilder.toString());
-		String fileName = "comparison_continuous.csv";
+		outputEvaluationResult(predictedSentimentDir, "comparison_continuous.csv", outputCsvBuilder);
+	}
+
+  private static void outputEvaluationResult(
+      String predictedSentimentDir,
+      String fileName,
+      StringBuilder outputCsvBuilder) {
+    
+    System.out.println(outputCsvBuilder.toString());
 		try (BufferedWriter writer = Files.newBufferedWriter(				
 				Paths.get(predictedSentimentDir + fileName), StandardOpenOption.CREATE)) {
 			writer.write(outputCsvBuilder.toString());
@@ -198,7 +205,7 @@ public class SentimentExperiment {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
+  }
 	
 	/**
 	 * Collect sentiment prediction of various methods 
