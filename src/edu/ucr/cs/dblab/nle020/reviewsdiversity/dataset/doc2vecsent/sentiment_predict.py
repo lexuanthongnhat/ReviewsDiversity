@@ -9,18 +9,19 @@ from gensim import utils
 from sklearn.linear_model import Ridge 
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import BayesianRidge
-from sklearn.linear_model import ElasticNet
+from sklearn.svm import LinearSVR
 
-INFER_STEPS = 5000
+
+INFER_STEPS = 9000
 
 model_dir = "./reviews/models/"
 start_time = default_timer()
 model_dbow = Doc2Vec.load(model_dir + 'model.dbow')
 model_dm_mean = Doc2Vec.load(model_dir + 'model.dm_mean')
 model_dm_concat = Doc2Vec.load(model_dir + "model.dm_concat")
-#model = ConcatenatedDoc2Vec([model_dm_mean, model_dbow, model_dm_concat])
+model = ConcatenatedDoc2Vec([model_dbow, model_dm_concat])
 #model = model_dm_mean
-model = model_dm_concat
+#model = model_dm_concat
 #model = model_dbow 
 
 num_one_star = 50000
@@ -58,9 +59,6 @@ for i in range(num_four_star):
     train_arrays[offset + i] = model.docvecs[prefix_train]
     train_labels[offset + i] = 3
 
-#print train_arrays
-#print train_labels
-
 # Test set
 start_time = default_timer()
 test_arrays = numpy.zeros((num_sentences, dimension))
@@ -73,23 +71,11 @@ with codecs.open(test_dir + "test-sentences.txt", encoding="utf-8") as test:
 print "Infer test sentences in {} s".format(default_timer() - start_time)
 #print test_arrays
 
-#test_arrays2 = numpy.zeros((num_sentences, dimension))
-#for i in range(num_sentences):
-#    prefix_test = 'TEST_SENTENCES_' + str(i)
-#    test_arrays2[i] = model.docvecs[prefix_test]
-#
-##print test_arrays2
-#for i in range(num_sentences):
-#    print "Infer {}: {}".format(i, test_arrays[i]) 
-#    print "Train {}: {}".format(i, test_arrays2[i])
-
 regression_models = {
         "lasso": Lasso(alpha=0.1, max_iter=10000),
         "ridge": Ridge(alpha=0.1, tol=0.0001),
         "bayesian_ridge": BayesianRidge(n_iter=10000),
-        "elastic_net": ElasticNet(alpha=0.1)
-        #"kernel_ridge": KernelRidge(alpha=0.1)
-        #"svr": LinearSVC()
+        "linear_svr": LinearSVR()
         }
 
 

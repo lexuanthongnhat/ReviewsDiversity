@@ -18,6 +18,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -55,11 +56,7 @@ public class SentimentExperiment {
 			this.sd = sd;
 		}
 		
-		public ErrorStatistic(List<Double> errors) {
-			
-			DoubleSummaryStatistics squareErrorStatistics = errors.stream().collect(
-					Collectors.summarizingDouble(error -> error * error));
-			// mean = Math.sqrt(squareErrorStatistics.getSum()) / errors.size();
+		public ErrorStatistic(List<Double> errors) {			
 			mean = errors.stream().collect(Collectors.averagingDouble(error -> error));
 			
 			sd = errors.stream().collect(Collectors
@@ -68,6 +65,23 @@ public class SentimentExperiment {
 		}
 	}
 	
+	private static class ClassAccuracyStatistic{
+		double accuracy;
+		
+		public ClassAccuracyStatistic (
+				Map<Integer, Double> orderToSurveyNormalizedSent,
+				Map<Integer, Double> orderToPredictedSent) {
+/*			double numMatch = orderToSurveyNormalizedSent.entrySet().stream().filter(
+					e -> e.getValue() == orderToPredictedSent.get(e.getKey()))
+					.count();*/
+			double numMatch = 0;
+			for (Integer order : orderToSurveyNormalizedSent.keySet()) {
+				if (orderToSurveyNormalizedSent.get(order).compareTo(orderToPredictedSent.get(order)) == 0)
+					numMatch++;
+			}
+			this.accuracy = numMatch / orderToSurveyNormalizedSent.size();
+		}
+	}
 	public static double median(List<Double> numbers) {
 		double median = 0.0d;
 		Collections.sort(numbers);
@@ -96,18 +110,114 @@ public class SentimentExperiment {
 		return mode;
 	}
 	
+	
 	public static void evaluateSurvey(String groundTruthSentimentDir, String predictedSentimentDir) {
 		Map<Integer, List<Double>> sentenceNumToSentiments = collectSurvey(groundTruthSentimentDir);
 		double krippendorffAlpha = krippendorffAlpha(sentenceNumToSentiments);
 		System.out.println("Krippendorf Alpha Coefficient is " + krippendorffAlpha);
 		
+		String baselineName = "Dictionary";
+		Map<String, String> nameToRegressors = new HashMap<>();
+		nameToRegressors.put("Ridge", "prediction_ridge.txt");
+		nameToRegressors.put("Lasso", "prediction_lasso.txt");
+		nameToRegressors.put("Bayesian Ridge", "prediction_bayesian_ridge.txt");
+		nameToRegressors.put("Linear SVR", "prediction_linear_svr.txt");
+		
+		evaluateAsContinuousSentiment(predictedSentimentDir, sentenceNumToSentiments, baselineName,
+				nameToRegressors);
+		evaluateAsNormalizedSentiment(predictedSentimentDir, sentenceNumToSentiments, baselineName,
+				nameToRegressors);
+	}
+	
+	private static void evaluateAsNormalizedSentiment(
+			String predictedSentimentDir,
+	    Map<Integer, List<Double>> sentenceNumToSentiments,
+	    String baselineName,
+	    Map<String, String> nameToRegressors) {
+		
+		System.out.println("Evaluating sentiment as normalizing number as class");
 		Map<Integer, Double> orderToSurveySentiment = collectAverageSurveySentiment(
 				sentenceNumToSentiments);
+		Map<Integer, Double> orderToSurveyNormalized = mapContinuousToNormalizedSent(
+				orderToSurveySentiment);
+		
+		Map<String, Map<Integer, Double>> methodToSentiments = collectMethodSentiments(
+				predictedSentimentDir, orderToSurveySentiment, baselineName, nameToRegressors);
+		Map<String, Map<Integer, Double>> methodToNormalizedSents = methodToSentiments.entrySet()
+				.stream().collect(Collectors.toMap(
+						e -> e.getKey(),
+						e -> mapContinuousToNormalizedSent(e.getValue())));
+		
+		Map<String, ClassAccuracyStatistic> methodToClassAccuracyStat = methodToNormalizedSents.entrySet()
+				.stream().collect(Collectors.toMap(
+						entry -> entry.getKey(),
+						entry -> new ClassAccuracyStatistic(orderToSurveyNormalized, entry.getValue())));
+		
+		StringBuilder outputCsvBuilder = new StringBuilder(
+				"Method, Accuracy, Compare to Dictionary\n");
+		double baselineAccuracy = methodToClassAccuracyStat.get(baselineName).accuracy;
+		methodToClassAccuracyStat.forEach(
+				(method, stat) -> outputCsvBuilder.append(method + ", " + stat.accuracy + ", " 
+																								  + (stat.accuracy / baselineAccuracy) + "\n"));
+		
+		System.out.println(outputCsvBuilder.toString());
+	}
+
+	private static void evaluateAsContinuousSentiment(
+			String predictedSentimentDir,
+	    Map<Integer, List<Double>> sentenceNumToSentiments,
+	    String baselineName,
+	    Map<String, String> nameToRegressors) {
+
+		System.out.println("Evaluating sentiment as continuous number");
+		Map<Integer, Double> orderToSurveySentiment = collectAverageSurveySentiment(
+				sentenceNumToSentiments);		
+		Map<String, Map<Integer, Double>> methodToSentiments = collectMethodSentiments(
+				predictedSentimentDir, orderToSurveySentiment, baselineName, nameToRegressors);
+		
+	
+		Map<String, ErrorStatistic> methodToErrorStats = methodToSentiments.entrySet().stream()
+				.collect(Collectors.toMap(
+						e -> e.getKey(),
+						e -> new ErrorStatistic(calculateAbsoluteError(orderToSurveySentiment, e.getValue()))));
+		
+		StringBuilder outputCsvBuilder = new StringBuilder(
+				"Method, Absolute Error Mean, Absolute Error Standard Deviation, Compare to Dictionary (Mean)\n");
+		double baselineErrorMean = methodToErrorStats.get(baselineName).mean;
+		methodToErrorStats.forEach(
+				(method, stats) -> outputCsvBuilder.append(method + ", " + stats.mean + ", " + stats.sd 
+																									+ ", " + (stats.mean / baselineErrorMean)
+																									+ "\n"));		
+		
+		System.out.println(outputCsvBuilder.toString());
+		String fileName = "comparison_continuous.csv";
+		try (BufferedWriter writer = Files.newBufferedWriter(				
+				Paths.get(predictedSentimentDir + fileName), StandardOpenOption.CREATE)) {
+			writer.write(outputCsvBuilder.toString());
+			System.out.println("Outputed comparison to: \"" + predictedSentimentDir + fileName + "\"");			
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * Collect sentiment prediction of various methods 
+	 * @param predictedSentimentDir
+	 * @param orderToSurveySentiment
+	 * @param baselineName
+	 * @param nameToRegressors
+	 * @return methodToSentiments: map name of method -> method's predictions (Map<Integer, Double>) 
+	 */
+	private static Map<String, Map<Integer, Double>> collectMethodSentiments(
+			String predictedSentimentDir,
+			Map<Integer, Double> orderToSurveySentiment,
+			String baselineName,
+			Map<String, String> nameToRegressors) {
 		
 		Map<Integer, Double> orderToSentimentMean = new HashMap<Integer, Double>();
 		Map<Integer, Double> orderToSentimentMedian = new HashMap<Integer, Double>();
 		Map<Integer, Double> orderToSentimentMode = new HashMap<Integer, Double>();
-
+	
 		List<Double> surveySentiments = new ArrayList<Double>(orderToSurveySentiment.values());
 		DoubleSummaryStatistics sentiStatistics = orderToSurveySentiment.values().stream().collect(
 				Collectors.summarizingDouble(sentiment -> sentiment));
@@ -132,27 +242,20 @@ public class SentimentExperiment {
 		}
 		
 		// Doc2Vec-based methods
-		Map<Integer, Double> orderToSentimentRidge = importSentimentFromRegression(
-				predictedSentimentDir + "prediction_ridge.txt");
-		Map<Integer, Double> orderToSentimentLasso = importSentimentFromRegression(
-				predictedSentimentDir + "prediction_lasso.txt");
-		Map<Integer, Double> orderToSentimentTest = importSentimentFromRegression(
-				predictedSentimentDir + "prediction_bayesian_ridge.txt");
-		Map<Integer, Double> orderToSentimentTest2 = importSentimentFromRegression(
-				predictedSentimentDir + "prediction_elastic_net.txt");
-				
-		Map<Integer, Double> orderToSentimentCombinationWithRidge = new HashMap<Integer, Double>();
-		Map<Integer, Double> orderToSentimentCombinationWithLasso = new HashMap<Integer, Double>();
-		for (Integer order : orderToSentimentDictionary.keySet()) {
-			double combination = (orderToSentimentRidge.get(order)
-					+ orderToSentimentDictionary.get(order)) / 2.0d;
-			orderToSentimentCombinationWithRidge.put(order, combination);
-			
-			combination = (orderToSentimentLasso.get(order)
-					+ orderToSentimentDictionary.get(order)) / 2.0d;
-			orderToSentimentCombinationWithLasso.put(order, combination);
-		}
+		Map<String, Map<Integer, Double>> regressorToSentiments = nameToRegressors.entrySet().stream()
+				.collect(Collectors.toMap(
+						entry -> entry.getKey(),
+						entry -> importSentimentFromRegression(predictedSentimentDir + entry.getValue())));
 
+		for (String regressor : nameToRegressors.keySet()) {
+			Map<Integer, Double> orderToSentiments = regressorToSentiments.get(regressor);
+			regressorToSentiments.put(
+					"Combination with " + regressor,
+					orderToSentiments.entrySet().stream().collect(Collectors.toMap(
+							e -> e.getKey(), 
+							e -> (e.getValue() + orderToSentimentDictionary.get(e.getKey())) / 2.0d)));
+		}
+				
 		// Predict by a fix number
 		double optimalSentiment = 0.0d;
 		Map<Integer, Double> orderToOptimalSentiment = new HashMap<>();
@@ -163,7 +266,7 @@ public class SentimentExperiment {
 				orderToLocalSentiment.put(order, staticSentiment);
 			}			
 			ErrorStatistic localError = new ErrorStatistic(
-					calculateError(orderToSurveySentiment, orderToLocalSentiment));
+					calculateAbsoluteError(orderToSurveySentiment, orderToLocalSentiment));
 			
 			if (localError.getMean() < optimalError.getMean()) {
 				optimalError = localError;
@@ -172,42 +275,21 @@ public class SentimentExperiment {
 			}
 		}
 		
+		// Predictions of every method
 		Map<String, Map<Integer, Double>> methodToSentiments = new HashMap<>();
-		String baseline = "Dictionary";
-		methodToSentiments.put(baseline, orderToSentimentDictionary);
-		methodToSentiments.put("Ridge", orderToSentimentRidge);
-		methodToSentiments.put("Lasso", orderToSentimentLasso);
-		methodToSentiments.put("Combination With Ridge", orderToSentimentCombinationWithRidge);
-		methodToSentiments.put("Combination With Lasso", orderToSentimentCombinationWithLasso);
+		methodToSentiments.put(baselineName, orderToSentimentDictionary);
+		
 		methodToSentiments.put("Predict As Mode", orderToSentimentMode);
 		methodToSentiments.put("Predict As Mean", orderToSentimentMean);
-		methodToSentiments.put("Predict As Media", orderToSentimentMedian);
+		methodToSentiments.put("Predict As Median", orderToSentimentMedian);
 		methodToSentiments.put("Predict As " + Math.round(optimalSentiment), orderToOptimalSentiment);
-		methodToSentiments.put("Bayesian Ridge", orderToSentimentTest);
-		methodToSentiments.put("Elastic Net", orderToSentimentTest2);
 		
-		Map<String, ErrorStatistic> methodToErrorStats = methodToSentiments.entrySet().stream()
-				.collect(Collectors.toMap(
-						e -> e.getKey(),
-						e -> new ErrorStatistic(calculateError(orderToSurveySentiment, e.getValue()))));
+		regressorToSentiments.forEach(
+				(name, orderToSentiments) -> methodToSentiments.put(name, orderToSentiments));		
 		
-		StringBuilder outputCsvBuilder = new StringBuilder(
-				"Method, Absolute Error Mean, Absolute Error Standard Deviation, Compare to Dictionary (Mean)\n");
-		double baselineErrorMean = methodToErrorStats.get(baseline).mean;
-		methodToErrorStats.forEach((method, stats) -> outputCsvBuilder
-				.append(method + ", " + stats.mean + ", " + stats.sd 
-						+ ", " + (stats.mean / baselineErrorMean) + "\n"));		
-		
-		System.out.println(outputCsvBuilder.toString());
-		try (BufferedWriter writer = Files.newBufferedWriter(
-				Paths.get(predictedSentimentDir + "comparison.csv"), StandardOpenOption.CREATE)) {
-			writer.write(outputCsvBuilder.toString());
-			System.out.println("Outputed comparison to: \"" + predictedSentimentDir + "comparison.csv\"");			
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		return methodToSentiments;
 	}
-	
+
 	/**
 	 * Collect sentences' sentiments from surveys
 	 * @param surveyFolder: where do surveys reside
@@ -308,7 +390,7 @@ public class SentimentExperiment {
 	 * @param orderToSentiment
 	 * @return errors: list of absolute errors
 	 */
-	private static List<Double> calculateError(
+	private static List<Double> calculateAbsoluteError(
 			Map<Integer, Double> orderToSurveySentiment,
 			Map<Integer, Double> orderToSentiment) {
 		
@@ -319,6 +401,7 @@ public class SentimentExperiment {
 		}
 		return errors;
 	}
+	
 	
 	private static Map<Integer, Double> importSentimentFromRegression(String sentimentPath) {
 		Map<Integer, Double> orderToPredictedSentiment = new HashMap<Integer, Double>();
@@ -376,5 +459,32 @@ public class SentimentExperiment {
 			sentiment = ratingToSentiment.get(ratingString);
 		
 		return sentiment;
+	}
+	
+	/**
+	 * Ex: map continuous sentiment 0.9 -> normalized sentiment 1.0
+	 * @param contSent
+	 * @return normalized sentiment
+	 */
+	private static double mapContinuousToNormalizedSent(double contSent) {
+		if (contSent >= 0.75)
+			return 1.0d;
+		else if (contSent >= 0.25)
+			return 0.5d;
+		else if (contSent >= -0.25)
+			return 0.0d;
+		else if (contSent >= -0.75)
+			return -0.5d;
+		else
+			return -1.0d;
+	}
+	
+	private static Map<Integer, Double> mapContinuousToNormalizedSent (
+			Map<Integer, Double> orderToContSentiment) {
+		return orderToContSentiment.entrySet().stream()
+				.collect(Collectors.toMap(
+						e -> e.getKey(),
+						e -> mapContinuousToNormalizedSent(e.getValue()))
+						);
 	}
 }
