@@ -57,7 +57,8 @@ public class TopPairsProgram {
 	
 	static boolean RANDOMIZE_DOCS = false;
 	private static int NUM_TRIALS = 20;
-	private static Set<Integer> randomIndices = Utils.randomIndices(1000, Constants.NUM_DOCTORS_TO_EXPERIMENT);
+	private static Set<Integer> randomIndices = Utils.randomIndices(1000,
+			Constants.NUM_DOCTORS_TO_EXPERIMENT);
 	private final static int NUM_DOCTORS_TO_EXPERIMENT = Constants.NUM_DOCTORS_TO_EXPERIMENT;
 	
 	private static final int ILP_INDEX = 0;

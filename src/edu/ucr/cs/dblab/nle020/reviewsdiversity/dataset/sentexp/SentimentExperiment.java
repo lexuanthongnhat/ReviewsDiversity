@@ -520,16 +520,14 @@ public class SentimentExperiment {
 		double max = 1.0d;
 		double min = -1.0d;
 		double rangeLength = (max - min) / numClass;
-		if (contSent >= max - rangeLength)
-			return 1.0d;
-		else if (contSent >= max - 2 * rangeLength)
-			return 0.5d;
-		else if (contSent >= max - 3 * rangeLength)
-			return 0.0d;
-		else if (contSent >= max - 4 * rangeLength)
-			return -0.5d;
-		else
-			return -1.0d;
+		double classDiff = (max - min) / (numClass - 1);
+		
+		for (int i = 0; i < numClass - 1; ++i) {
+			if (contSent >= max - (i + 1) * rangeLength)
+				return max - i * classDiff;
+		}
+		
+		return min;
 	}
 	
 	private static Map<Integer, Double> mapContinuousToNormalizedSent (

@@ -47,9 +47,7 @@ public class TopSetsBaseline {
 		}		
 		
 		return docToTopKSets;
-	}
-	
-	
+	}	
 	
 	public static int getK() {
 		return k;
