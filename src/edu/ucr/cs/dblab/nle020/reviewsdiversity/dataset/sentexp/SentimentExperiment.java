@@ -18,8 +18,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -68,12 +66,14 @@ public class SentimentExperiment {
 	private static class ClassAccuracyStatistic{
 		double accuracy;
 		
+		public ClassAccuracyStatistic (double accuracy) {
+			this.accuracy = accuracy;
+		}
+		
 		public ClassAccuracyStatistic (
 				Map<Integer, Double> orderToSurveyNormalizedSent,
 				Map<Integer, Double> orderToPredictedSent) {
-/*			double numMatch = orderToSurveyNormalizedSent.entrySet().stream().filter(
-					e -> e.getValue() == orderToPredictedSent.get(e.getKey()))
-					.count();*/
+
 			double numMatch = 0;
 			for (Integer order : orderToSurveyNormalizedSent.keySet()) {
 				if (orderToSurveyNormalizedSent.get(order).compareTo(orderToPredictedSent.get(order)) == 0)
@@ -123,9 +123,9 @@ public class SentimentExperiment {
 		nameToRegressors.put("Bayesian Ridge", "prediction_bayesian_ridge.txt");
 		nameToRegressors.put("Linear SVR", "prediction_linear_svr.txt");
 		
-		evaluateAsContinuousSentiment(predictedSentimentDir, sentenceNumToSentiments, baselineName,
-				nameToRegressors);
 		evaluateAsNormalizedSentiment(predictedSentimentDir, sentenceNumToSentiments, baselineName,
+				nameToRegressors);
+		evaluateAsContinuousSentiment(predictedSentimentDir, sentenceNumToSentiments, baselineName,
 				nameToRegressors);
 	}
 	
@@ -135,32 +135,46 @@ public class SentimentExperiment {
 	    String baselineName,
 	    Map<String, String> nameToRegressors) {
 		
-		System.out.println("Evaluating sentiment as normalizing number as class");
 		Map<Integer, Double> orderToSurveySentiment = collectAverageSurveySentiment(
-				sentenceNumToSentiments);
-		Map<Integer, Double> orderToSurveyNormalized = mapContinuousToNormalizedSent(
-				orderToSurveySentiment);
-		
+				sentenceNumToSentiments);		
 		Map<String, Map<Integer, Double>> methodToSentiments = collectMethodSentiments(
 				predictedSentimentDir, orderToSurveySentiment, baselineName, nameToRegressors);
-		Map<String, Map<Integer, Double>> methodToNormalizedSents = methodToSentiments.entrySet()
-				.stream().collect(Collectors.toMap(
-						e -> e.getKey(),
-						e -> mapContinuousToNormalizedSent(e.getValue())));
 		
-		Map<String, ClassAccuracyStatistic> methodToClassAccuracyStat = methodToNormalizedSents.entrySet()
-				.stream().collect(Collectors.toMap(
-						entry -> entry.getKey(),
-						entry -> new ClassAccuracyStatistic(orderToSurveyNormalized, entry.getValue())));
-		
-		StringBuilder outputCsvBuilder = new StringBuilder(
-				"Method, Accuracy, Compare to Dictionary\n");
-		double baselineAccuracy = methodToClassAccuracyStat.get(baselineName).accuracy;
-		methodToClassAccuracyStat.forEach(
-				(method, stat) -> outputCsvBuilder.append(method + ", " + stat.accuracy + ", " 
-																								  + (stat.accuracy / baselineAccuracy) + "\n"));
-		
-    outputEvaluationResult(predictedSentimentDir, "comparison_class.csv", outputCsvBuilder);
+		double[] numClasses = new double[]{3.0d, 5.0d};
+		for (double numClass : numClasses) {
+			System.out.println("Evaluating sentiment as normalizing number as "
+												 + (int) numClass + " class");
+
+			Map<Integer, Double> orderToSurveyNormalized = mapContinuousToNormalizedSent(
+					orderToSurveySentiment, numClass);
+			Map<String, Map<Integer, Double>> methodToNormalizedSents = methodToSentiments.entrySet()
+					.stream().collect(Collectors.toMap(
+							e -> e.getKey(),
+							e -> mapContinuousToNormalizedSent(e.getValue(), numClass)));
+			
+			// Predict by a fix number
+			double sentimentMax = 1.0d;
+			double sentimentMin = -1.0d;
+			double range = sentimentMax - sentimentMin;
+			optimalFixPrediction(orderToSurveyNormalized, methodToNormalizedSents,
+													 true, range / (numClass - 1));
+			
+			Map<String, ClassAccuracyStatistic> methodToClassAccuracyStat = methodToNormalizedSents.entrySet()
+					.stream().collect(Collectors.toMap(
+							entry -> entry.getKey(),
+							entry -> new ClassAccuracyStatistic(orderToSurveyNormalized, entry.getValue())));
+			
+			StringBuilder outputCsvBuilder = new StringBuilder(
+					"Method, Accuracy, Compare to Dictionary\n");
+			double baselineAccuracy = methodToClassAccuracyStat.get(baselineName).accuracy;
+			methodToClassAccuracyStat.forEach(
+					(method, stat) -> outputCsvBuilder.append(method + ", " + stat.accuracy + ", " 
+																									  + (stat.accuracy / baselineAccuracy) + "\n"));
+			
+	    outputEvaluationResult(predictedSentimentDir,
+	    											 "comparison_" + (int) numClass + "class.csv",
+	    											 outputCsvBuilder);
+		}
 	}
 
 	private static void evaluateAsContinuousSentiment(
@@ -175,6 +189,8 @@ public class SentimentExperiment {
 		Map<String, Map<Integer, Double>> methodToSentiments = collectMethodSentiments(
 				predictedSentimentDir, orderToSurveySentiment, baselineName, nameToRegressors);
 		
+		// Predict by a fix number
+		optimalFixPrediction(orderToSurveySentiment, methodToSentiments, false, 0.1d);
 	
 		Map<String, ErrorStatistic> methodToErrorStats = methodToSentiments.entrySet().stream()
 				.collect(Collectors.toMap(
@@ -190,6 +206,48 @@ public class SentimentExperiment {
 																									+ "\n"));		
 		
 		outputEvaluationResult(predictedSentimentDir, "comparison_continuous.csv", outputCsvBuilder);
+	}
+
+	private static void optimalFixPrediction(
+			Map<Integer, Double> orderToSurveySentiment,
+	    Map<String, Map<Integer, Double>> methodToSentiments,
+	    boolean sentimentAsClass,
+	    double sentimentStep) {
+		
+		double optimalSentiment = 0.0d;
+		Map<Integer, Double> orderToOptimalSentiment = new HashMap<>();
+		ErrorStatistic optimalError = new ErrorStatistic(10.0d, 10.0d);
+		ClassAccuracyStatistic classAccuracy = new ClassAccuracyStatistic(0.0d);
+		
+		for (double staticSentiment = -1.0d; staticSentiment <= 1.0d;
+				staticSentiment += sentimentStep) {
+			Map<Integer, Double> orderToLocalSentiment = new HashMap<>();
+			for (Integer order : orderToSurveySentiment.keySet()) {
+				orderToLocalSentiment.put(order, staticSentiment);
+			}
+			
+			if (sentimentAsClass) {
+				ClassAccuracyStatistic localAccuracy = new ClassAccuracyStatistic(
+						orderToSurveySentiment, orderToLocalSentiment);
+				
+				if (localAccuracy.accuracy > classAccuracy.accuracy) {
+					classAccuracy = localAccuracy;
+					optimalSentiment = staticSentiment;
+					orderToOptimalSentiment = orderToLocalSentiment;
+				}
+			} else {			
+				ErrorStatistic localError = new ErrorStatistic(
+						calculateAbsoluteError(orderToSurveySentiment, orderToLocalSentiment));
+				
+				if (localError.getMean() < optimalError.getMean()) {
+					optimalError = localError;
+					optimalSentiment = staticSentiment;
+					orderToOptimalSentiment = orderToLocalSentiment;
+				}
+			}
+		}
+		
+		methodToSentiments.put("Predict As " + Math.round(optimalSentiment), orderToOptimalSentiment);
 	}
 
   private static void outputEvaluationResult(
@@ -263,24 +321,7 @@ public class SentimentExperiment {
 							e -> (e.getValue() + orderToSentimentDictionary.get(e.getKey())) / 2.0d)));
 		}
 				
-		// Predict by a fix number
-		double optimalSentiment = 0.0d;
-		Map<Integer, Double> orderToOptimalSentiment = new HashMap<>();
-		ErrorStatistic optimalError = new ErrorStatistic(10.0d, 10.0d);		
-		for (double staticSentiment = -1.0d; staticSentiment <= 1.0d; staticSentiment += 0.1) {
-			Map<Integer, Double> orderToLocalSentiment = new HashMap<>();
-			for (Integer order : orderToSurveySentiment.keySet()) {
-				orderToLocalSentiment.put(order, staticSentiment);
-			}			
-			ErrorStatistic localError = new ErrorStatistic(
-					calculateAbsoluteError(orderToSurveySentiment, orderToLocalSentiment));
-			
-			if (localError.getMean() < optimalError.getMean()) {
-				optimalError = localError;
-				optimalSentiment = staticSentiment;
-				orderToOptimalSentiment = orderToLocalSentiment;
-			}
-		}
+
 		
 		// Predictions of every method
 		Map<String, Map<Integer, Double>> methodToSentiments = new HashMap<>();
@@ -289,7 +330,6 @@ public class SentimentExperiment {
 		methodToSentiments.put("Predict As Mode", orderToSentimentMode);
 		methodToSentiments.put("Predict As Mean", orderToSentimentMean);
 		methodToSentiments.put("Predict As Median", orderToSentimentMedian);
-		methodToSentiments.put("Predict As " + Math.round(optimalSentiment), orderToOptimalSentiment);
 		
 		regressorToSentiments.forEach(
 				(name, orderToSentiments) -> methodToSentiments.put(name, orderToSentiments));		
@@ -473,25 +513,28 @@ public class SentimentExperiment {
 	 * @param contSent
 	 * @return normalized sentiment
 	 */
-	private static double mapContinuousToNormalizedSent(double contSent) {
-		if (contSent >= 0.75)
+	private static double mapContinuousToNormalizedSent(double contSent, double numClass) {
+		double max = 1.0d;
+		double min = -1.0d;
+		double rangeLength = (max - min) / numClass;
+		if (contSent >= max - rangeLength)
 			return 1.0d;
-		else if (contSent >= 0.25)
+		else if (contSent >= max - 2 * rangeLength)
 			return 0.5d;
-		else if (contSent >= -0.25)
+		else if (contSent >= max - 3 * rangeLength)
 			return 0.0d;
-		else if (contSent >= -0.75)
+		else if (contSent >= max - 4 * rangeLength)
 			return -0.5d;
 		else
 			return -1.0d;
 	}
 	
 	private static Map<Integer, Double> mapContinuousToNormalizedSent (
-			Map<Integer, Double> orderToContSentiment) {
+			Map<Integer, Double> orderToContSentiment, double numClass) {
 		return orderToContSentiment.entrySet().stream()
 				.collect(Collectors.toMap(
 						e -> e.getKey(),
-						e -> mapContinuousToNormalizedSent(e.getValue()))
+						e -> mapContinuousToNormalizedSent(e.getValue(), numClass))
 						);
 	}
 }

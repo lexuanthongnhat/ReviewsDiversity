@@ -1,6 +1,7 @@
 import io 
 import codecs
 from timeit import default_timer
+from collections import OrderedDict
 
 import numpy
 from gensim.models import Doc2Vec 
@@ -14,69 +15,72 @@ from sklearn.svm import LinearSVR
 
 INFER_STEPS = 9000
 
+# Load models
 model_dir = "./reviews/models/"
-start_time = default_timer()
 model_dbow = Doc2Vec.load(model_dir + 'model.dbow')
 model_dm_mean = Doc2Vec.load(model_dir + 'model.dm_mean')
 model_dm_concat = Doc2Vec.load(model_dir + "model.dm_concat")
+
 model = ConcatenatedDoc2Vec([model_dbow, model_dm_concat])
 #model = model_dm_mean
 #model = model_dm_concat
 #model = model_dbow 
 
-num_one_star = 50000
-num_two_star = 50000
-num_three_star = 50000
-num_four_star = 50000
-num_total = num_one_star + num_two_star + num_three_star + num_four_star
-num_sentences = 110615
 
 # Training set
-dimension = model.docvecs['TRAIN_ONE_STAR_1'].shape[0]
+label_to_num = OrderedDict()    # Label to the number of label's sentences
+label_to_num[0] = 50000
+label_to_num[1] = 50000
+label_to_num[2] = 50000
+label_to_num[3] = 50000 
+label_to_train_tag = {
+        0: "TRAIN_ONE_STAR_",
+        1: "TRAIN_TWO_STAR_",
+        2: "TRAIN_THREE_STAR_",
+        3: "TRAIN_FOUR_STAR_"}
+
+dimension = model.docvecs['TRAIN_ONE_STAR_0'].shape[0]
+num_total = sum(label_to_num.values())
 train_arrays = numpy.zeros((num_total, dimension))
 train_labels = numpy.zeros(num_total)
 
-for i in range(num_one_star):
-    prefix_train = 'TRAIN_ONE_STAR_' + str(i)
-    train_arrays[i] = model.docvecs[prefix_train]
-    train_labels[i] = 0
+train_index = 0
+for label, num in label_to_num.iteritems():
+    print "sentiment label {}, number of sentences {}".format(label, num)
+    for i in range(num): 
+        train_arrays[i] = model.docvecs[label_to_train_tag[label] + str(i)]
+        train_labels[train_index] = label
+        train_index += 1 
 
-offset = num_one_star
-for i in range(num_two_star):
-    prefix_train = 'TRAIN_TWO_STAR_' + str(i)
-    train_arrays[offset + i] = model.docvecs[prefix_train]
-    train_labels[offset + i] = 1
-
-offset += num_two_star
-for i in range(num_three_star):
-    prefix_train = 'TRAIN_THREE_STAR_' + str(i)
-    train_arrays[offset + i] = model.docvecs[prefix_train]
-    train_labels[offset + i] = 2
-
-offset += num_three_star
-for i in range(num_four_star):
-    prefix_train = 'TRAIN_FOUR_STAR_' + str(i)
-    train_arrays[offset + i] = model.docvecs[prefix_train]
-    train_labels[offset + i] = 3
 
 # Test set
 start_time = default_timer()
+num_sentences = 110615
 test_arrays = numpy.zeros((num_sentences, dimension))
-test_sentences = []
-test_dir = "./reviews/"
-with codecs.open(test_dir + "all-sentences.txt", encoding="utf-8") as test:
+test_dir = "./reviews/all-sentences.txt"
+save_file = "./reviews/all-sentences"
+with codecs.open(test_dir, encoding="utf-8") as test:
+    percent_to_notify = 5
+    num_line_to_notify = num_sentences / (100 / percent_to_notify)
+
     for num, line in enumerate(test):
         line_words = utils.to_unicode(line).split()
         test_arrays[num] = model.infer_vector(line_words, steps=INFER_STEPS)
-print "Infer test sentences in {} s".format(default_timer() - start_time)
-#print test_arrays
 
-regression_models = {
+        if num % num_line_to_notify == 1:
+            print "Inferred {} sentences in {} s".format(num,
+                    default_timer() - start_time)
+
+print "Infer test sentences in {} s".format(default_timer() - start_time)
+#test_arrays = numpy.load(save_file + ".npy") 
+print test_arrays
+
+regression_models = { 
+        "lasso": Lasso(alpha=0.1, max_iter=10000),
         "ridge": Ridge(alpha=0.1, tol=0.0001),
         "bayesian_ridge": BayesianRidge(n_iter=10000),
         "linear_svr": LinearSVR()
         }
-
 
 output_dir = "../sentexp/predict/"
 for name, model in regression_models.iteritems():
@@ -91,3 +95,5 @@ for name, model in regression_models.iteritems():
 
     print "Running time of {} is: {} s".format(name,
                                                default_timer() - start_time) 
+
+numpy.save(save_file, test_arrays)
