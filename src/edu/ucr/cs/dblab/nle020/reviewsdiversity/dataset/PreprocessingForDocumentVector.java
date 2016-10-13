@@ -15,14 +15,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.CopyOnWriteArrayList;
-
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
@@ -31,8 +28,8 @@ import edu.ucr.cs.dblab.nle020.utils.Utils;
 public class PreprocessingForDocumentVector {
 	public final static String DOC_TO_REVIEWS_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\doc_pairs_1_prunned.txt";
 	public final static String FULL_REVIEWS_PATH = "D:\\reviews.csv";
-	public final static String PYTHON_WORKSPACE = "D:\\UCR Google Drive\\python_workspace\\doc_reviews\\";
-	public final static String PYTHON_WORKSPACE_FULL = "D:\\UCR Google Drive\\python_workspace\\doc_reviews_full\\";
+	public final static String PYTHON_WORKSPACE =
+	    "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/doc2vecsent/reviews/";	
 	public final static int TRAINING_SIZE = 50000;
 	public final static int SAMPLE_SIZE = 100;
 
@@ -147,47 +144,8 @@ public class PreprocessingForDocumentVector {
 		}		
 	}
 
-	private static void outputingStandardReviews() {
-		Map<Integer, List<SentimentReview>> docToSentimentReviews = new HashMap<Integer, List<SentimentReview>>();		
-		docToSentimentReviews = importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, Constants.NUM_DOCTORS_TO_EXPERIMENT);
-		
-		List<SentimentReview> positiveReviews = new ArrayList<SentimentReview>();
-		List<SentimentReview> negativeReviews = new ArrayList<SentimentReview>();
-		
-		List<SentimentSentence> sentences = new ArrayList<SentimentSentence>();
-		Map<Integer, SentimentSentence> orderToSentences = new HashMap<Integer, SentimentSentence>();
-		int sentenceCount = 0;
-		
-		for (List<SentimentReview> sentimentReviews : docToSentimentReviews.values()) {
-			for (SentimentReview review : sentimentReviews) {
-				if (review.getRawReview().getRate() > 50)
-					positiveReviews.add(review);
-				else
-					negativeReviews.add(review);
-				
-				for (SentimentSentence sentence : review.getSentences()) {
-					if (sentence.getPairs().size() > 0) {
-						sentences.add(sentence);
-						orderToSentences.put(sentenceCount, sentence);
-						++sentenceCount;
-					}
-				}
-			}
-		}
-		
-		
-		outputReviewsToFile(positiveReviews, PYTHON_WORKSPACE + "train-pos-reviews.txt");
-		outputReviewsToFile(negativeReviews, PYTHON_WORKSPACE + "train-neg-reviews.txt");
-		
-		outputSentencesToFile(sentences, PYTHON_WORKSPACE + "test-sentences.txt");
-		outputOrderToSentence(orderToSentences, PYTHON_WORKSPACE + "order-to-sentence.txt");		
-		
-		System.out.println("# pos_reviews: " + positiveReviews.size() + ", # neg_reviews: " + negativeReviews.size() +
-				", # sentences: " + sentences.size());
-	}
-	
 	// Make sure: each conceptSentimentPair of a SentimentReview has an unique hashcode
-	public static Map<Integer, List<SentimentReview>> importDocToSentimentReviews(String path, int numDoctorsToExperiment) {
+	private static Map<Integer, List<SentimentReview>> importDocToSentimentReviews(String path, int numDoctorsToExperiment) {
 		Map<Integer, List<SentimentReview>> result = new HashMap<Integer, List<SentimentReview>>();
 		
 		ObjectMapper mapper = new ObjectMapper();		
@@ -261,26 +219,6 @@ public class PreprocessingForDocumentVector {
 		}		
 	}
 
-	private static void outputReviewsToFile(
-			List<SentimentReview> reviews, String outputPath) {
-/*		try {
-			Files.deleteIfExists(Paths.get(outputPath));
-		} catch (IOException e) {
-			e.printStackTrace();
-		}	*/	
-		
-		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath),
-				StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-			for (SentimentReview review : reviews) {
-				writer.append(normalizeText(review.getRawReview().getBody()));
-				writer.newLine();
-			}
-		} catch (IOException e) {			
-			e.printStackTrace();
-		}
-		
-	}
-	
 	private static String normalizeText(String text) {
 		String normalized = text.toLowerCase();
 	

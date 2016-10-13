@@ -18,6 +18,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -33,12 +34,14 @@ import edu.ucr.cs.dblab.nle020.stats.KrippendorffAlpha.DataValueType;
 
 public class SentimentExperiment {
 
+  public static String PREDICTED_SENTIMENT_DIR =
+      "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/sentexp/predict/";
+  
 	public static void main(String[] args) {
-    String predictedSentimentDir =
-        "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/sentexp/predict/";
+
     String groundTruthSentimentDir =
     		"src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/sentexp/survey/";
-		evaluateSurvey(groundTruthSentimentDir, predictedSentimentDir);
+		evaluateSurvey(groundTruthSentimentDir, PREDICTED_SENTIMENT_DIR);
 	}
 	
 	private static class ErrorStatistic{
@@ -450,7 +453,7 @@ public class SentimentExperiment {
 	}
 	
 	
-	private static Map<Integer, Double> importSentimentFromRegression(String sentimentPath) {
+	public static Map<Integer, Double> importSentimentFromRegression(String sentimentPath) {
 		Map<Integer, Double> orderToPredictedSentiment = new HashMap<Integer, Double>();
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(sentimentPath))) {
 			String line;

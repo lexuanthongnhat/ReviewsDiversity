@@ -61,9 +61,9 @@ do for [xaxis in "0 1"] {
 				set output folder . subfolder . "main_" . filename . ".pdf"
 				plot folder . subfolder . filename . '.csv' using 1:8 title column with lines ls 1, \
 					'' u 1:9 title column with lines ls 2, \
-					'' u 1:10 title column with lines ls 3, \
-					'' u 1:11 title column with lines, \
-					'' u 1:12 title column with lines
+					'' u 1:10 title column with lines ls 3
+#					'' u 1:11 title column with lines, \
+#					'' u 1:12 title column with lines
 			}
 		}
 	}
