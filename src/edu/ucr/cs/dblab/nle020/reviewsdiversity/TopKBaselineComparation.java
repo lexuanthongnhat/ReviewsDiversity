@@ -31,9 +31,6 @@ public class TopKBaselineComparation {
 		long startTime = System.currentTimeMillis();
 		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = 
 				importConceptSentimentPairDataset(TopPairsProgram.DOC_TO_REVIEWS_PATH);
-				
-		//int conceptDistanceThreshold = 3;
-		//float sentimentDistanceThreshold = 0.3f;
 		
 		int[] conceptDistanceThresholds = new int[] {1, 2, 3, 4};
 		float[] sentimentDistanceThresholds = new float[] {0.1f, 0.2f, 0.3f, 0.4f};
@@ -74,12 +71,14 @@ public class TopKBaselineComparation {
 					double baselineCoverage = evaluating(docToConceptSentimentPairDataset, docIds, 
 							conceptDistanceThreshold, sentimentDistanceThreshold, docToTopSentencesBaseline);
 					
-					outputString = outputString + k + "," + ilpCoverage + "," + rrCoverage + "," + greedyCoverage 
-							+ "," + baselineCoverage + "\n";
+					outputString = outputString + k + "," + ilpCoverage + ","
+					               + rrCoverage + "," + greedyCoverage + "," + baselineCoverage + "\n";
 				}
 
-				String outputPath = sourceInputFolder + "baseline\\comparison_distance" 
-						+ conceptDistanceThreshold + "_sentiment" + ((int) 10*sentimentDistanceThreshold) + ".csv";
+				String outputPath = sourceInputFolder
+				    + "baseline\\comparison_distance" 
+						+ conceptDistanceThreshold + "_sentiment" + ((int) 10*sentimentDistanceThreshold)
+						+ ".csv";
 				try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
 						StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 					writer.write(outputString);
@@ -102,17 +101,19 @@ public class TopKBaselineComparation {
 			int conceptDistanceThreshold, float sentimentDistanceThreshold,
 			Map<Integer, List<SentimentSentence>> docToTopSentences) {
 
-		List<Double> coverages = new ArrayList<Double>();
+		List<Double> coverages = new ArrayList<>();
 		for (Integer docId : docIds) {
 			double datasetSize = docToConceptSentimentPairDataset.get(docId).size();
 			
-			List<ConceptSentimentPair> uncoveredPairs = new ArrayList<ConceptSentimentPair>();
+			List<ConceptSentimentPair> uncoveredPairs = new ArrayList<>();
 			uncoveredPairs.addAll(docToConceptSentimentPairDataset.get(docId));
 			
-			Set<ConceptSentimentPair> hostingPairs = new HashSet<ConceptSentimentPair>();
-			docToTopSentences.get(docId).stream().forEach(sentence -> hostingPairs.addAll(sentence.getPairs()));
+			Set<ConceptSentimentPair> hostingPairs = new HashSet<>();
+			docToTopSentences.get(docId).stream().forEach(
+			    sentence -> hostingPairs.addAll(sentence.getPairs()));
 			for (ConceptSentimentPair hostingPair : hostingPairs) {
-				uncoveredPairs.removeIf(pair -> isCoverable(hostingPair, pair, conceptDistanceThreshold, sentimentDistanceThreshold));
+				uncoveredPairs.removeIf(pair -> isCoverable(hostingPair, pair, conceptDistanceThreshold,
+				                                                               sentimentDistanceThreshold));
 			}
 			
 			coverages.add(1.0f - (double) uncoveredPairs.size() / datasetSize);
@@ -168,27 +169,32 @@ public class TopKBaselineComparation {
 	}
 
 
-	private static Map<Integer, List<ConceptSentimentPair>> importConceptSentimentPairDataset(String docToReviewsPath) {
-		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = new HashMap<Integer, List<ConceptSentimentPair>>();
-		Map<Integer, List<SentimentSet>> docToSentences = TopPairsProgram.importDocToSentimentSentences(docToReviewsPath, false);
+	private static Map<Integer, List<ConceptSentimentPair>> importConceptSentimentPairDataset(
+	    String docToReviewsPath) {
+	  
+		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = new HashMap<>();
+		Map<Integer, List<SentimentSet>> docToSentences =
+		    TopPairsProgram.importDocToSentimentSentences(docToReviewsPath, false);
 		
 		for (Integer docId : docToSentences.keySet()) {
-			docToConceptSentimentPairDataset.put(docId, new ArrayList<ConceptSentimentPair>());
-			docToSentences.get(docId).stream().
-				forEach(sentence -> docToConceptSentimentPairDataset.get(docId).addAll(sentence.getPairs()));
+			docToConceptSentimentPairDataset.put(docId, new ArrayList<>());
+			docToSentences.get(docId).stream().forEach(
+			    sentence -> docToConceptSentimentPairDataset.get(docId).addAll(sentence.getPairs()));
 		}
 		
 		return docToConceptSentimentPairDataset;
 	}
 
 
-	private static Map<Integer, List<SentimentSentence>> importDocToSentimentSentencesFromJson(String inputPath) {
-		Map<Integer, List<SentimentSentence>> result = new HashMap<Integer, List<SentimentSentence>>();
-		
+	private static Map<Integer, List<SentimentSentence>> importDocToSentimentSentencesFromJson(
+	    String inputPath) {
+	  
+		Map<Integer, List<SentimentSentence>> result = new HashMap<>();		
 		ObjectMapper mapper = new ObjectMapper();
 		
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(inputPath))) {
-			result = mapper.readValue(reader, new TypeReference<Map<Integer, List<SentimentSentence>>>() {	});
+			result = mapper.readValue(reader,
+			    new TypeReference<Map<Integer, List<SentimentSentence>>>() {	});
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

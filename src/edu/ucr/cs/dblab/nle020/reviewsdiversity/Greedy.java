@@ -22,8 +22,10 @@ public class Greedy {
 
 	protected FullPair root = new FullPair(Constants.ROOT_CUI);
 	
-	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
-	protected ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
+	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult =
+	    new ConcurrentHashMap<>();
+	protected ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult =
+	    new ConcurrentHashMap<>();
 	
 	public Greedy(int k, float threshold,
 			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
@@ -53,7 +55,7 @@ public class Greedy {
 		//initPairs(conceptSentimentPairs, pairs, statisticalResult);
 		FiniteDistanceInitializer.initFullPairs(conceptSentimentPairs, pairs, statisticalResult);
 		
-		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<FullPair, Map<FullPair, Integer>>();	
+		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<>();	
 		if (Constants.DEBUG_MODE)
 			initDistances(conceptSentimentPairs, distances, pairs);
 				
@@ -80,7 +82,8 @@ public class Greedy {
 			checkResult(topK, distances, statisticalResult);
 		
 		startPartialTime = System.nanoTime();
-		List<ConceptSentimentPair> topKPairsResult = convertTopKFullPairsToTopKPairs(conceptSentimentPairs, topK);
+		List<ConceptSentimentPair> topKPairsResult = convertTopKFullPairsToTopKPairs(
+		    conceptSentimentPairs, topK);
 		statisticalResult.addPartialTime(
 				PartialTimeIndex.GET_TOPK, 
 				Utils.runningTimeInMs(
@@ -130,7 +133,8 @@ public class Greedy {
 				FullPair other = fullPairs.get(j);
 				int distance = Constants.INVALID_DISTANCE;
 				
-				distance = conceptSentimentPairs.get(i).calculateDistance(conceptSentimentPairs.get(j), threshold);
+				distance = conceptSentimentPairs.get(i).calculateDistance(conceptSentimentPairs.get(j),
+				                                                          threshold);
 									
 				// "pair" is the ancestor of "other"
 				if (distance > 0 && distance != Constants.INVALID_DISTANCE) {
@@ -148,7 +152,9 @@ public class Greedy {
 	}
 	
 	@SuppressWarnings("unused")
-	private void initNumPotentialUsefulCover(StatisticalResult result, List<ConceptSentimentPair> conceptSentimentPairs) {
+	private void initNumPotentialUsefulCover(StatisticalResult result,
+	    List<ConceptSentimentPair> conceptSentimentPairs) {
+	  
 		for (int i = 0; i < conceptSentimentPairs.size() - 1; ++i) {
 			ConceptSentimentPair pair1 = conceptSentimentPairs.get(i);
 			for (int j = i + 1; j < conceptSentimentPairs.size(); ++j) {
@@ -163,7 +169,8 @@ public class Greedy {
 	}
 	
 	@SuppressWarnings("unused")
-	private void initNumPotentialUsefulCoverWithThreshold(StatisticalResult result, List<FullPair> fullPairs) {
+	private void initNumPotentialUsefulCoverWithThreshold(StatisticalResult result,
+	    List<FullPair> fullPairs) {
 		for (FullPair pair : fullPairs) {
 			if (pair.getCustomerMap() != null) {
 				for (FullPair customer : pair.getCustomerMap().keySet()) {

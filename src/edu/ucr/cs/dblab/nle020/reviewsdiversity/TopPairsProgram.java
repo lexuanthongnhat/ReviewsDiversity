@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -81,30 +82,33 @@ public class TopPairsProgram {
 		long startTime = System.currentTimeMillis();
 //		getDatasetStatistics();
 //		examineProblemSizes();
+		
+		List<Integer> kSet = Arrays.asList(3);
+//		List<Float> thresholdSet = Arrays.asList(2.0f);
+//		List<Float> thresholdSet = Arrays.asList(0.3f, 0.4f, 0.5f, 0.6f);
+		List<Float> thresholdSet = new ArrayList<>();
+		for (float thres = 0.1f; thres < 2.05; thres += 0.1f) {
+		  thresholdSet.add(thres);
+		}		
+		
+//		topPairsExperiment(kSet, thresholdSet);
+//    topSetsExperiment(kSet, thresholdSet, SetOption.SENTENCE);
 
-		topPairsExperiment();
-//		topSetsExperiment(SetOption.REVIEW);
-//		topSetsExperiment(SetOption.SENTENCE);
+		topSetsExperiment(kSet, thresholdSet, SetOption.REVIEW);
 
 //		topPairsSyntheticExperiment();
 		Utils.printRunningTime(startTime, "Finished evaluation");
-j}
+}
 
-	private static void topPairsExperiment()
+	private static void topPairsExperiment(List<Integer> kSet, List<Float> thresholdSet)
 			throws InterruptedException, ExecutionException, IOException {
 
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();
 
-		// TODO - the first "3" is always slower than the other numbers
-//		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-		int[] ks = new int[] {3, 10, 15};
-//		float[] thresholds = new float[] {0.1f, 0.3f};
-		float[] thresholds = new float[] {0.3f};
-
-		for (int numChoosen : ks) {
+		for (int numChoosen : kSet) {
 			k = numChoosen;
-			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
-				threshold = thresholds[thresh];
+			for (float thres : thresholdSet) {
+			  threshold = thres;
 
 				String subFolder = "top_pair/k" + k + "_threshold" + threshold + "/";
 				if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder)))
@@ -114,10 +118,65 @@ j}
 			}
 		}
 
-		outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER, "top-pair");
+		outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER + "/top_pair/", "top_pair");
+		outputThresholdAndCostToCSV(statisticalResults, OUTPUT_FOLDER + "cost_threshold/", "top_pair");
 	}
 
-	/**
+	private static void outputThresholdAndCostToCSV(List<StatisticalResult[]> statisticalResults,
+	    String outputFolder, String fileNamePrefix) throws IOException {
+    
+	  if (!Files.exists(Paths.get(outputFolder))) {
+	    Files.createDirectories(Paths.get(outputFolder));
+	  }
+    
+	  List<Map<Integer, List<StatisticalResult>>> kToResultsOfMethods = new ArrayList<>();
+	  for (int i = 0; i < 3; ++i)
+	    kToResultsOfMethods.add(new HashMap<>());
+	  for (StatisticalResult[] results : statisticalResults) {
+	    for (int i = 0; i < 3; ++i) {
+	      Map<Integer, List<StatisticalResult>> kToResults = kToResultsOfMethods.get(i);
+	      StatisticalResult result = results[i];
+	      
+	      Integer numSelected = result.getK();
+	      if (!kToResults.containsKey(numSelected))
+	        kToResults.put(numSelected, new ArrayList<>());
+	      kToResults.get(numSelected).add(result);
+	    }	    
+	  }
+	  
+	  for (int i = 0; i < 3; ++i) {
+	    String methodPrefix = "";
+	    switch(i) {
+	    case ILP_INDEX:
+	      methodPrefix = "ilp_";
+	      break;
+	    case RR_INDEX:
+	      methodPrefix = "rr_";
+        break;
+	    case GREEDY_INDEX:
+        methodPrefix = "greedy_";
+        break;
+	    }
+	   
+      Map<Integer, List<StatisticalResult>> kToResults = kToResultsOfMethods.get(i);
+      for (Integer num : kToResults.keySet()) {
+        StringBuilder sb = new StringBuilder();
+        for (StatisticalResult result : kToResults.get(num)) {
+          sb.append(result.getThreshold() + ", " + result.getFinalCost() + "\n");          
+        }
+        
+        BufferedWriter writer = Files.newBufferedWriter(
+            Paths.get(outputFolder + fileNamePrefix + "_" + methodPrefix + "k" + num + ".csv"),
+            StandardOpenOption.CREATE,
+            StandardOpenOption.APPEND);
+        writer.write(sb.toString());
+        writer.flush();
+        writer.close();
+      }
+	  }
+  }
+
+  /**
 	 *
 	 * @param outputFolder
 	 * @return array of size 3 of average result for 3 algorithms, also output csv file
@@ -269,8 +328,8 @@ j}
  * 				docToTopPairsResultRR, docToTopKPairsResultRR);
 		outputResultToJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);*/
 
-		String outputPath = OUTPUT_FOLDER + "synthetic_k" + k + "_threshold" + threshold
-				+ "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
+		String outputPath = OUTPUT_FOLDER + "synthetic_k" + k + "_threshold"
+		    + Math.round(threshold) / 10f	+ "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = false;
 		outputStatisticalResultToExcel(outputPath, isSet,
 				docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
@@ -278,19 +337,19 @@ j}
 		Utils.printRunningTime(startTime, "Finished Top Pairs Synthetic", true);
 	}
 
-	private static void topSetsExperiment(SetOption setOption) throws IOException {
+	private static void topSetsExperiment(
+	    List<Integer> kSet, List<Float> thresholdSet, SetOption setOption) throws IOException {
+	  
 		List<StatisticalResult[]> statisticalResults = new ArrayList<StatisticalResult[]>();
-
-		int[] ks = new int[] {3, 3, 5, 10, 15, 20};
-//		int[] ks = new int[] {3, 10};
-//		float[] thresholds = new float[] {0.1f, 0.3f};
-		float[] thresholds = new float[] {0.3f};
-		for (int numChoosen : ks) {
+		String setName = setOption.toString().toLowerCase();
+		
+		for (int numChoosen : kSet) {
 			k = numChoosen;
-			for (int thresh = 0; thresh < thresholds.length; ++thresh) {
-				threshold = thresholds[thresh];
-
-				String subFolder = "Top " + setOption + "\\k" + k + "_threshold" + threshold + "\\";
+			for (float thres : thresholdSet) {
+				threshold = thres;
+				
+				String subFolder = "top_" + setName + "/k" + k + "_threshold"
+				                   + Math.round(threshold * 10) / 10.0f + "/";
 
 				if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder)))
 					Files.createDirectories(Paths.get(OUTPUT_FOLDER + subFolder));
@@ -299,7 +358,10 @@ j}
 			}
 		}
 
-		outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER, "top-" + setOption.toString().toLowerCase());
+		outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER + "top_" + setName + "/",
+		    "top_" + setName);
+    outputThresholdAndCostToCSV(statisticalResults, OUTPUT_FOLDER +
+        "cost_threshold/", "top_" + setName);
 	}
 
 	private static StatisticalResult[] topSetsExperiment(SetOption setOption, String outputFolder) {
@@ -372,7 +434,7 @@ j}
 		}
 
 		String outputPath = outputFolder + "review_diversity_" + setOption +
-										"_k" + k + "_threshold" + threshold + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
+										"_k" + k + "_threshold" + Math.round(threshold) / 10f + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
 		boolean isSet = true;
 		outputStatisticalResultToExcel(outputPath, isSet,
 				docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
@@ -1369,15 +1431,17 @@ j}
 		double[] getKTimeSum = new double[] {0, 0, 0};
 		double rrTime = 0;
 		for (Integer docId : docToStatisticalResultGreedy.keySet()) {
-			if (docToStatisticalResultILP.containsKey(docId) && docToStatisticalResultRR.containsKey(docId)) {
+			if (docToStatisticalResultILP.containsKey(docId)
+			    && docToStatisticalResultRR.containsKey(docId)) {
+			  
 				++count;
-				costSum[GREEDY_INDEX] 	+= docToStatisticalResultGreedy.get(docId).getFinalCost();
-				costSum[ILP_INDEX] 		+= docToStatisticalResultILP.get(docId).getFinalCost();
-				costSum[RR_INDEX]		+= docToStatisticalResultRR.get(docId).getFinalCost();
+				costSum[GREEDY_INDEX] += docToStatisticalResultGreedy.get(docId).getFinalCost();
+				costSum[ILP_INDEX] += docToStatisticalResultILP.get(docId).getFinalCost();
+				costSum[RR_INDEX]	+= docToStatisticalResultRR.get(docId).getFinalCost();
 
-				runningTimeSum[GREEDY_INDEX] 	+= docToStatisticalResultGreedy.get(docId).getRunningTime();
-				runningTimeSum[ILP_INDEX] 		+= docToStatisticalResultILP.get(docId).getRunningTime();
-				runningTimeSum[RR_INDEX]		+= docToStatisticalResultRR.get(docId).getRunningTime();
+				runningTimeSum[GREEDY_INDEX] += docToStatisticalResultGreedy.get(docId).getRunningTime();
+				runningTimeSum[ILP_INDEX] += docToStatisticalResultILP.get(docId).getRunningTime();
+				runningTimeSum[RR_INDEX] += docToStatisticalResultRR.get(docId).getRunningTime();
 
 				setupTimeSum[GREEDY_INDEX]
 						+= docToStatisticalResultGreedy.get(docId).getPartialTime(PartialTimeIndex.SETUP);
@@ -1408,7 +1472,9 @@ j}
 		}
 
 		StatisticalResult[] statisticalResults = new StatisticalResult[3];
-		statisticalResults[GREEDY_INDEX] 	= new StatisticalResult(k, threshold, costSum[GREEDY_INDEX] / count,
+		statisticalResults[GREEDY_INDEX] = new StatisticalResult(
+		    k, threshold,
+		    costSum[GREEDY_INDEX] / count,
 				Utils.rounding(runningTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
 		statisticalResults[GREEDY_INDEX].addPartialTime(PartialTimeIndex.SETUP,
 				Utils.rounding(setupTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
@@ -1417,7 +1483,7 @@ j}
 		statisticalResults[GREEDY_INDEX].addPartialTime(PartialTimeIndex.GET_TOPK,
 				Utils.rounding(getKTimeSum[GREEDY_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
 
-		statisticalResults[ILP_INDEX] 		= new StatisticalResult(k, threshold, costSum[ILP_INDEX] / count,
+		statisticalResults[ILP_INDEX] = new StatisticalResult(k, threshold, costSum[ILP_INDEX] / count,
 				Utils.rounding(runningTimeSum[ILP_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
 		statisticalResults[ILP_INDEX].addPartialTime(PartialTimeIndex.SETUP,
 				Utils.rounding(setupTimeSum[ILP_INDEX] / count, Constants.NUM_DIGITS_IN_TIME));
@@ -1443,8 +1509,12 @@ j}
 
 	private static void outputSummaryStatisticsToCSV(
 			List<StatisticalResult[]> statisticalResults,
-			String finalOutputFolder, String fileNamePrefix) {
+			String finalOutputFolder, String fileNamePrefix) throws IOException {
 
+	  if (!Files.exists(Paths.get(finalOutputFolder))) {
+	    Files.createDirectory(Paths.get(finalOutputFolder));
+	  }
+	  
 		Map<Float, List<StatisticalResult[]>> thresholdToStatisticalResults = new HashMap<>();
 		statisticalResults.stream().forEach(statistics -> {
 			Float threshold = statistics[GREEDY_INDEX].getThreshold();
@@ -1455,17 +1525,14 @@ j}
 
 		for (Float threshold : thresholdToStatisticalResults.keySet()) {
 			int modifiedThresholdForLatexName = (int) (threshold * 10);
-			String fileName = finalOutputFolder + fileNamePrefix + "-" + modifiedThresholdForLatexName + ".csv";
+			String fileName = finalOutputFolder + fileNamePrefix + "_" + modifiedThresholdForLatexName
+			                  + ".csv";
 			String content = prepareCSVSummary(thresholdToStatisticalResults.get(threshold));
 
-			try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileName),
-					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
-
-				writer.write(content);
-				writer.flush();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileName),
+					StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+			writer.write(content);
+			writer.flush();
 		}
 
 		System.err.println("Summaries was outputed to \"" + finalOutputFolder + "\"");
@@ -1478,7 +1545,8 @@ j}
 				+ "Greedy Setup, Greedy Main, Greedy GetK\n";
 
 		int i = 0;
-		if (resultsList.get(0)[GREEDY_INDEX].getK() == resultsList.get(1)[GREEDY_INDEX].getK())
+		if (resultsList.size() >= 2 
+		    && resultsList.get(0)[GREEDY_INDEX].getK() == resultsList.get(1)[GREEDY_INDEX].getK())
 			i = 1;
 		for ( ; i < resultsList.size(); ++i) {
 			StatisticalResult[] stats = resultsList.get(i);
