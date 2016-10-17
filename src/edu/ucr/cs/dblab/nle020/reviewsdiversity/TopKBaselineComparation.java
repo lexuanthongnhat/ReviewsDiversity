@@ -32,23 +32,23 @@ public class TopKBaselineComparation {
 		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = 
 				importConceptSentimentPairDataset(TopPairsProgram.DOC_TO_REVIEWS_PATH);
 		
-		int[] conceptDistanceThresholds = new int[] {1, 2, 3, 4};
-		float[] sentimentDistanceThresholds = new float[] {0.1f, 0.2f, 0.3f, 0.4f};
+		int[] conceptDistanceThresholds = new int[] {2};
+		float[] sentimentDistanceThresholds = new float[] {0.1f};
 		
 		for (int conceptDistanceThreshold : conceptDistanceThresholds) {
 			for (float sentimentDistanceThreshold : sentimentDistanceThresholds) {
 				String outputString = "k,ilp,rr,greedy,baseline\n";		
 				int[] ks = new int[] {3, 5, 10, 15, 20};		
 				for (int k : ks) {
-					String topSentencesGreedyPath =  sourceInputFolder + "Top SENTENCE\\k" 
-							+ k + "_threshold0.2\\top_SENTENCE_result_200_greedy_set.txt";
-					String topSentencesILPPath =  sourceInputFolder + "Top SENTENCE\\k" 
-							+ k + "_threshold0.2\\top_SENTENCE_result_200_ilp_set.txt";
-					String topSentencesRRPath =  sourceInputFolder + "Top SENTENCE\\k" 
-							+ k + "_threshold0.2\\top_SENTENCE_result_200_rr_set.txt";
+					String topSentencesGreedyPath =  sourceInputFolder + "top_sentence/k" 
+							+ k + "_threshold0.2/top_SENTENCE_result_1000_greedy_set.txt";
+					String topSentencesILPPath =  sourceInputFolder + "top_sentence/k" 
+							+ k + "_threshold0.2/top_SENTENCE_result_1000_ilp_set.txt";
+					String topSentencesRRPath =  sourceInputFolder + "top_sentence/k" 
+							+ k + "_threshold0.2/top_SENTENCE_result_1000_rr_set.txt";
 					
-					String topSentencesBaselinePath = sourceInputFolder + "baseline\\top_SENTENCE_baseline_k" 
-							+ k + ".txt";
+					String topSentencesBaselinePath = sourceInputFolder
+							+ "baseline/top_sentence_baseline_k" + k + ".txt";
 					
 					Map<Integer, List<SentimentSentence>> docToTopSentencesGreedy = 
 							importDocToSentimentSentencesFromJson(topSentencesGreedyPath);
@@ -76,8 +76,8 @@ public class TopKBaselineComparation {
 				}
 
 				String outputPath = sourceInputFolder
-				    + "baseline\\comparison_distance" 
-						+ conceptDistanceThreshold + "_sentiment" + ((int) 10*sentimentDistanceThreshold)
+				    + "baseline/comparison_distance" 
+						+ conceptDistanceThreshold + "_sentiment" + (int) Math.round(10*sentimentDistanceThreshold)
 						+ ".csv";
 				try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath), 
 						StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {

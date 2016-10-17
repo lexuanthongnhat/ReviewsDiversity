@@ -29,7 +29,8 @@ public class TopSetsBaseline {
 			Map<Integer, List<SentimentSet>> docToTopKSentences = 
 					getTopKSentimentSet(TopPairsProgram.DOC_TO_REVIEWS_PATH, setOption);
 
-			String outputPath = TopPairsProgram.OUTPUT_FOLDER + "baseline\\top_" + setOption + "_baseline_k" + k + ".txt";
+			String outputPath = TopPairsProgram.OUTPUT_FOLDER
+					+ "baseline/top_" + setOption.toString().toLowerCase() + "_baseline_k" + k + ".txt";
 			TopPairsProgram.outputTopKToJson(outputPath, docToTopKSentences);
 
 			System.out.println("Outputed to \"" + outputPath + "\"");
@@ -37,11 +38,12 @@ public class TopSetsBaseline {
 		Utils.printRunningTime(startTime, "Finished topK baseline for " + setOption);
 	}
 	
-	private static Map<Integer, List<SentimentSet>> getTopKSentimentSet(String inputPath, TopPairsProgram.SetOption setOption) {
+	private static Map<Integer, List<SentimentSet>> getTopKSentimentSet(
+			String inputPath, TopPairsProgram.SetOption setOption) {
 			
 		Map<Integer, List<SentimentSet>> docToSentimentSets = importSentimentSets(inputPath, setOption);
 		
-		Map<Integer, List<SentimentSet>> docToTopKSets = new HashMap<Integer, List<SentimentSet>>();		
+		Map<Integer, List<SentimentSet>> docToTopKSets = new HashMap<>();		
 		for (Integer docId : docToSentimentSets.keySet()) {
 			docToTopKSets.put(docId, extractTopKFromList(docToSentimentSets.get(docId)));
 		}		
@@ -59,7 +61,7 @@ public class TopSetsBaseline {
 
 	public static List<SentimentSet> extractTopKFromList(List<SentimentSet> sentimentSets) {
 		
-		Map<String, Set<SentimentSet>> posNegConceptToSentimentSets = new HashMap<String, Set<SentimentSet>>();
+		Map<String, Set<SentimentSet>> posNegConceptToSentimentSets = new HashMap<>();
 		for (SentimentSet sentimentSet : sentimentSets) {
 			for (ConceptSentimentPair pair : sentimentSet.getPairs()) {
 				String posNegConcept = pair.getId();
@@ -112,19 +114,23 @@ public class TopSetsBaseline {
 
 
 
-	private static Map<Integer, List<SentimentSet>> importSentimentSets(String inputPath, TopPairsProgram.SetOption setOption) {
-		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<Integer, List<SentimentSet>>();	
+	private static Map<Integer, List<SentimentSet>> importSentimentSets(
+			String inputPath, TopPairsProgram.SetOption setOption) {
 		
+		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<>();		
 		boolean getSomeRandomItems = false;
 		switch (setOption) {
 		case REVIEW: 	
-			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath, getSomeRandomItems);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath,
+																																			 getSomeRandomItems);
 			break;
 		case SENTENCE:  
-			docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(inputPath, getSomeRandomItems);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(inputPath,
+																																				 getSomeRandomItems);
 			break;
 		default: 		
-			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath, getSomeRandomItems);
+			docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath,
+																																			 getSomeRandomItems);
 			break;
 		}
 		
@@ -139,9 +145,7 @@ public class TopSetsBaseline {
 			this.concept = concept;
 			this.containingSets = containingSets;
 		}
-		public String getConcept() {
-			return concept;
-		}
+
 		public Set<SentimentSet> getContainingSets() {
 			return containingSets;
 		}

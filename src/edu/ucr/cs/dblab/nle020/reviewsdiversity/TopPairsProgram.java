@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
@@ -816,25 +817,29 @@ public class TopPairsProgram {
 	}
 
 	public static <T> void  outputTopKToJson(
-			String outputPath,
+			String outputPathString,
 			Map<Integer, List<T>> docToTopKResult) {
 		long startTime = System.currentTimeMillis();
 		ObjectMapper mapper = new ObjectMapper();
-
+		
 		try {
-			Files.deleteIfExists(Paths.get(outputPath));
+			Path outputPath = Paths.get(outputPathString);
+			if (!Files.exists(outputPath.getParent()))
+				Files.createDirectories(outputPath.getParent());
+			
+			Files.deleteIfExists(outputPath);			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
-		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath),
+		try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPathString),
 				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 			mapper.writeValue(writer, docToTopKResult);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
-		Utils.printRunningTime(startTime, "Outputed " + docToTopKResult.size() + " topK to " + outputPath);
+		Utils.printRunningTime(startTime, "Outputed " + docToTopKResult.size() + " topK to " + outputPathString);
 	}
 
 	@SuppressWarnings("unused")
@@ -1229,7 +1234,7 @@ public class TopPairsProgram {
 		Map<Integer, List<SentimentSet>> result = new HashMap<Integer, List<SentimentSet>>();
 
 		List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);
-		Set<Integer> indices = new HashSet<Integer>();
+		Set<Integer> indices = new HashSet<>();
 		if (getSomeRandomItems)
 			indices = randomIndices;
 		else {
@@ -1258,7 +1263,7 @@ public class TopPairsProgram {
 	}
 
 	public static List<DoctorSentimentReview> importDoctorSentimentReviewsDataset(String path) {
-		List<DoctorSentimentReview> doctorSentimentReviews = new ArrayList<DoctorSentimentReview>();
+		List<DoctorSentimentReview> doctorSentimentReviews = new ArrayList<>();
 		ObjectMapper mapper = new ObjectMapper();
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {
 			String line;
