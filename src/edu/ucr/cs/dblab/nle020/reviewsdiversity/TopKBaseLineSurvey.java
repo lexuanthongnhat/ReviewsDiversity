@@ -80,7 +80,7 @@ public class TopKBaseLineSurvey {
 	
 	public static void main(String[] args) {
 		String surveyFolder = "src/main/resources/survey/topsentences/";
-//		prepareSurvey(surveyFolder);
+		prepareSurvey(surveyFolder);
 		
 		collectSurveys(surveyFolder + "collectedsurvey/");
 	}
@@ -284,7 +284,12 @@ public class TopKBaseLineSurvey {
 	@SuppressWarnings("unused")
 	private static void prepareSurvey(String surveyFolder) {
 		long startTime = System.currentTimeMillis();
-		Map<Integer, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews();
+		
+		List<Integer> preDefinedDoctors = Arrays.asList(784091, 303476, 1088737, 796942, 1052723,
+		    250230, 378031, 149560, 1106190, 893234);
+		Map<Integer, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews(
+		    preDefinedDoctors);
+    //Map<Integer, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews();
 				
 		Map<Integer, List<SentimentSentence>> docToSentimentSentences =
 		    convertToDocToSentimentSentences(docToSentimentReviews);
@@ -537,6 +542,24 @@ public class TopKBaseLineSurvey {
 		
 		return choosenDocToReviews;
 	}
+	
+	private static Map<Integer, List<SentimentReview>> chooseDoctorToSentimentReviews(
+	    List<Integer> preDefinedDoctors) {
+	  
+    Map<Integer, List<SentimentReview>> completeDocToReviews = importRawCompleteDocToReviews(
+        TopPairsProgram.DOC_TO_REVIEWS_PATH);
+    Map<Integer, List<SentimentReview>> docToReviews = new HashMap<>();
+        
+    for (Integer docId : preDefinedDoctors) 
+      docToReviews.put(docId, completeDocToReviews.get(docId));
+    
+    Map<Integer, List<SentimentReview>> choosenDocToReviews = new HashMap<>();
+    for (Integer docId : docToReviews.keySet()) {
+      choosenDocToReviews.put(docId, pickUpReviewsForSurvey(docToReviews.get(docId)));
+    }
+    
+    return choosenDocToReviews;
+  }	
 
 	private static List<SentimentReview> pickUpReviewsForSurvey(
 	    List<SentimentReview> completeSetOfReviews) {

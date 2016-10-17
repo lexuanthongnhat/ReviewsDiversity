@@ -58,7 +58,7 @@ public class TopPairsProgram {
 	private static float threshold = Constants.THRESHOLD;
 
 	static boolean RANDOMIZE_DOCS = false;
-	private static int NUM_TRIALS = 1;
+	private static int NUM_TRIALS = 20;
 	private static Set<Integer> randomIndices = Utils.randomIndices(1000,
 			Constants.NUM_DOCTORS_TO_EXPERIMENT);
 	private final static int NUM_DOCTORS_TO_EXPERIMENT = Constants.NUM_DOCTORS_TO_EXPERIMENT;
@@ -84,17 +84,14 @@ public class TopPairsProgram {
 //		getDatasetStatistics();
 //		examineProblemSizes();
 		
-		List<Integer> kSet = Arrays.asList(3);
-//		List<Float> thresholdSet = Arrays.asList(2.0f);
+		List<Integer> kSet = Arrays.asList(10);
+		List<Float> thresholdSet = Arrays.asList(0.5f);
 //		List<Float> thresholdSet = Arrays.asList(0.3f, 0.4f, 0.5f, 0.6f);
-		List<Float> thresholdSet = new ArrayList<>();
-		for (float thres = 0.1f; thres < 2.05; thres += 0.1f) {
-		  thresholdSet.add(thres);
-		}		
+//		List<Float> thresholdSet = Arrays.asList(0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f,
+//		    1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f);
 		
-//		topPairsExperiment(kSet, thresholdSet);
-//    topSetsExperiment(kSet, thresholdSet, SetOption.SENTENCE);
-
+		topPairsExperiment(kSet, thresholdSet);
+    topSetsExperiment(kSet, thresholdSet, SetOption.SENTENCE);
 		topSetsExperiment(kSet, thresholdSet, SetOption.REVIEW);
 
 //		topPairsSyntheticExperiment();

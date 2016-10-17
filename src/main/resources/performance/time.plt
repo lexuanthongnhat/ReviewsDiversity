@@ -40,10 +40,10 @@ do for [xaxis in "0 1"] {
 		set xlabel "Number of Pairs + Edges"
 		filenameprefix = "time_pair_edge_"
 	}
-	do for [folder in "'Top Pairs/' 'Top REVIEW/' 'Top SENTENCE/'"] {
+	do for [folder in "'top_pair/' 'top_review/' 'top_sentence/'"] {
 	#	do for [k in "3 5 10 15 20"] {
-		do for [k in "10 15"] {
-			do for [sentiment in "1 3"] {
+		do for [k in "10"] {
+			do for [sentiment in "5"] {
 				set title "k=" . k . ", sentiment threshold = 0." . sentiment							
 				
 				filename = filenameprefix . 'k' . k . "_s" . sentiment
