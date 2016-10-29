@@ -1265,7 +1265,8 @@ public class TopPairsProgram {
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {
 			String line;
 			while ((line = reader.readLine()) != null) {
-				DoctorSentimentReview doctorSentimentReview = mapper.readValue(line, DoctorSentimentReview.class);
+				DoctorSentimentReview doctorSentimentReview = mapper.readValue(line,
+						DoctorSentimentReview.class);
 				doctorSentimentReviews.add(doctorSentimentReview);
 			}
 		} catch (IOException e) {

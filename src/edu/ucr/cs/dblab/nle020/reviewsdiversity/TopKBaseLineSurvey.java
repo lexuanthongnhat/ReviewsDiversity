@@ -46,6 +46,8 @@ import edu.ucr.cs.dblab.nle020.utils.Utils;
 import gov.nih.nlm.nls.metamap.Ev;
 import gov.nih.nlm.nls.metamap.Position;
 
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.SentimentByDocumentVector;
+
 public class TopKBaseLineSurvey {
 
 	private static final int K = 3;
@@ -80,7 +82,7 @@ public class TopKBaseLineSurvey {
 	
 	public static void main(String[] args) {
 		String surveyFolder = "src/main/resources/survey/topsentences/";
-		prepareSurvey(surveyFolder);
+		//prepareSurvey(surveyFolder);
 		
 		collectSurveys(surveyFolder + "collectedsurvey/");
 	}
@@ -285,16 +287,14 @@ public class TopKBaseLineSurvey {
 	private static void prepareSurvey(String surveyFolder) {
 		long startTime = System.currentTimeMillis();
 		
-		List<Integer> preDefinedDoctors = Arrays.asList(784091, 303476, 1088737, 796942, 1052723,
-		    250230, 378031, 149560, 1106190, 893234);
 		Map<Integer, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews(
-		    preDefinedDoctors);
+		    "src/main/resources/survey/pre_selected_survey.txt");
     //Map<Integer, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews();
 				
 		Map<Integer, List<SentimentSentence>> docToSentimentSentences =
 		    convertToDocToSentimentSentences(docToSentimentReviews);
 		Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod = getKSentencesOurMethod(
-		    docToSentimentSentences);
+		    docToSentimentSentences, K, 0.5f);
 		Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline = getKSentencesBaseline(
 		    docToSentimentSentences);
 		Map<Integer, List<SentimentSentence>> docToTopSentences = new HashMap<>();
@@ -306,8 +306,8 @@ public class TopKBaseLineSurvey {
 
 		String outputExcelPath = surveyFolder + "survey.xlsx";
 		outputToExcel(docToSentimentSentences, docToTopSentences, outputExcelPath);
-//		Utils.writeToJson(docToTopSentencesOurMethod, surveyFolder + "our-method.txt");
-//		Utils.writeToJson(docToTopSentencesBaseline, surveyFolder + "baseline.txt");
+		Utils.writeToJson(docToTopSentencesOurMethod, surveyFolder + "our-method.txt");
+		Utils.writeToJson(docToTopSentencesBaseline, surveyFolder + "baseline.txt");
 		
 		Utils.printRunningTime(startTime, "Finished outputing survey to \"" + outputExcelPath + "\"");
 	}
@@ -342,8 +342,10 @@ public class TopKBaseLineSurvey {
 		Map<Integer, List<SentimentSentence>> docToSentimentSentences = new HashMap<>();
 		for (Integer docId : docToSentimentReviews.keySet()) {
 			List<SentimentSentence> sentences = new ArrayList<>();
-			docToSentimentReviews.get(docId).stream().forEach(
-			    review -> sentences.addAll(review.getSentences()));
+			for (SentimentReview review : docToSentimentReviews.get(docId)) {
+				List<SentimentSentence> reviewSentences = review.getSentences();
+				sentences.addAll(reviewSentences);
+			}
 			docToSentimentSentences.put(docId, sentences);
 		}
 		
@@ -351,7 +353,9 @@ public class TopKBaseLineSurvey {
 	}
 
 	private static Map<Integer, List<SentimentSentence>> getKSentencesOurMethod(
-	    Map<Integer, List<SentimentSentence>> docToSentimentSentences) {
+	    Map<Integer, List<SentimentSentence>> docToSentimentSentences,
+	    int k,
+	    float threshold) {
 	  
 		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<>();
 		for (Integer docId : docToSentimentSentences.keySet()) {
@@ -365,8 +369,8 @@ public class TopKBaseLineSurvey {
 		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<>();
 		ConcurrentMap<Integer, List<SentimentSet>> docToTopKSets = new ConcurrentHashMap<>();
 		
-		GreedySetThreadImpl ourMethod = 
-				new GreedySetThreadImpl(K, THRESHOLD, docToStatisticalResult, docToTopKSets, 0, 1, docToSentimentSets);
+		GreedySetThreadImpl ourMethod = new GreedySetThreadImpl(k, threshold,
+				docToStatisticalResult, docToTopKSets, 0, 1, docToSentimentSets);
 		ourMethod.run();
 		
 		
@@ -505,6 +509,7 @@ public class TopKBaseLineSurvey {
 		
 		XSSFRichTextString richText = new XSSFRichTextString(sentence);
 		List<Ev> mappings = mmParser.getValidMappings(sentence);
+		System.out.println("Parsing: \"" + sentence + "\"");
 		for (Ev ev : mappings) {
 			
 			List<Position> positions;
@@ -527,7 +532,7 @@ public class TopKBaseLineSurvey {
 		    TopPairsProgram.DOC_TO_REVIEWS_PATH);
 		Map<Integer, List<SentimentReview>> docToReviews = new HashMap<>();
 		
-		//Set<Integer> indices = Utils.randomIndices(completeDocToReviews.size(), NUM_DOCS_TO_SURVEY);
+		Set<Integer> indices = Utils.randomIndices(completeDocToReviews.size(), NUM_DOCS_TO_SURVEY);
 		
 		Integer[] allDocIds = new Integer[completeDocToReviews.size()];
 		completeDocToReviews.keySet().toArray(allDocIds);
@@ -544,21 +549,19 @@ public class TopKBaseLineSurvey {
 	}
 	
 	private static Map<Integer, List<SentimentReview>> chooseDoctorToSentimentReviews(
-	    List<Integer> preDefinedDoctors) {
-	  
-    Map<Integer, List<SentimentReview>> completeDocToReviews = importRawCompleteDocToReviews(
-        TopPairsProgram.DOC_TO_REVIEWS_PATH);
-    Map<Integer, List<SentimentReview>> docToReviews = new HashMap<>();
-        
-    for (Integer docId : preDefinedDoctors) 
-      docToReviews.put(docId, completeDocToReviews.get(docId));
+	    String inputFile) {
+		
+		Map<Integer, List<SentimentReview>> docToReviews = new HashMap<>();
+		List<DoctorSentimentReview> doctorSentimentReviews =
+		    TopPairsProgram.importDoctorSentimentReviewsDataset(inputFile);
+		
+		for (DoctorSentimentReview doctorSentimentReview : doctorSentimentReviews) {		
+			List<SentimentReview> reviews = doctorSentimentReview.getSentimentReviews();
+			Integer docId = doctorSentimentReview.getDocId();
+			docToReviews.put(docId, reviews);
+		}
     
-    Map<Integer, List<SentimentReview>> choosenDocToReviews = new HashMap<>();
-    for (Integer docId : docToReviews.keySet()) {
-      choosenDocToReviews.put(docId, pickUpReviewsForSurvey(docToReviews.get(docId)));
-    }
-    
-    return choosenDocToReviews;
+    return docToReviews;
   }	
 
 	private static List<SentimentReview> pickUpReviewsForSurvey(
@@ -572,7 +575,7 @@ public class TopKBaseLineSurvey {
 			    Constants.USE_ADVANCED_SENTENCE_BREAKING).size() > THRESHOLD_ON_NUM_SENTENCE_PER_REVIEW);				
 		
 		updatePairsOfSentimentReviews(completeSetOfReviews);
-		List<String> choosenCuis = new ArrayList<String>();
+		List<String> choosenCuis = new ArrayList<>();
 		
 		if (completeSetOfReviews.size() <= NUM_REVIEWS_PER_DOC)
 			pickUpReviews = completeSetOfReviews;

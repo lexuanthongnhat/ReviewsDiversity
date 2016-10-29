@@ -32,8 +32,8 @@ public class TopKBaselineComparation {
 		Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = 
 				importConceptSentimentPairDataset(TopPairsProgram.DOC_TO_REVIEWS_PATH);
 		
-		int[] conceptDistanceThresholds = new int[] {2};
-		float[] sentimentDistanceThresholds = new float[] {0.1f};
+		int[] conceptDistanceThresholds = new int[] {3, 4};
+		float[] sentimentDistanceThresholds = new float[] {0.5f};
 		
 		for (int conceptDistanceThreshold : conceptDistanceThresholds) {
 			for (float sentimentDistanceThreshold : sentimentDistanceThresholds) {

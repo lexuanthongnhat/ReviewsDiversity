@@ -73,7 +73,7 @@ public class SentimentByDocumentVector {
 				+ (System.currentTimeMillis() - startTime) + " ms");
 	}
 	
-	private static void outputDoctorSentimentReviewsToJson(
+	public static void outputDoctorSentimentReviewsToJson(
 			Map<Integer, List<SentimentReview>> docToSentimentReviews,
 			String updatedDatasetPath) {
 		
