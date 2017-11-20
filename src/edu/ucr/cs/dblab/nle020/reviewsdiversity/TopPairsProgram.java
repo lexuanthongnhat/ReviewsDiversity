@@ -72,7 +72,7 @@ public class TopPairsProgram {
 //	public final static String OUTPUT_FOLDER = "D:\\Experiments\\";
 	public final static String OUTPUT_FOLDER = "src/main/resources/performance/";
 
-	private enum Algorithm {GREEDY, ILP, RANDOMIZED_ROUDNING};
+	private enum Algorithm {GREEDY, ILP, RANDOMIZED_ROUNDING};
 	private enum SetAlgorithm	{GREEDY_SET, ILP_SET, RANDOMIZED_ROUNDING_SET};
 	public static enum SetOption {REVIEW, SENTENCE };
 	private enum NumItem {NUM_PAIRS, NUM_PAIRS_EDGES};
@@ -224,7 +224,7 @@ public class TopPairsProgram {
 				Map<LPMethod, Long> methodToTime = new HashMap<LPMethod, Long>();
 				for (LPMethod method : methods) {
 					long startTime2 = System.currentTimeMillis();
-					runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUDNING, Constants.NUM_THREADS_ALGORITHM,
+					runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUNDING, Constants.NUM_THREADS_ALGORITHM,
 							docToConceptSentimentPairs, docToStatisticalResultRR, docToTopKPairsResultRR, method);
 					outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
 
@@ -240,7 +240,7 @@ public class TopPairsProgram {
 				}
 				System.err.println("Best LP Method: " + bestMethod + ", number " + bestMethod.method());
 			} else {
-				runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUDNING, Constants.NUM_THREADS_ALGORITHM,
+				runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUNDING, Constants.NUM_THREADS_ALGORITHM,
 						docToConceptSentimentPairs, docToStatisticalResultRR, docToTopKPairsResultRR);
 				outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
 				outputTopKToJson(outputPrefix + "_rr_pair.txt", docToTopKPairsResultRR);
@@ -675,7 +675,7 @@ public class TopPairsProgram {
 				future = fixedPool.submit(new ILPThreadImpl(k, threshold, docToStatisticalResult, docToTopKPairsResult,
 						index, numThreadsAlgorithm, docToConceptSentimentPairs), "DONE!");
 				break;
-			case RANDOMIZED_ROUDNING:
+			case RANDOMIZED_ROUNDING:
 				future = fixedPool.submit(new RandomizedRoundingThreadImpl(k, threshold, docToStatisticalResult, docToTopKPairsResult,
 						index, numThreadsAlgorithm, docToConceptSentimentPairs, method), "DONE!");
 				break;

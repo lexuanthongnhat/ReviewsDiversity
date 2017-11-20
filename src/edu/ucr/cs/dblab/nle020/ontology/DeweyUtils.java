@@ -25,9 +25,12 @@ public class DeweyUtils {
 	public static int getDeweyDistanceFromRoot(String dewey) {
 		return getDeweyDistance(ROOT_DEWEY, dewey);
 	}
-	
-	// If the childDewey turn out to be the actual ancestor, then the returned value is negative
-	// If 2 deweys are in different branches, then distance = INVALID_DISTANCE
+
+	/**
+	 * If the childDewey turn out to be the actual ancestor, then the returned value is negative.
+	 * If 2 deweys are in different branches, then distance = INVALID_DISTANCE.
+	 * Otherwise the distance is positive.
+	 */
 	public static int getDeweyDistance(String ancestorDewey, String childDewey) {
 		if (distances.containsKey(ancestorDewey) && distances.get(ancestorDewey).containsKey(childDewey)) {
 			if (distances.get(ancestorDewey).get(childDewey) == null) {

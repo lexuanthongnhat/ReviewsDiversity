@@ -71,7 +71,7 @@ public class ConceptSentimentPair{
 
 	/**
 	 *  Calculate the distance from this Unit to the other Unit
-	 * @param other - other Unit
+	 * @param otherPair - other Unit
 	 * @return distance is Constants.INVALID_DISTANCE if 2 nodes are in different branches, <br>
 	 * otherwise, it can be both positive and negative.
 	 */
