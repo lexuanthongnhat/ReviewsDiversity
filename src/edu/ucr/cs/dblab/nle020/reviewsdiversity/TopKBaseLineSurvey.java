@@ -36,7 +36,6 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 import edu.ucr.cs.dblab.nle020.metamap.MetaMapParser;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.GreedySetThreadImpl;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.composite.TopSetsBaseline;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.DoctorSentimentReview;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.SentimentCalculator;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
@@ -46,8 +45,6 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
 import gov.nih.nlm.nls.metamap.Ev;
 import gov.nih.nlm.nls.metamap.Position;
-
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset.SentimentByDocumentVector;
 
 public class TopKBaseLineSurvey {
 
@@ -91,7 +88,7 @@ public class TopKBaseLineSurvey {
 	}
 
 	private static void collectSurveys(String surveyFolder) {
-		List<Path> surveys = new ArrayList<Path>();
+		List<Path> surveys = new ArrayList<>();
 
 		try {
 			Files.walkFileTree(Paths.get(surveyFolder), new SimpleFileVisitor<Path>(){
@@ -188,10 +185,10 @@ public class TopKBaseLineSurvey {
 			Map<Integer, Map<String, Integer>> docToCoveragesSummry,
 			String outputPath) {
 
-		Map<Integer, Double> docToAverageOurMethod = new HashMap<Integer, Double>();
-		Map<Integer, Double> docToAverageBaseline  = new HashMap<Integer, Double>();
-		Map<Integer, Double> docToAverageTextRank  = new HashMap<Integer, Double>();
-		Map<Integer, Double> docToAverageSummry  = new HashMap<Integer, Double>();
+		Map<Integer, Double> docToAverageOurMethod = new HashMap<>();
+		Map<Integer, Double> docToAverageBaseline  = new HashMap<>();
+		Map<Integer, Double> docToAverageTextRank  = new HashMap<>();
+		Map<Integer, Double> docToAverageSummry  = new HashMap<>();
 
 
 		for (Integer docId : docToRowUnitNum.keySet()) {
@@ -323,36 +320,36 @@ public class TopKBaseLineSurvey {
 		Map<Integer, List<Integer>> docToIndicesTextRank = new HashMap<>();
 		Map<Integer, List<Integer>> docToIndicesSummry = new HashMap<>();
 		for (Integer doc : DOCS) {
-			docToIndicesOurMethod.put(doc, new ArrayList<Integer>(Arrays.asList(1, 2, 3)));
+			docToIndicesOurMethod.put(doc, new ArrayList<>(Arrays.asList(1, 2, 3)));
 		}
 
-		docToIndicesBliu.put(796942, new ArrayList<Integer>(Arrays.asList(4, 5, 6)));
-		docToIndicesBliu.put(1106190, new ArrayList<Integer>(Arrays.asList(4, 5, 6)));
-		docToIndicesBliu.put(893234, new ArrayList<Integer>(Arrays.asList(2, 3, 4)));
+		docToIndicesBliu.put(796942, new ArrayList<>(Arrays.asList(4, 5, 6)));
+		docToIndicesBliu.put(1106190, new ArrayList<>(Arrays.asList(4, 5, 6)));
+		docToIndicesBliu.put(893234, new ArrayList<>(Arrays.asList(2, 3, 4)));
 		for (int i = 1; i < 8; i++)
-			docToIndicesBliu.put(DOCS.get(i), new ArrayList<Integer>(Arrays.asList(3, 4, 5)));
+			docToIndicesBliu.put(DOCS.get(i), new ArrayList<>(Arrays.asList(3, 4, 5)));
 
-		docToIndicesTextRank.put(796942, new ArrayList<Integer>(Arrays.asList(1, 7, 6)));
-		docToIndicesTextRank.put(1052723, new ArrayList<Integer>(Arrays.asList(1, 6, 3)));
-		docToIndicesTextRank.put(378031, new ArrayList<Integer>(Arrays.asList(1, 6, 7)));
-		docToIndicesTextRank.put(784091, new ArrayList<Integer>(Arrays.asList(1, 6, 7)));
-		docToIndicesTextRank.put(303476, new ArrayList<Integer>(Arrays.asList(4, 2, 7)));
-		docToIndicesTextRank.put(1088737, new ArrayList<Integer>(Arrays.asList(6, 7, 8)));
-		docToIndicesTextRank.put(250230, new ArrayList<Integer>(Arrays.asList(5, 6, 4)));
-		docToIndicesTextRank.put(149560, new ArrayList<Integer>(Arrays.asList(5, 1, 2)));
-		docToIndicesTextRank.put(1106190, new ArrayList<Integer>(Arrays.asList(7, 3, 8)));
-		docToIndicesTextRank.put(893234, new ArrayList<Integer>(Arrays.asList(2, 1, 4)));
+		docToIndicesTextRank.put(796942, new ArrayList<>(Arrays.asList(1, 7, 6)));
+		docToIndicesTextRank.put(1052723, new ArrayList<>(Arrays.asList(1, 6, 3)));
+		docToIndicesTextRank.put(378031, new ArrayList<>(Arrays.asList(1, 6, 7)));
+		docToIndicesTextRank.put(784091, new ArrayList<>(Arrays.asList(1, 6, 7)));
+		docToIndicesTextRank.put(303476, new ArrayList<>(Arrays.asList(4, 2, 7)));
+		docToIndicesTextRank.put(1088737, new ArrayList<>(Arrays.asList(6, 7, 8)));
+		docToIndicesTextRank.put(250230, new ArrayList<>(Arrays.asList(5, 6, 4)));
+		docToIndicesTextRank.put(149560, new ArrayList<>(Arrays.asList(5, 1, 2)));
+		docToIndicesTextRank.put(1106190, new ArrayList<>(Arrays.asList(7, 3, 8)));
+		docToIndicesTextRank.put(893234, new ArrayList<>(Arrays.asList(2, 1, 4)));
 
-		docToIndicesSummry.put(796942, new ArrayList<Integer>(Arrays.asList(1, 8, 7)));
-		docToIndicesSummry.put(1052723, new ArrayList<Integer>(Arrays.asList(7, 6, 4)));
-		docToIndicesSummry.put(378031, new ArrayList<Integer>(Arrays.asList(1, 8, 9)));
-		docToIndicesSummry.put(784091, new ArrayList<Integer>(Arrays.asList(3, 6, 2)));
-		docToIndicesSummry.put(303476, new ArrayList<Integer>(Arrays.asList(1, 4, 6)));
-		docToIndicesSummry.put(1088737, new ArrayList<Integer>(Arrays.asList(6, 1, 2)));
-		docToIndicesSummry.put(250230, new ArrayList<Integer>(Arrays.asList(7, 5, 8)));
-		docToIndicesSummry.put(149560, new ArrayList<Integer>(Arrays.asList(6, 2, 7)));
-		docToIndicesSummry.put(1106190, new ArrayList<Integer>(Arrays.asList(9, 8, 10)));
-		docToIndicesSummry.put(893234, new ArrayList<Integer>(Arrays.asList(1, 5, 6)));
+		docToIndicesSummry.put(796942, new ArrayList<>(Arrays.asList(1, 8, 7)));
+		docToIndicesSummry.put(1052723, new ArrayList<>(Arrays.asList(7, 6, 4)));
+		docToIndicesSummry.put(378031, new ArrayList<>(Arrays.asList(1, 8, 9)));
+		docToIndicesSummry.put(784091, new ArrayList<>(Arrays.asList(3, 6, 2)));
+		docToIndicesSummry.put(303476, new ArrayList<>(Arrays.asList(1, 4, 6)));
+		docToIndicesSummry.put(1088737, new ArrayList<>(Arrays.asList(6, 1, 2)));
+		docToIndicesSummry.put(250230, new ArrayList<>(Arrays.asList(7, 5, 8)));
+		docToIndicesSummry.put(149560, new ArrayList<>(Arrays.asList(6, 2, 7)));
+		docToIndicesSummry.put(1106190, new ArrayList<>(Arrays.asList(9, 8, 10)));
+		docToIndicesSummry.put(893234, new ArrayList<>(Arrays.asList(1, 5, 6)));
 
 
 		try {
@@ -411,10 +408,10 @@ public class TopKBaseLineSurvey {
 				if (countOurMethod > 0 || countBliu > 0 || countTextRank > 0 || countSummry > 0) {
 					if (!docToRowUnitNum.containsKey(docId)) {
 						docToRowUnitNum.put(docId, count);
-						docToCoveragesOurMethod.put(docId, new HashMap<String, Integer>());
-						docToCoveragesBliu.put(docId, new HashMap<String, Integer>());
-						docToCoveragesTextRank.put(docId, new HashMap<String, Integer>());
-						docToCoveragesSummry.put(docId, new HashMap<String, Integer>());
+						docToCoveragesOurMethod.put(docId, new HashMap<>());
+						docToCoveragesBliu.put(docId, new HashMap<>());
+						docToCoveragesTextRank.put(docId, new HashMap<>());
+						docToCoveragesSummry.put(docId, new HashMap<>());
 					}
 
 					docToCoveragesOurMethod.get(docId).put(fileName, countOurMethod);
@@ -463,7 +460,7 @@ public class TopKBaseLineSurvey {
 	// end by baseline only
 	private static List<SentimentSentence> reorderTopSentences(
 			List<SentimentSentence> ourMethodSentences, List<SentimentSentence> baselineSentences) {
-		List<SentimentSentence> reorderedSentences = new ArrayList<SentimentSentence>();
+		List<SentimentSentence> reorderedSentences = new ArrayList<>();
 
 		ourMethodSentences.stream().forEach(sentence -> {
 				if (!baselineSentences.contains(sentence))
@@ -506,7 +503,7 @@ public class TopKBaseLineSurvey {
 
 		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<>();
 		for (Integer docId : docToSentimentSentences.keySet()) {
-			List<SentimentSet> sentimentSets = new ArrayList<SentimentSet>();
+			List<SentimentSet> sentimentSets = new ArrayList<>();
 			docToSentimentSentences.get(docId).stream().forEach(sentence -> sentimentSets.add(sentence));
 			docToSentimentSets.put(docId, sentimentSets);
 		}
@@ -525,7 +522,7 @@ public class TopKBaseLineSurvey {
 			List<SentimentSentence> sentences = new ArrayList<>();
 			docToTopKSets.get(docId).stream().forEach(set -> {
 			  // To avoid error when writing to Json (recursive FullPair)
-				set.setFullPairs(new ArrayList<FullPair>());
+				set.setFullPairs(new ArrayList<>());
 				sentences.add((SentimentSentence) set);
 			});
 			docToTopKSentences.put(docId, sentences);
@@ -539,19 +536,19 @@ public class TopKBaseLineSurvey {
 
 		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<>();
 		for (Integer docId : docToSentimentSentences.keySet()) {
-			List<SentimentSet> sentimentSets = new ArrayList<SentimentSet>();
+			List<SentimentSet> sentimentSets = new ArrayList<>();
 			docToSentimentSentences.get(docId).stream().forEach(sentence -> sentimentSets.add(sentence));
 			docToSentimentSets.put(docId, sentimentSets);
 		}
 
 		Map<Integer, List<SentimentSentence>> docToTopKSentences = new HashMap<>();
-		TopSetsBaseline.setK(K);
 		for (Integer docId : docToSentimentSets.keySet()) {
-			List<SentimentSet> sets = TopSetsBaseline.extractTopKFromList(docToSentimentSets.get(docId));
-			List<SentimentSentence> sentences = new ArrayList<SentimentSentence>();
+//			List<SentimentSet> sets = FreqBasedTopSets.selectMostPopular(docToSentimentSets.get(docId), K);
+			List<SentimentSet> sets = new ArrayList<>();
+			List<SentimentSentence> sentences = new ArrayList<>();
 			sets.stream().forEach(set -> {
 			  // To avoid error when writing to Json (recursive FullPair)
-				set.setFullPairs(new ArrayList<FullPair>());
+				set.setFullPairs(new ArrayList<>());
 				sentences.add((SentimentSentence) set);
 			});
 			docToTopKSentences.put(docId, sentences);
@@ -662,9 +659,7 @@ public class TopKBaseLineSurvey {
 			List<Position> positions;
 			try {
 				positions = ev.getPositionalInfo();
-				for (int i = 0; i < positions.size(); i++) {
-					Position pos = positions.get(i);
-
+				for (Position pos : positions) {
 					richText.applyFont(pos.getX(), pos.getX() + pos.getY(), highlightFont);
 				}
 			} catch (Exception e) {
@@ -769,7 +764,7 @@ public class TopKBaseLineSurvey {
 	private static void updatePairsOfSentimentReviews(
 			List<SentimentReview> pickUpReviews) {
 		for (SentimentReview review : pickUpReviews) {
-			List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+			List<ConceptSentimentPair> pairs = new ArrayList<>();
 			for (SentimentSentence sentence : review.getSentences()) {
 				pairs.addAll(sentence.getPairs());
 			}

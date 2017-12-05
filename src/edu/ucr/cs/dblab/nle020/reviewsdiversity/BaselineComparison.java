@@ -2,6 +2,7 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.baseline.FreqBasedTopSets;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
@@ -14,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 
@@ -24,19 +26,31 @@ import java.util.stream.DoubleStream;
  */
 public class BaselineComparison {
   private static final String SUMMARY_DIR = TopPairsProgram.OUTPUT_FOLDER;
-  private static final int ROUNDING_DIGIT = 3;
+  public static final String BASELINE_SUMMARY_DIR = SUMMARY_DIR + "baseline/summary/";
+  private static final int ROUNDING_DIGIT = 2;
+//  public static final int[] K_LIST = {3, 5, 10, 15, 20};
+  public static final int[] K_LIST = {3};
   private static Map<String, MethodType> methodToType = new HashMap<>();
   private static List<String> methods = new ArrayList<>();
+
+  // Some randomRelatedMethods should be run (re-sample) several time to get stable performances
+  private static List<String> randomRelatedMethods = new ArrayList<>();
+  private static final int RE_SAMPLE_RANDOM_METHOD = 1;
 
   static {
     methodToType.put("greedy", MethodType.OUR);
     methodToType.put("ilp", MethodType.OUR);
     methodToType.put("rr", MethodType.OUR);
-    methodToType.put("baseline", MethodType.BASELINE);
+    methodToType.put("most_popular", MethodType.BASELINE);
+    methodToType.put("proportional", MethodType.BASELINE);
     methodToType.put("textrank", MethodType.BASELINE);
     methodToType.put("lexrank", MethodType.BASELINE);
     methodToType.put("lsa", MethodType.BASELINE);
-    methods.addAll(Arrays.asList("greedy", "baseline", "textrank", "lsa"));
+
+    methods.addAll(Arrays.asList("greedy",
+                                 "most_popular", "proportional",
+                                 "textrank", "lexrank", "lsa"));
+    randomRelatedMethods.addAll(Arrays.asList("most_popular", "proportional"));
   }
 
   private enum MethodType {OUR, BASELINE}
@@ -73,13 +87,40 @@ public class BaselineComparison {
     Map<Measure, Map<String, Double>> measureToResults = new HashMap<>();
     for (Measure measure : measures) {
       Map<String, Double> results = new HashMap<>();
-      for (String method : methods)
-        results.put(method,
-            measure.evaluate(methodToSummaries.get(method), sampleDocs, ROUNDING_DIGIT));
+      for (String method : methods) {
+        double error = randomRelatedMethods.contains(method) && RE_SAMPLE_RANDOM_METHOD > 1 ?
+            evaluateWithReSample(method, k, sampleDocs, measure, ROUNDING_DIGIT) :
+            measure.evaluate(methodToSummaries.get(method), sampleDocs, ROUNDING_DIGIT);
+        results.put(method, error);
+      }
 
       measureToResults.put(measure, results);
     }
     return measureToResults;
+  }
+
+  /**
+   * Several summarizers involve randomization choice at some extents. These summarizers should be
+   * re-sampled a number of time to get stable results.
+   */
+  private static Double evaluateWithReSample(String method, int k,
+                                             List<Integer> docIds, Measure measure,
+                                             int roundingDigit){
+    List<Double> errors = new ArrayList<>();
+    for (int i = 0; i < RE_SAMPLE_RANDOM_METHOD; ++i) {
+      Map<Integer, List<SentimentSet>> docToSummaries = FreqBasedTopSets.summarizeDoctorReviews(
+          TopPairsProgram.DOC_TO_REVIEWS_PATH, TopPairsProgram.SetOption.SENTENCE, k,method);
+      Map<Integer, List<SentimentSentence>> docToSentimentSets = new HashMap<>();
+      for (Integer doc : docToSummaries.keySet()) {
+        List<SentimentSet> sets = docToSummaries.get(doc);
+        docToSentimentSets.put(
+            doc,
+            sets.stream().map(s -> (SentimentSentence) s).collect(Collectors.toList()));
+      }
+      errors.add(measure.evaluate(docToSentimentSets, docIds, roundingDigit + 1));
+    }
+    double averageError = errors.stream().collect(Collectors.averagingDouble(e -> e));
+    return Utils.rounding(averageError, roundingDigit);
   }
 
   /**
@@ -124,7 +165,7 @@ public class BaselineComparison {
         summaryPath = SUMMARY_DIR + "top_sentence/k" + k + "_threshold" +
             Double.toString(threshold) + "/top_SENTENCE_result_1000_" + method + "_set.txt";
       else
-        summaryPath = SUMMARY_DIR + "baseline/top_sentence_" + method + "_k" + k + ".txt";
+        summaryPath = BASELINE_SUMMARY_DIR + "top_sentence_" + method + "_k" + k + ".txt";
       final Map<Integer, List<SentimentSentence>> docToTopSentences =
           importSummaryFromJson(summaryPath);
       mthToSummaries.put(method, docToTopSentences);
@@ -172,16 +213,16 @@ public class BaselineComparison {
   public static void main(String[] args) {
     long startTime = System.currentTimeMillis();
     // Threshold parameters of COVERAGE measures
-    int[] conceptDiffThresholds = {3, 4};
-    double[] sentimentDiffThresholds = {0.5};
+    int[] conceptDiffThresholds = {2, 3, 4};
+    double[] sentimentDiffThresholds = {0.3};
     final List<Measure> measures = Measure.initMeasures(conceptDiffThresholds,
         sentimentDiffThresholds,
         TopPairsProgram.DOC_TO_REVIEWS_PATH);
-    int[] ks = {3, 5, 10, 15, 20};
+
     final double appliedSentThreshold = 0.5;  // Sentiment threshold used when generating summaries
     // Evaluate with various measures
     Map<Measure, Map<Integer, Map<String, Double>>> measureToKResults = new HashMap<>();
-    for (int k : ks) {
+    for (int k : K_LIST) {
       final Map<Measure, Map<String, Double>> measureToResults = evaluate(k, appliedSentThreshold,
           measures, 1.0);
       for (Measure measure : measureToResults.keySet()) {
@@ -234,33 +275,50 @@ public class BaselineComparison {
     private MeasureType type;
     private int conceptDiffThreshold;
     private double sentimentDiffThreshold;
+    private Function<Double, Double> penalizeFunc;
+    private String penalizeName;
     Map<Integer, List<ConceptSentimentPair>> docToRawData;
 
-    public Measure(MeasureType type, int conceptDiffThreshold, double sentimentDiffThreshold,
+    private Measure(MeasureType type, int conceptDiffThreshold, double sentimentDiffThreshold,
                    Map<Integer, List<ConceptSentimentPair>> docToRawData) {
       this.type = type;
       this.conceptDiffThreshold = conceptDiffThreshold;
       this.sentimentDiffThreshold = sentimentDiffThreshold;
       this.docToRawData = docToRawData;
+      this.penalizeFunc = null;
     }
 
-    public Measure(MeasureType type, Map<Integer, List<ConceptSentimentPair>> docToRawData) {
-      this(type, -1, -1.0, docToRawData);
+    /**
+     * Init Sentiment Distribution Error measure
+     * @param penalizeFunc calculate the penalty when the concepts and its ancestors are missing in
+     *                     the summary.
+     */
+    private static Measure initDistErrorMeasure(MeasureType type, Map<Integer,
+                                                List<ConceptSentimentPair>> docToRawData,
+                                                Function<Double, Double> penalizeFunc,
+                                                String penalizeName) {
+      Measure measure = new Measure(type, -1, -1.0, docToRawData);
+      measure.penalizeFunc = penalizeFunc;
+      measure.penalizeName = penalizeName;
+      return measure;
     }
 
     private static List<Measure> initMeasures(int[] conceptDiffThresholds,
                                               double[] sentimentDiffThresholds,
                                               String rawDataPath) {
       Map<Integer, List<ConceptSentimentPair>> docToRawData = importRawDataset(rawDataPath);
-      Measure distErrorMeasure = new Measure(MeasureType.DIST_ERROR, docToRawData);
       List<Measure> measures = new ArrayList<>();
-      measures.add(distErrorMeasure);
-      for (int conceptDiffThreshold : conceptDiffThresholds) {
+      measures.add(Measure.initDistErrorMeasure(MeasureType.DIST_ERROR, docToRawData,
+                                                Math::abs, "no_penalize"));
+      measures.add(Measure.initDistErrorMeasure(MeasureType.DIST_ERROR, docToRawData,
+                                                s -> Math.max(Math.abs(1 - s), Math.abs(-1 - s)),
+                                                "penalize"));
+      /*for (int conceptDiffThreshold : conceptDiffThresholds) {
         for (double sentimentDiffThreshold : sentimentDiffThresholds) {
           measures.add(new Measure(MeasureType.COVERAGE, conceptDiffThreshold,
               sentimentDiffThreshold, docToRawData));
         }
-      }
+      }*/
       return measures;
     }
 
@@ -300,7 +358,7 @@ public class BaselineComparison {
           List<Double> sumSents = sumSentDist.get(concept);
           for (Double sent : rawSentDist.get(concept)) {
             if (sumSents == null || sumSents.size() < 1)
-              squareErrors.add(sent * sent);
+              squareErrors.add(Math.pow(this.penalizeFunc.apply(sent), 2));
             else
               sumSents.stream().map(s -> Math.pow(s - sent, 2))
                   .min(Double::compare).ifPresent(squareErrors::add);
@@ -460,6 +518,10 @@ public class BaselineComparison {
         pathStr.append("_sentiment");
         pathStr.append(Math.round(10 * sentimentDiffThreshold));
       }
+      if (this.type == MeasureType.DIST_ERROR) {
+        if (this.penalizeName.equalsIgnoreCase("penalize"))
+          pathStr.append("_penalize");
+      }
       return pathStr.toString();
     }
 
@@ -471,6 +533,7 @@ public class BaselineComparison {
       Measure measure = (Measure) o;
       return conceptDiffThreshold == measure.conceptDiffThreshold &&
           Double.compare(measure.sentimentDiffThreshold, sentimentDiffThreshold) == 0 &&
+          penalizeName.equalsIgnoreCase(((Measure) o).penalizeName) &&
           type == measure.type;
     }
 
@@ -482,6 +545,8 @@ public class BaselineComparison {
       result = 31 * result + conceptDiffThreshold;
       temp = Double.doubleToLongBits(sentimentDiffThreshold);
       result = 31 * result + (int) (temp ^ (temp >>> 32));
+      result = 31 * result + penalizeFunc.hashCode();
+      result = 31 * result + penalizeName.hashCode();
       return result;
     }
   }

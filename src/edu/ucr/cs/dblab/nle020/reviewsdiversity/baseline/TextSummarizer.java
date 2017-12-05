@@ -2,6 +2,7 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.baseline;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.BaselineComparison;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
@@ -20,7 +21,7 @@ import java.util.*;
  * Communicate with Text Summarizer that are implemented in Python.
  */
 public class TextSummarizer {
-  private static final int[] K_LIST = {3, 5, 10, 15, 20};
+  private static final int[] K_LIST = BaselineComparison.K_LIST;
 
   /**
    * Prepare review dataset in a form that Python summarizers (textsum.py) can easily pick up.
@@ -164,7 +165,7 @@ public class TextSummarizer {
         long startTime = System.currentTimeMillis();
         String inputDir = "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/summary/";
         List<String> summarizers = Arrays.asList("textrank", "lexrank", "lsa");
-        String exportDir = TopPairsProgram.OUTPUT_FOLDER + "baseline/";
+        String exportDir = BaselineComparison.BASELINE_SUMMARY_DIR;
         digestPythonSummaries(inputDir, summarizers, exportDir);
 
         Utils.printRunningTime(startTime, "Finished digesting Python summaries",
