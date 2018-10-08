@@ -342,7 +342,7 @@ public class BaselineComparison {
     private Double evalDistError(Map<Integer, List<SentimentSentence>> docToTopSentences,
                                  List<Integer> docIds,
                                  int roundingDigit) {
-      Double error = 0.0;
+      double error = 0.0;
       for (Integer docId : docIds) {
         List<ConceptSentimentPair> rawPairs = new ArrayList<>(docToRawData.get(docId));
         final Map<String, List<Double>> rawSentDist = collectSentiments(rawPairs);
@@ -601,9 +601,8 @@ public class BaselineComparison {
      */
     private static boolean is_successor(String ancestorDewey, String childDewey) {
       if (ancestorDewey.startsWith(childDewey)) {
-        if (ancestorDewey.length() > childDewey.length() &&
-            ancestorDewey.charAt(childDewey.length()) == '.')
-          return true;
+        return ancestorDewey.length() > childDewey.length() &&
+                ancestorDewey.charAt(childDewey.length()) == '.';
       }
       return false;
     }
