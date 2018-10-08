@@ -13,14 +13,16 @@ public class RandomizedRoundingThreadImpl extends RandomizedRounding implements 
 	private int index;			// To specify the thread order
 	private int numThreadsAlgorithm;
 	
-	Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs;	
+	Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairs;
 	
-	public RandomizedRoundingThreadImpl(int k, float threshold, 
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult,
+	RandomizedRoundingThreadImpl(
+			int k, float threshold,
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<ConceptSentimentPair>> docToTopKPairsResult,
 			int index, int numThreadsAlgorithm, 
-			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs, 
-			LPMethod method) {
+			Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairs,
+			LPMethod method
+    ) {
 		super(k, threshold, docToStatisticalResult, docToTopKPairsResult, method);
 		
 		this.index = index;
@@ -31,10 +33,10 @@ public class RandomizedRoundingThreadImpl extends RandomizedRounding implements 
 	@Override
 	public void run() {
 		long startTime = System.currentTimeMillis();
-		Integer[] docIDs = docToConceptSentimentPairs.keySet().toArray(new Integer[docToConceptSentimentPairs.size()]); 
+        String[] docIDs = docToConceptSentimentPairs.keySet().toArray(new String[docToConceptSentimentPairs.size()]);
 		
 		for (int i = index; i < docIDs.length; i += numThreadsAlgorithm) {
-			Integer docId = docIDs[i];
+            String docId = docIDs[i];
 			
 			runRandomizedRoundingPerDoc(docId, docToConceptSentimentPairs.get(docId));
 			

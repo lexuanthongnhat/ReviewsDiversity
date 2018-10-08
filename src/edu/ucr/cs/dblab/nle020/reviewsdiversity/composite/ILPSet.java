@@ -17,11 +17,11 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
 
 public class ILPSet extends ILP {
-	ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult = new ConcurrentHashMap<Integer, List<SentimentSet>>();
+	ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult;
 
 	public ILPSet(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult) {
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult) {
 		super(k, threshold, docToStatisticalResult);
 		this.docToTopKSetsResult = docToTopKSetsResult;
 	}
@@ -29,16 +29,16 @@ public class ILPSet extends ILP {
 	/**
 	 * Run Integer Linear Programming for a doctor's data set
 	 * @param docId - doctor ID
-	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
+	 * @param sentimentSets - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected void runILPSetPerDoc(int docId, List<SentimentSet> sentimentSets) {
+	protected void runILPSetPerDoc(String docId, List<SentimentSet> sentimentSets) {
 		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
-		List<SentimentSet> topKSets = new ArrayList<SentimentSet>();
+		List<SentimentSet> topKSets = new ArrayList<>();
 		
-		List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+		List<ConceptSentimentPair> pairs = new ArrayList<>();
 		for (SentimentSet set : sentimentSets) {
 			if (set.getPairs().size() > 0) {
 				for (ConceptSentimentPair pair : set.getPairs()) {

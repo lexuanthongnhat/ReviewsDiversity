@@ -5,14 +5,14 @@ import java.util.List;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 
 public class DoctorPairs {
-	private Integer docID;
+	private String docID;
 	private RawReview rawReview;
 	private List<ConceptSentimentPair> pairs;
 	
-	public Integer getDocID() {
+	public String getDocID() {
 		return docID;
 	}
-	public void setDocID(Integer docID) {
+	public void setDocID(String docID) {
 		this.docID = docID;
 	}
 	public List<ConceptSentimentPair> getPairs() {
@@ -24,7 +24,7 @@ public class DoctorPairs {
 	
 	public DoctorPairs() {}
 	
-	public DoctorPairs(Integer docID, List<ConceptSentimentPair> pairs) {
+	public DoctorPairs(String docID, List<ConceptSentimentPair> pairs) {
 		super();
 		this.docID = docID;
 		this.pairs = pairs;

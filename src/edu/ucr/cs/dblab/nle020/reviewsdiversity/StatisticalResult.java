@@ -6,7 +6,7 @@ import java.util.Map;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
 
 public class StatisticalResult {
-	private int docID = 0;
+	private String docID = "docId";
 	
 	private int k = 0;
 	private float threshold = 0.0f;
@@ -40,7 +40,7 @@ public class StatisticalResult {
 		}
 	}
 	
-	public void switchToMin(StatisticalResult other) {
+	void switchToMin(StatisticalResult other) {
 		if (other.runningTime < this.runningTime) { 
 	//			|| other.partialTimes.get(PartialTimeIndex.SETUP) < this.partialTimes.get(PartialTimeIndex.SETUP)) {
 			
@@ -81,7 +81,7 @@ public class StatisticalResult {
 		this.runningTime = runningTime;
 	}
 	
-	public StatisticalResult(int docID, int k, float threshold) {
+	public StatisticalResult(String docID, int k, float threshold) {
 		super();
 		this.docID = docID;
 		this.k = k;
@@ -127,11 +127,11 @@ public class StatisticalResult {
 				+ ", partialTimes=" + partialTimes + "]";
 	}
 
-	public int getDocID() {
+	public String getDocID() {
 		return docID;
 	}
 
-	public void setDocID(int docID) {
+	public void setDocID(String docID) {
 		this.docID = docID;
 	}
 

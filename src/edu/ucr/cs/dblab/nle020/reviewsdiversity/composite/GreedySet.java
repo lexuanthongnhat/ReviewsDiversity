@@ -27,12 +27,12 @@ public class GreedySet {
 
 	protected FullPair root = new FullPair(Constants.ROOT_CUI);
 	
-	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
-	ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult = new ConcurrentHashMap<Integer, List<SentimentSet>>();
+	protected ConcurrentMap<String, StatisticalResult> docToStatisticalResult;
+	ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult;
 			
 	public GreedySet(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult) {
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
@@ -43,21 +43,21 @@ public class GreedySet {
 	/**
 	 * Run Greedy Algorithm for a doctor's data set
 	 * @param docId - doctor ID
-	 * @param sentimentUnits - list of sentiment units/nodes in K-medians
+	 * @param sentimentSets - list of sentiment units/nodes in K-medians
 	 * @return Result's statistics
 	 */
-	protected void runGreedyPerDoc(int docId, List<? extends SentimentSet> sentimentSets) {
+	protected void runGreedyPerDoc(String docId, List<? extends SentimentSet> sentimentSets) {
 		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);;
 
 //		printInitialization();		
 
-		List<FullPair> topK = new ArrayList<FullPair>();	
-		List<FullPair> fullPairSets = new ArrayList<FullPair>();
+		List<FullPair> topK = new ArrayList<>();
+		List<FullPair> fullPairSets = new ArrayList<>();
 		FiniteDistanceInitializer.initFullPairs(threshold, sentimentSets, fullPairSets, statisticalResult);
 		
-		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<FullPair, Map<FullPair, Integer>>();
+		Map<FullPair, Map<FullPair, Integer>> distances = new HashMap<>();
 		if (Constants.DEBUG_MODE)
 			initDistances(fullPairSets, distances);		
 		
@@ -154,7 +154,7 @@ public class GreedySet {
 	private void initDistances(List<FullPair> fullPairSets,
 			Map<FullPair, Map<FullPair, Integer>> distances) {
 		for (FullPair fullPairSet : fullPairSets) {
-			distances.put(fullPairSet, new HashMap<FullPair, Integer>());
+			distances.put(fullPairSet, new HashMap<>());
 			
 			for (FullPair customer : fullPairSet.getCustomerMap().keySet()) {
 				distances.get(fullPairSet).put(customer, fullPairSet.distanceToCustomer(customer));

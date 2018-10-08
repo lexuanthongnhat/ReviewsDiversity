@@ -11,13 +11,13 @@ public class GreedyThreadImpl extends Greedy implements Runnable{
 	private int index;			// Thread Index
 	private int numThreadsAlgorithm;
 	
-	Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs;	
+	private Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairs;
 
-	public GreedyThreadImpl(int k, float threshold, 
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult,
+	GreedyThreadImpl(int k, float threshold,
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<ConceptSentimentPair>> docToTopKPairsResult,
 			int index, int numThreadsAlgorithm,
-			Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairs) {
+			Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairs) {
 		super(k, threshold, docToStatisticalResult, docToTopKPairsResult);
 		
 		this.index = index;
@@ -26,11 +26,11 @@ public class GreedyThreadImpl extends Greedy implements Runnable{
 	}
 	
 	@Override
-	public void run() {		
-		Integer[] docIDs = docToConceptSentimentPairs.keySet().toArray(new Integer[docToConceptSentimentPairs.size()]); 
+	public void run() {
+		String[] docIDs = docToConceptSentimentPairs.keySet().toArray(new String[docToConceptSentimentPairs.size()]);
 		
 		for (int i = index; i < docIDs.length; i += numThreadsAlgorithm) {
-			Integer docId = docIDs[i];
+			String docId = docIDs[i];
 //			Utils.printTotalHeapSize("Heapsize before docID " + docId);
 			runGreedyPerDoc(docId, docToConceptSentimentPairs.get(docId));
 //			Utils.printTotalHeapSize("Heapsize after docID " + docId);

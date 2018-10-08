@@ -433,16 +433,16 @@ public class TopKBaseLineSurvey {
 
 		/*Map<Integer, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews(
 		    "src/main/resources/survey/pre_selected_survey.txt");*/
-    Map<Integer, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews();
+    Map<String, List<SentimentReview>> docToSentimentReviews = chooseDoctorToSentimentReviews();
 
-		Map<Integer, List<SentimentSentence>> docToSentimentSentences =
+		Map<String, List<SentimentSentence>> docToSentimentSentences =
 		    convertToDocToSentimentSentences(docToSentimentReviews);
-		Map<Integer, List<SentimentSentence>> docToTopSentencesOurMethod = getKSentencesOurMethod(
+		Map<String, List<SentimentSentence>> docToTopSentencesOurMethod = getKSentencesOurMethod(
 		    docToSentimentSentences, K, 0.5f);
-		Map<Integer, List<SentimentSentence>> docToTopSentencesBaseline = getKSentencesBaseline(
+		Map<String, List<SentimentSentence>> docToTopSentencesBaseline = getKSentencesBaseline(
 		    docToSentimentSentences);
-		Map<Integer, List<SentimentSentence>> docToTopSentences = new HashMap<>();
-		for (Integer docId : docToTopSentencesOurMethod.keySet()) {
+		Map<String, List<SentimentSentence>> docToTopSentences = new HashMap<>();
+		for (String docId : docToTopSentencesOurMethod.keySet()) {
 			docToTopSentences.put(docId, reorderTopSentences(docToTopSentencesOurMethod.get(docId),
 			                                                 docToTopSentencesBaseline.get(docId)));
 		}
@@ -481,10 +481,10 @@ public class TopKBaseLineSurvey {
 		return reorderedSentences;
 	}
 
-	private static Map<Integer, List<SentimentSentence>> convertToDocToSentimentSentences(
-			Map<Integer, List<SentimentReview>> docToSentimentReviews) {
-		Map<Integer, List<SentimentSentence>> docToSentimentSentences = new HashMap<>();
-		for (Integer docId : docToSentimentReviews.keySet()) {
+	private static Map<String, List<SentimentSentence>> convertToDocToSentimentSentences(
+			Map<String, List<SentimentReview>> docToSentimentReviews) {
+		Map<String, List<SentimentSentence>> docToSentimentSentences = new HashMap<>();
+		for (String docId : docToSentimentReviews.keySet()) {
 			List<SentimentSentence> sentences = new ArrayList<>();
 			for (SentimentReview review : docToSentimentReviews.get(docId)) {
 				List<SentimentSentence> reviewSentences = review.getSentences();
@@ -496,31 +496,31 @@ public class TopKBaseLineSurvey {
 		return docToSentimentSentences;
 	}
 
-	private static Map<Integer, List<SentimentSentence>> getKSentencesOurMethod(
-	    Map<Integer, List<SentimentSentence>> docToSentimentSentences,
+	private static Map<String, List<SentimentSentence>> getKSentencesOurMethod(
+	    Map<String, List<SentimentSentence>> docToSentimentSentences,
 	    int k,
 	    float threshold) {
 
-		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<>();
-		for (Integer docId : docToSentimentSentences.keySet()) {
+		Map<String, List<SentimentSet>> docToSentimentSets = new HashMap<>();
+		for (String docId : docToSentimentSentences.keySet()) {
 			List<SentimentSet> sentimentSets = new ArrayList<>();
-			docToSentimentSentences.get(docId).stream().forEach(sentence -> sentimentSets.add(sentence));
+			docToSentimentSentences.get(docId).forEach(sentence -> sentimentSets.add(sentence));
 			docToSentimentSets.put(docId, sentimentSets);
 		}
 
-		Map<Integer, List<SentimentSentence>> docToTopKSentences = new HashMap<>();
+		Map<String, List<SentimentSentence>> docToTopKSentences = new HashMap<>();
 
-		ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<>();
-		ConcurrentMap<Integer, List<SentimentSet>> docToTopKSets = new ConcurrentHashMap<>();
+		ConcurrentMap<String, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<>();
+		ConcurrentMap<String, List<SentimentSet>> docToTopKSets = new ConcurrentHashMap<>();
 
 		GreedySetThreadImpl ourMethod = new GreedySetThreadImpl(k, threshold,
 				docToStatisticalResult, docToTopKSets, 0, 1, docToSentimentSets);
 		ourMethod.run();
 
 
-		for (Integer docId : docToTopKSets.keySet()) {
+		for (String docId : docToTopKSets.keySet()) {
 			List<SentimentSentence> sentences = new ArrayList<>();
-			docToTopKSets.get(docId).stream().forEach(set -> {
+			docToTopKSets.get(docId).forEach(set -> {
 			  // To avoid error when writing to Json (recursive FullPair)
 				set.setFullPairs(new ArrayList<>());
 				sentences.add((SentimentSentence) set);
@@ -531,22 +531,22 @@ public class TopKBaseLineSurvey {
 		return docToTopKSentences;
 	}
 
-	private static Map<Integer, List<SentimentSentence>> getKSentencesBaseline(
-	    Map<Integer, List<SentimentSentence>> docToSentimentSentences) {
+	private static Map<String, List<SentimentSentence>> getKSentencesBaseline(
+	    Map<String, List<SentimentSentence>> docToSentimentSentences) {
 
-		Map<Integer, List<SentimentSet>> docToSentimentSets = new HashMap<>();
-		for (Integer docId : docToSentimentSentences.keySet()) {
+		Map<String, List<SentimentSet>> docToSentimentSets = new HashMap<>();
+		for (String docId : docToSentimentSentences.keySet()) {
 			List<SentimentSet> sentimentSets = new ArrayList<>();
-			docToSentimentSentences.get(docId).stream().forEach(sentence -> sentimentSets.add(sentence));
+			docToSentimentSentences.get(docId).forEach(sentence -> sentimentSets.add(sentence));
 			docToSentimentSets.put(docId, sentimentSets);
 		}
 
-		Map<Integer, List<SentimentSentence>> docToTopKSentences = new HashMap<>();
-		for (Integer docId : docToSentimentSets.keySet()) {
+		Map<String, List<SentimentSentence>> docToTopKSentences = new HashMap<>();
+		for (String docId : docToSentimentSets.keySet()) {
 //			List<SentimentSet> sets = FreqBasedTopSets.selectMostPopular(docToSentimentSets.get(docId), K);
 			List<SentimentSet> sets = new ArrayList<>();
 			List<SentimentSentence> sentences = new ArrayList<>();
-			sets.stream().forEach(set -> {
+			sets.forEach(set -> {
 			  // To avoid error when writing to Json (recursive FullPair)
 				set.setFullPairs(new ArrayList<>());
 				sentences.add((SentimentSentence) set);
@@ -558,13 +558,13 @@ public class TopKBaseLineSurvey {
 	}
 
 	private static void outputToExcel(
-			Map<Integer, List<SentimentSentence>> docToSentimentSentences,
-			Map<Integer, List<SentimentSentence>> docToTopSentences,
+			Map<String, List<SentimentSentence>> docToSentimentSentences,
+			Map<String, List<SentimentSentence>> docToTopSentences,
 			String outputExcelPath) {
 
 		Map<SentimentSentence, XSSFRichTextString> sentenceToRichText = new HashMap<>();
-		for (Integer docId : docToSentimentSentences.keySet()) {
-			docToSentimentSentences.get(docId).stream().forEach( sentence ->
+		for (String docId : docToSentimentSentences.keySet()) {
+			docToSentimentSentences.get(docId).forEach( sentence ->
 				sentenceToRichText.put(sentence, prepareColoredRichTextSentence(sentence.getSentence()))
 				);
 		}
@@ -573,12 +573,12 @@ public class TopKBaseLineSurvey {
 	}
 
 	private static void outputToExcel(
-			Map<Integer, List<SentimentSentence>> docToSentimentSentences,
-			Map<Integer, List<SentimentSentence>> docToTopSentences,
+			Map<String, List<SentimentSentence>> docToSentimentSentences,
+			Map<String, List<SentimentSentence>> docToTopSentences,
 			String outputExcelPath,
 			Map<SentimentSentence, XSSFRichTextString> sentenceToRichText) {
 
-		for (Integer docId : docToSentimentSentences.keySet()) {
+		for (String docId : docToSentimentSentences.keySet()) {
 			XSSFSheet sheet = wb.createSheet(docId + "");
 			fillSheet(sheet, docToSentimentSentences.get(docId), docToTopSentences.get(docId),
 			    sentenceToRichText);
@@ -669,37 +669,37 @@ public class TopKBaseLineSurvey {
 		return richText;
 	}
 
-	private static Map<Integer, List<SentimentReview>> chooseDoctorToSentimentReviews() {
-		Map<Integer, List<SentimentReview>> completeDocToReviews = importRawCompleteDocToReviews(
+	private static Map<String, List<SentimentReview>> chooseDoctorToSentimentReviews() {
+		Map<String, List<SentimentReview>> completeDocToReviews = importRawCompleteDocToReviews(
 		    TopPairsProgram.DOC_TO_REVIEWS_PATH);
-		Map<Integer, List<SentimentReview>> docToReviews = new HashMap<>();
+		Map<String, List<SentimentReview>> docToReviews = new HashMap<>();
 
 		Set<Integer> indices = Utils.randomIndices(completeDocToReviews.size(), NUM_DOCS_TO_SURVEY);
 
-		Integer[] allDocIds = new Integer[completeDocToReviews.size()];
+		String[] allDocIds = new String[completeDocToReviews.size()];
 		completeDocToReviews.keySet().toArray(allDocIds);
 
 		for (Integer index : indices)
 			docToReviews.put(allDocIds[index], completeDocToReviews.get(allDocIds[index]));
 
-		Map<Integer, List<SentimentReview>> choosenDocToReviews = new HashMap<>();
-		for (Integer docId : docToReviews.keySet()) {
+		Map<String, List<SentimentReview>> choosenDocToReviews = new HashMap<>();
+		for (String docId : docToReviews.keySet()) {
 			choosenDocToReviews.put(docId, pickUpReviewsForSurvey(docToReviews.get(docId)));
 		}
 
 		return choosenDocToReviews;
 	}
 
-	private static Map<Integer, List<SentimentReview>> chooseDoctorToSentimentReviews(
+	private static Map<String, List<SentimentReview>> chooseDoctorToSentimentReviews(
 	    String inputFile) {
 
-		Map<Integer, List<SentimentReview>> docToReviews = new HashMap<>();
+		Map<String, List<SentimentReview>> docToReviews = new HashMap<>();
 		List<DoctorSentimentReview> doctorSentimentReviews =
 		    TopPairsProgram.importDoctorSentimentReviewsDataset(inputFile);
 
 		for (DoctorSentimentReview doctorSentimentReview : doctorSentimentReviews) {
 			List<SentimentReview> reviews = doctorSentimentReview.getSentimentReviews();
-			Integer docId = doctorSentimentReview.getDocId();
+			String docId = doctorSentimentReview.getDocId();
 			docToReviews.put(docId, reviews);
 		}
 
@@ -774,9 +774,9 @@ public class TopKBaseLineSurvey {
 
 	}
 
-	private static Map<Integer, List<SentimentReview>> importRawCompleteDocToReviews(
+	private static Map<String, List<SentimentReview>> importRawCompleteDocToReviews(
 			String docToReviewsPath) {
-		Map<Integer, List<SentimentReview>> rawDocToReviews = new HashMap<>();
+		Map<String, List<SentimentReview>> rawDocToReviews = new HashMap<>();
 		List<DoctorSentimentReview> doctorSentimentReviews =
 		    TopPairsProgram.importDoctorSentimentReviewsDataset(docToReviewsPath);
 

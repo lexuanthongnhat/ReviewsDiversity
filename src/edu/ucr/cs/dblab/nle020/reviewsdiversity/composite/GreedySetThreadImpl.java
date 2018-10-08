@@ -13,13 +13,13 @@ public class GreedySetThreadImpl extends GreedySet implements Runnable{
 	private int index;			// Thread Index
 	private int numThreadsAlgorithm;
 	
-	Map<Integer, List<SentimentSet>> docToSentimentSets;	
+	private Map<String, List<SentimentSet>> docToSentimentSets;
 
 	public GreedySetThreadImpl(int k, float threshold, 
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult,
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult,
 			int index, int numThreadsAlgorithm, 
-			Map<Integer, List<SentimentSet>> docToSentimentSets) {
+			Map<String, List<SentimentSet>> docToSentimentSets) {
 		super(k, threshold, docToStatisticalResult, docToTopKSetsResult);
 		
 		this.index = index;
@@ -30,10 +30,11 @@ public class GreedySetThreadImpl extends GreedySet implements Runnable{
 	@Override
 	public void run() {
 		long startTime = System.currentTimeMillis();
-		Integer[] docIDs = docToSentimentSets.keySet().toArray(new Integer[docToSentimentSets.size()]); 
+        String[] docIDs =
+				docToSentimentSets.keySet().toArray(new String[docToSentimentSets.size()]);
 		
 		for (int i = index; i < docIDs.length; i += numThreadsAlgorithm) {
-			Integer docId = docIDs[i];
+            String docId = docIDs[i];
 			runGreedyPerDoc(docId, docToSentimentSets.get(docId));
 			
 			Utils.printRunningTime(startTime, "Finished GreedySet #" + i + " of docId " + docId);

@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.StatisticalResult;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
@@ -13,13 +12,13 @@ public class RandomizedRoundingSetThreadImpl extends RandomizedRoundingSet imple
 	private int index;			// To specify the thread order
 	private int numThreadsAlgorithm;
 	
-	Map<Integer, List<SentimentSet>> docToSentimentSets;		
+	private Map<String, List<SentimentSet>> docToSentimentSets;
 	
 	public RandomizedRoundingSetThreadImpl(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult,
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult,
 			int index, int numThreadsAlgorithm, 
-			Map<Integer, List<SentimentSet>> docToSentimentSets) {
+			Map<String, List<SentimentSet>> docToSentimentSets) {
 		super(k, threshold, docToStatisticalResult, docToTopKSetsResult);
 		this.index = index;
 		this.numThreadsAlgorithm = numThreadsAlgorithm;
@@ -30,10 +29,10 @@ public class RandomizedRoundingSetThreadImpl extends RandomizedRoundingSet imple
 	@Override
 	public void run() {
 		long startTime = System.currentTimeMillis();
-		Integer[] docIDs = docToSentimentSets.keySet().toArray(new Integer[docToSentimentSets.size()]); 
+		String[] docIDs = docToSentimentSets.keySet().toArray(new String[docToSentimentSets.size()]);
 		
 		for (int i = index; i < docIDs.length; i += numThreadsAlgorithm) {
-			Integer docId = docIDs[i];
+			String docId = docIDs[i];
 			
 			runRandomizedRoundingSetPerDoc(docId, docToSentimentSets.get(docId));
 			

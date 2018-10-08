@@ -28,12 +28,12 @@ public class TextSummarizer {
    *
    * @param sentencePath path to export the prepared dataset
    */
-  private static void exportDataset(String sentencePath) {
-    Map<Integer, List<SentimentSet>> docToSentences = TopPairsProgram
-        .importDocToSentimentSentences(TopPairsProgram.DOC_TO_REVIEWS_PATH, false);
+  private static void exportDataset(String inputPath, String sentencePath) {
+    Map<String, List<SentimentSet>> docToSentences = TopPairsProgram
+              .importDocToSentimentSentences(inputPath, false, -1);
 
-    Map<Integer, Map<String, String>> docToTrimSentences = new HashMap<>();
-    for (Integer doc : docToSentences.keySet()) {
+    Map<String, Map<String, String>> docToTrimSentences = new HashMap<>();
+    for (String doc : docToSentences.keySet()) {
       docToTrimSentences.put(doc, new HashMap<>());
       for (SentimentSet sentence : docToSentences.get(doc)) {
         String str = ((SentimentSentence) sentence).getSentence();
@@ -67,7 +67,7 @@ public class TextSummarizer {
     for (String summarizer : summarizers) {
       final Map<Integer, Map<String, List<String>>> kToDocSummaries = importSummaries(inputDir,
           summarizer);
-      final Map<Integer, Map<Integer, List<SentimentSet>>> kToDocSentences = inferSummaries(
+      final Map<Integer, Map<String, List<SentimentSet>>> kToDocSentences = inferSummaries(
           kToDocSummaries);
       exportSummaries(kToDocSentences, outputDir, summarizer);
     }
@@ -105,23 +105,22 @@ public class TextSummarizer {
    * @param kToDocSummaries summaries in form of sentence id list
    * @return summaries in form of SentimentSentence list
    */
-  private static Map<Integer, Map<Integer, List<SentimentSet>>> inferSummaries(
+  private static Map<Integer, Map<String, List<SentimentSet>>> inferSummaries(
       Map<Integer, Map<String, List<String>>> kToDocSummaries) {
-    Map<Integer, List<SentimentSet>> docToAllSentences = TopPairsProgram
-        .importDocToSentimentSentences(TopPairsProgram.DOC_TO_REVIEWS_PATH, false);
+    Map<String, List<SentimentSet>> docToAllSentences = TopPairsProgram
+        .importDocToSentimentSentences(TopPairsProgram.DOC_TO_REVIEWS_PATH, false, -1);
 
-    Map<Integer, Map<Integer, List<SentimentSet>>> kToDocSentences = new HashMap<>();
+    Map<Integer, Map<String, List<SentimentSet>>> kToDocSentences = new HashMap<>();
     for (Integer k : kToDocSummaries.keySet()) {
       Map<String, List<String>> docToSummary = kToDocSummaries.get(k);
-      Map<Integer, List<SentimentSet>> docToSentences = new HashMap<>();
+      Map<String, List<SentimentSet>> docToSentences = new HashMap<>();
       for (String doc : docToSummary.keySet()) {
-        Integer docId = Integer.valueOf(doc);
         Set<String> sentences = new HashSet<>(docToSummary.get(doc));
-        List<SentimentSet> allSentences = docToAllSentences.get(docId);
-        docToSentences.put(docId, new ArrayList<>());
+        List<SentimentSet> allSentences = docToAllSentences.get(doc);
+        docToSentences.put(doc, new ArrayList<>());
         for (SentimentSet s : allSentences) {
           if (sentences.contains(s.getId())) {
-            docToSentences.get(docId).add(s);
+            docToSentences.get(doc).add(s);
           }
         }
       }
@@ -131,10 +130,10 @@ public class TextSummarizer {
   }
 
   private static void exportSummaries(
-      Map<Integer, Map<Integer, List<SentimentSet>>> kToDocSentences,
+      Map<Integer, Map<String, List<SentimentSet>>> kToDocSentences,
       String dir, String summarizer) {
     for (Integer k : kToDocSentences.keySet()) {
-      Map<Integer, List<SentimentSet>> docToTopKSentences = kToDocSentences.get(k);
+      Map<String, List<SentimentSet>> docToTopKSentences = kToDocSentences.get(k);
       String outputPath = dir + "top_sentence_" + summarizer + "_k" + k.toString() + ".txt";
       TopPairsProgram.outputTopKToJson(outputPath, docToTopKSentences);
     }
@@ -159,8 +158,12 @@ public class TextSummarizer {
         String footer = "Task 2 is the main usage; task 1 is enabled by flag \"-p\".";
         formatter.printHelp("TextSummarizer", header, options, footer, true);
       } else if (line.hasOption("p")) {
-        String senPath = "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/sentence_data.json";
-        exportDataset(senPath);
+//        String inputPath = TopPairsProgram.DOC_TO_REVIEWS_PATH;
+//        String senPath = "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/sentence_data.json";
+        String inputPath =
+                "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/cell/review_transformed.jl";
+        String senPath = "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/cell/cell.json";
+        exportDataset(inputPath, senPath);
       } else {
         long startTime = System.currentTimeMillis();
         String inputDir = "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/summary/";

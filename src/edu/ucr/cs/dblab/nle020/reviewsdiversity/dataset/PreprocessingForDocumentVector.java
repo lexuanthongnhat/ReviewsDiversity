@@ -34,23 +34,23 @@ public class PreprocessingForDocumentVector {
 	public final static int SAMPLE_SIZE = 100;
 
 	public static void main (String[] args) {
-		Map<Integer, List<SentimentReview>> docToSentimentReviews = 
+		Map<String, List<SentimentReview>> docToSentimentReviews =
 				importDocToSentimentReviews(DOC_TO_REVIEWS_PATH, 1000);
 		
 		outputSampleSentenceToFile(docToSentimentReviews, PYTHON_WORKSPACE);
 		
-		Set<Integer> seenReviewIds = new HashSet<Integer>();
+		Set<Integer> seenReviewIds = new HashSet<>();
 		for (List<SentimentReview> reviews : docToSentimentReviews.values()) {
 			for (SentimentReview review : reviews){
 				seenReviewIds.add(Integer.parseInt(review.getId().trim()));
 			}
 		}
 		
-		List<RawReview> oneStarRawReviews = new ArrayList<RawReview>();
-		List<RawReview> twoStarRawReviews = new ArrayList<RawReview>();
-		List<RawReview> threeStarRawReviews = new ArrayList<RawReview>();
-		List<RawReview> fourStarRawReviews = new ArrayList<RawReview>();
-		
+		List<RawReview> oneStarRawReviews = new ArrayList<>();
+		List<RawReview> twoStarRawReviews = new ArrayList<>();
+		List<RawReview> threeStarRawReviews = new ArrayList<>();
+		List<RawReview> fourStarRawReviews = new ArrayList<>();
+
 		List<RawReview> rawReviews = getReviews(FULL_REVIEWS_PATH);
 		for (RawReview review : rawReviews) {
 			if (!seenReviewIds.contains(review.getId())) {					
@@ -74,23 +74,25 @@ public class PreprocessingForDocumentVector {
 				+ ", #3-star: " + threeStarRawReviews.size() + ", #4-star: " + fourStarRawReviews.size());
 	}
 	
-	private static void outputSampleSentenceToFile(Map<Integer, List<SentimentReview>> docToSentimentReviews, String outputFolder) {
+	private static void outputSampleSentenceToFile(
+	        Map<String, List<SentimentReview>> docToSentimentReviews,
+            String outputFolder) {
 		int samplePartSize = SAMPLE_SIZE / 4;
 		
-		List<SentimentSentence> sentences = new ArrayList<SentimentSentence>();
-		Map<Integer, SentimentSentence> orderToSentences = new HashMap<Integer, SentimentSentence>();
+		List<SentimentSentence> sentences = new ArrayList<>();
+		Map<Integer, SentimentSentence> orderToSentences = new HashMap<>();
 		int sentenceCount = 0;
 		
-		List<SentimentReview> allReviews = new ArrayList<SentimentReview>();
-		docToSentimentReviews.values().stream().forEach(reviews -> allReviews.addAll(reviews));
+		List<SentimentReview> allReviews = new ArrayList<>();
+		docToSentimentReviews.values().forEach(reviews -> allReviews.addAll(reviews));
 		
-		List<SentimentReview> sampleReviews = new ArrayList<SentimentReview>();
+		List<SentimentReview> sampleReviews = new ArrayList<>();
 		int oneStarCount = 0;
 		int twoStarCount = 0;
 		int threeStarCount = 0;
 		int fourStarCount = 0;
 		Random random = new Random();
-		Set<Integer> seenIndices = new HashSet<Integer>();
+		Set<Integer> seenIndices = new HashSet<>();
 		while ((oneStarCount + twoStarCount + threeStarCount + fourStarCount) < SAMPLE_SIZE) {
 			int randomIndex = random.nextInt(allReviews.size());
 			while (seenIndices.contains(randomIndex)) {
@@ -145,8 +147,9 @@ public class PreprocessingForDocumentVector {
 	}
 
 	// Make sure: each conceptSentimentPair of a SentimentReview has an unique hashcode
-	private static Map<Integer, List<SentimentReview>> importDocToSentimentReviews(String path, int numDoctorsToExperiment) {
-		Map<Integer, List<SentimentReview>> result = new HashMap<Integer, List<SentimentReview>>();
+	private static Map<String, List<SentimentReview>> importDocToSentimentReviews(
+			String path, int numDoctorsToExperiment) {
+		Map<String, List<SentimentReview>> result = new HashMap<>();
 		
 		ObjectMapper mapper = new ObjectMapper();		
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {	
@@ -154,12 +157,12 @@ public class PreprocessingForDocumentVector {
 			int count = 0;
 			while ((line = reader.readLine()) != null) {
 				DoctorSentimentReview doctorSentimentReview = mapper.readValue(line, DoctorSentimentReview.class);
-				
-				Integer docId = doctorSentimentReview.getDocId();
-				List<SentimentReview> sentimentReviews = new ArrayList<SentimentReview>();
+
+				String docId = doctorSentimentReview.getDocId();
+				List<SentimentReview> sentimentReviews = new ArrayList<>();
 				
 				for (SentimentReview sentimentReview : doctorSentimentReview.getSentimentReviews()) {
-					List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+					List<ConceptSentimentPair> pairs = new ArrayList<>();
 					for (SentimentSentence sentimentSentence : sentimentReview.getSentences()) {
 						for (ConceptSentimentPair csPair : sentimentSentence.getPairs()) {
 						
@@ -223,7 +226,7 @@ public class PreprocessingForDocumentVector {
 		String normalized = text.toLowerCase();
 	
 		// Erroneous codes
-		normalized = normalized.replace("…", "").replace("—", "");
+		normalized = normalized.replace("ï¿½", "").replace("ï¿½", "");
 		normalized = normalized.replaceAll("\\x85", "").replaceAll("\\x97", "")
 				.replaceAll("\\xb4", "").replaceAll("\\x96", "");
 		
@@ -240,8 +243,7 @@ public class PreprocessingForDocumentVector {
 	private static List<RawReview> getReviews(String file) {
 		long startTime = System.currentTimeMillis();	
 
-		List<RawReview> results = new ArrayList<RawReview>();
-		
+		List<RawReview> results = new ArrayList<>();
 		try {
 			Reader in = new FileReader(file);
 			Iterable<CSVRecord> records = CSVFormat.EXCEL.parse(in);
@@ -253,8 +255,8 @@ public class PreprocessingForDocumentVector {
 					continue;
 				}
 				
-				int id = Integer.parseInt(record.get(0).trim());
-				int docID = Integer.parseInt(record.get(1).trim());
+				String id = record.get(0).trim();
+                String docID = record.get(1).trim();
 				String tittle = record.get(5).trim();
 				String body = record.get(6).trim();
 				body = body.replace("DR.", "DR").replace("dr.", "dr").replace("Dr.", "Dr").replace("dR.", "dR");
@@ -264,10 +266,10 @@ public class PreprocessingForDocumentVector {
 				body = body.replace("Mrs.", "Mrs").replace("mrs.", "mrs").replace("MRS.", "MRS");
 				body = body.replace("Miss.", "Miss");
 				
-				// The review "Â " cause MetaMap server to fail				
+				// The review "ï¿½ " cause MetaMap server to fail				
 				body = body.replace("Â ", "");
-				body = body.replace("Â", "");
-				body = body.replaceAll("â€¦", "").replaceAll("¨", "").replaceAll("¦", "").replace("Ã¯»¿", "");
+				body = body.replace("ï¿½", "");
+				body = body.replaceAll("â€¦", "").replaceAll("ï¿½", "").replaceAll("ï¿½", "").replace("Ã¯ï¿½ï¿½", "");
 				
 				if (body.trim().length() == 0)
 					continue;
@@ -289,10 +291,7 @@ public class PreprocessingForDocumentVector {
 					}
 					if (sum > 0) {
 						rate = sum/count;
-				//		System.out.println("RawReview: " + body + ", rate: " + rate);
-					} else {
-				//		System.out.println("RawReview: " + body);
-					}				
+					}
 				}
 				
 				if (rate >= 0) {

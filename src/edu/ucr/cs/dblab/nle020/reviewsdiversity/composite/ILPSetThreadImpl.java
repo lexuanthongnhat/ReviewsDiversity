@@ -14,12 +14,12 @@ public class ILPSetThreadImpl extends ILPSet implements Runnable {
 	private int index;			// To specify the thread order
 	private int numThreadsAlgorithm;
 	
-	Map<Integer, List<SentimentSet>> docToSentimentSets;	
+	Map<String, List<SentimentSet>> docToSentimentSets;
 	public ILPSetThreadImpl(int k, float threshold, 
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult, 
-			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult,
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult,
 			int index, int numThreadsAlgorithm, 
-			Map<Integer, List<SentimentSet>> docToSentimentSets) {
+			Map<String, List<SentimentSet>> docToSentimentSets) {
 		super(k, threshold, docToStatisticalResult, docToTopKSetsResult);
 		
 		this.index = index;
@@ -30,10 +30,10 @@ public class ILPSetThreadImpl extends ILPSet implements Runnable {
 	@Override
 	public void run() {
 		long startTime = System.currentTimeMillis();
-		Integer[] docIDs = docToSentimentSets.keySet().toArray(new Integer[docToSentimentSets.size()]); 
+		String[] docIDs = docToSentimentSets.keySet().toArray(new String[docToSentimentSets.size()]);
 
 		for (int i = index; i < docIDs.length; i += numThreadsAlgorithm) {
-			Integer docId = docIDs[i];
+			String docId = docIDs[i];
 			runILPSetPerDoc(docId, docToSentimentSets.get(docId));
 			
 			Utils.printRunningTime(startTime, "ILPSet Finished " + i + ", final cost: " + docToStatisticalResult.get(docId).getFinalCost());

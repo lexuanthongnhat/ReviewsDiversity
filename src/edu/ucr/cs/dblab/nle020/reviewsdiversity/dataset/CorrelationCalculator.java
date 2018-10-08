@@ -7,23 +7,22 @@ import java.util.Map;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 
-public class CorrelationCalculator {
+class CorrelationCalculator {
 		
 	// Update the field "correlation" of ConceptSentimentPair
-	public static void calculatePairCorrelation(Map<RawReview, List<ConceptSentimentPair>> reviewToPairs) {
-		Map<Integer, Float> reviewIdToRate = calculateReviewToNormalizedRate(reviewToPairs);
-
-		Map<String, Map<Integer, Float>> cuiToSentimentMap = new HashMap<String, Map<Integer, Float>>();
+	static void calculatePairCorrelation(Map<RawReview, List<ConceptSentimentPair>> reviewToPairs) {
+		Map<String, Float> reviewIdToRate = calculateReviewToNormalizedRate(reviewToPairs);
+		Map<String, Map<String, Float>> cuiToSentimentMap = new HashMap<>();
 		
 		for (RawReview rawReview : reviewToPairs.keySet()) {
-			int reviewId = rawReview.getId();
+			String reviewId = rawReview.getId();
 						
-			Map<String, List<Float>> cuiToSentimentsWithinReview = new HashMap<String, List<Float>>();
+			Map<String, List<Float>> cuiToSentimentsWithinReview = new HashMap<>();
 			
 			for (ConceptSentimentPair pair : reviewToPairs.get(rawReview)) {
 				String cui = pair.getId();				
 				if (!cuiToSentimentsWithinReview.containsKey(cui))
-					cuiToSentimentsWithinReview.put(cui, new ArrayList<Float>());
+					cuiToSentimentsWithinReview.put(cui, new ArrayList<>());
 				cuiToSentimentsWithinReview.get(cui).add(pair.getSentiment());
 			}
 			
@@ -34,18 +33,16 @@ public class CorrelationCalculator {
 				float cuiCount = (float) cuiToSentimentsWithinReview.get(cui).size();				
 				
 				if (!cuiToSentimentMap.containsKey(cui))
-					cuiToSentimentMap.put(cui, new HashMap<Integer, Float>());
+					cuiToSentimentMap.put(cui, new HashMap<>());
 				cuiToSentimentMap.get(cui).put(reviewId, cuiSentiment / cuiCount);
 			}
 		}
 		
-		////////////////////////////
-		Map<String, Float> cuiToCorrelation = new HashMap<String, Float>();
+		Map<String, Float> cuiToCorrelation = new HashMap<>();
 		for (String cui : cuiToSentimentMap.keySet()) {
 			cuiToCorrelation.put(cui, calculatePairCorrelationForEachConcept(reviewIdToRate, cuiToSentimentMap.get(cui)));
 		}
 		
-		////////////////////////////
 		for (List<ConceptSentimentPair> pairList : reviewToPairs.values()) {
 			for (ConceptSentimentPair pair : pairList) {
 				pair.setCorrelation(cuiToCorrelation.get(pair.getId()));
@@ -54,26 +51,26 @@ public class CorrelationCalculator {
 	}
 	
 	// Update the field "correlation" of ConceptSentimentPair, treat concept as present or absent (not by sentiment)
-	public static void calculatePairCorrelationWithPresence(Map<RawReview, List<ConceptSentimentPair>> reviewToPairs) {
-		
-		Map<Integer, Float> reviewIdToRate = calculateReviewToNormalizedRate(reviewToPairs);
-		
-		Map<String, Map<Integer, Float>> cuiToPresenceMap = new HashMap<String, Map<Integer, Float>>();
+	static void calculatePairCorrelationWithPresence(
+			Map<RawReview, List<ConceptSentimentPair>> reviewToPairs) {
+		Map<String, Float> reviewIdToRate = calculateReviewToNormalizedRate(reviewToPairs);
+		Map<String, Map<String, Float>> cuiToPresenceMap = new HashMap<>();
 		
 		for (RawReview rawReview : reviewToPairs.keySet()) {
-			int reviewId = rawReview.getId();
+			String reviewId = rawReview.getId();
 						
 			for (ConceptSentimentPair pair : reviewToPairs.get(rawReview)) {
 				String cui = pair.getId();
 				if (!cuiToPresenceMap.containsKey(cui))
-					cuiToPresenceMap.put(cui, new HashMap<Integer, Float>());
+					cuiToPresenceMap.put(cui, new HashMap<>());
 				cuiToPresenceMap.get(cui).putIfAbsent(reviewId, (float) 1);
 			}
 		}		
 		
-		Map<String, Float> cuiToCorrelation = new HashMap<String, Float>();
+		Map<String, Float> cuiToCorrelation = new HashMap<>();
 		for (String cui : cuiToPresenceMap.keySet()) {
-			cuiToCorrelation.put(cui, calculatePairCorrelationWithPresenceForEachConcept(reviewIdToRate, cuiToPresenceMap.get(cui)));
+			cuiToCorrelation.put(cui, calculatePairCorrelationWithPresenceForEachConcept(
+			        reviewIdToRate, cuiToPresenceMap.get(cui)));
 		}		
 		
 		for (List<ConceptSentimentPair> pairList : reviewToPairs.values()) {
@@ -84,8 +81,8 @@ public class CorrelationCalculator {
 	}
 
 	private static Float calculatePairCorrelationForEachConcept(
-			Map<Integer, Float> reviewIdToRate, Map<Integer, Float> reviewIdToConceptSentiment) {
-		double correlation = 0.0f;
+			Map<String, Float> reviewIdToRate, Map<String, Float> reviewIdToConceptSentiment) {
+		double correlation;
 //		float size = reviewIdToConceptSentiment.size();
 		
 		double reviewMeanSum = 0.0f;
@@ -95,7 +92,7 @@ public class CorrelationCalculator {
 		double conceptDenominator = 0.0f;
 		double reviewDenominator = 0.0f;
 		float count = 0; 
-		for (Integer reviewId : reviewIdToConceptSentiment.keySet()) {
+		for (String reviewId : reviewIdToConceptSentiment.keySet()) {
 			if (reviewIdToRate.containsKey(reviewId)) {
 				++count;
 				reviewMeanSum += reviewIdToRate.get(reviewId);
@@ -125,8 +122,8 @@ public class CorrelationCalculator {
 	}
 	
 	private static Float calculatePairCorrelationWithPresenceForEachConcept(
-			Map<Integer, Float> reviewIdToRate, Map<Integer, Float> reviewIdToConceptPresence) {
-		double correlation = 0.0f;
+			Map<String, Float> reviewIdToRate, Map<String, Float> reviewIdToConceptPresence) {
+		double correlation;
 		float size = reviewIdToRate.size();
 		
 		double reviewMeanSum = 0.0f;
@@ -136,7 +133,7 @@ public class CorrelationCalculator {
 		double conceptDenominator = 0.0f;
 		double reviewDenominator = 0.0f;
 
-		for (Integer reviewId : reviewIdToRate.keySet()) {
+		for (String reviewId : reviewIdToRate.keySet()) {
 			
 			float reviewRate = reviewIdToRate.get(reviewId);	
 			float conceptPresence = 0.0f;
@@ -167,9 +164,9 @@ public class CorrelationCalculator {
 		return (float) correlation;
 	}
 
-	private static Map<Integer, Float> calculateReviewToNormalizedRate(
+	private static Map<String, Float> calculateReviewToNormalizedRate(
 			Map<RawReview, List<ConceptSentimentPair>> reviewToPairs) {
-		Map<Integer, Float> reviewIdToRate = new HashMap<Integer, Float>();		
+		Map<String, Float> reviewIdToRate = new HashMap<>();
 		for (RawReview rawReview : reviewToPairs.keySet()) {
 			if (reviewToPairs.get(rawReview).size() > 0) {
 				reviewIdToRate.put(rawReview.getId(), normalizingRate(rawReview.getRate()));
@@ -179,9 +176,9 @@ public class CorrelationCalculator {
 		return reviewIdToRate;
 	}
 
-	public static float normalizingRate(int rate) {
+	private static float normalizingRate(int rate) {
 		float mean = (100.0f + 25.0f) / 2.0f;
-		return (float) (rate - mean) / mean;
+		return (rate - mean) / mean;
 	}
 
 }

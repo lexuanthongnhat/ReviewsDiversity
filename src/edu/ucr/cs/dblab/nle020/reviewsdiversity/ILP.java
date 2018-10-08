@@ -29,12 +29,12 @@ public class ILP {
 
 	protected static ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
 	
-	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
-	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
+	protected ConcurrentMap<String, StatisticalResult> docToStatisticalResult;
+	private ConcurrentMap<String, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<>();
 	
 	// Used for ILPSetThreadImpl
 	public ILP(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult) {
+			   ConcurrentMap<String, StatisticalResult> docToStatisticalResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
@@ -43,8 +43,8 @@ public class ILP {
 	
 	// Used for ILPThreadImpl
 	public ILP(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult) {
+			   ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			   ConcurrentMap<String, List<ConceptSentimentPair>> docToTopKPairsResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
@@ -55,18 +55,17 @@ public class ILP {
 	/**
 	 * Run Integer Linear Programming for a doctor's data set
 	 * @param docId - doctor ID
-	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
-	 * @return Result's statistics
+	 * @param conceptSentimentPairs - list of sentiment units/nodes in K-medians
 	 */
-	protected void runILPPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
+	void runILPPerDoc(String docId, List<ConceptSentimentPair> conceptSentimentPairs) {
 		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);
 		
-		List<ConceptSentimentPair> topKPairs = new ArrayList<ConceptSentimentPair>();
+		List<ConceptSentimentPair> topKPairs = new ArrayList<>();
 		statisticalResult.setNumPairs(conceptSentimentPairs.size());
 		
-		List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+		List<ConceptSentimentPair> pairs = new ArrayList<>();
 		pairs.add(root);
 		pairs.addAll(conceptSentimentPairs);
 		
@@ -112,8 +111,8 @@ public class ILP {
 			Constants.LPMethod method) {
 		long startTime = System.nanoTime();
 		
-		Map<Integer, Double> openedFacilities = new HashMap<Integer, Double>();
-		Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection = new HashMap<Integer, Map<Integer, Double>>();
+		Map<Integer, Double> openedFacilities = new HashMap<>();
+		Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection = new HashMap<>();
 		boolean integralModel = true;
 		executeModel(k, LPMethod.AUTOMATIC, integralModel, 
 				facilityToCustomerAndDistance,
@@ -126,7 +125,7 @@ public class ILP {
 				Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));	
 //		System.out.println(Utils.runningTimeInMs(startTime, Constants.NUM_DIGITS_IN_TIME));
 		// Get top K by original order
-		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
+		List<Integer> topKByOriginalOrders = new ArrayList<>();
 		for (Integer f : openedFacilities.keySet()) {			// Start from "1" because the first is the root
 			if (f > 0 && openedFacilities.get(f) == 1.0) {
 				topKByOriginalOrders.add(f - 1);
@@ -146,7 +145,7 @@ public class ILP {
 	 * @param openedFacilityToCustomerAndConnection - output of facility-customer connection
 	 * @param statisticalResult - output of objective
 	 */
-	public static void executeModel(
+	static void executeModel(
 			int k, Constants.LPMethod method, boolean integralModel,
 			Map<Integer, Map<Integer, Integer>> facilityToCustomerAndDistance,
 			Map<Integer, Double> openedFacilities,
@@ -181,7 +180,7 @@ public class ILP {
 				for (Integer f : facilityToCustomerAndDistance.keySet()) {					
 					Map<Integer, Integer> customerToDistance = facilityToCustomerAndDistance.get(f);
 					if (customerToDistance.size() > 0)
-						connecting.put(f, new HashMap<Integer, GRBVar>());
+						connecting.put(f, new HashMap<>());
 					
 					for (Integer c : customerToDistance.keySet()) {						
 						connecting.get(f).put(
@@ -193,7 +192,7 @@ public class ILP {
 				for (Integer f : facilityToCustomerAndDistance.keySet()) {					
 					Map<Integer, Integer> customerToDistance = facilityToCustomerAndDistance.get(f);
 					if (customerToDistance.size() > 0)
-						connecting.put(f, new HashMap<Integer, GRBVar>());
+						connecting.put(f, new HashMap<>());
 					
 					for (Integer c : customerToDistance.keySet()) {						
 						connecting.get(f).put(
@@ -221,12 +220,12 @@ public class ILP {
 			 * 				Sum_f x(f, c) = 1
 			 * number = number of location/pairs
 			 */			
-			Map<Integer, Set<Integer>> customerToFacilities = new HashMap<Integer, Set<Integer>>();
+			Map<Integer, Set<Integer>> customerToFacilities = new HashMap<>();
 			for (Integer f : facilityToCustomerAndDistance.keySet()) {
 				Map<Integer, Integer> customerToDistance = facilityToCustomerAndDistance.get(f);				
 				for (Integer c : customerToDistance.keySet()) {
 					if (!customerToFacilities.containsKey(c))
-						customerToFacilities.put(c, new HashSet<Integer>());
+						customerToFacilities.put(c, new HashSet<>());
 					customerToFacilities.get(c).add(f);
 				}
 			}
@@ -268,7 +267,7 @@ public class ILP {
 			for (int f = 0; f < numFacilities; ++f) {
 				if (open.get(f).get(GRB.DoubleAttr.X) > 0) {
 					openedFacilities.put(f, open.get(f).get(GRB.DoubleAttr.X));
-					openedFacilityToCustomerAndConnection.put(f, new HashMap<Integer, Double>());
+					openedFacilityToCustomerAndConnection.put(f, new HashMap<>());
 					for (Integer c : connecting.get(f).keySet()) {
 						if (connecting.get(f).get(c).get(GRB.DoubleAttr.X) > 0) {
 							openedFacilityToCustomerAndConnection.get(f).put(

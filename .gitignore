@@ -4,10 +4,17 @@ src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/doc2vecsent/reviews/models/
 src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/doc2vecsent/reviews/*.npy
 # python virtualenv
 src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/doc2vecsent/.env/
+**/.env
 # My experiment results
 src/main/resources/performance/Top Pairs/
 src/main/resources/performance/Top SENTENCE/
 src/main/resources/performance/Top REVIEW/
+
+################
+### IntelliJ ###
+###############
+*.iml
+.idea
 
 #################
 ## Eclipse

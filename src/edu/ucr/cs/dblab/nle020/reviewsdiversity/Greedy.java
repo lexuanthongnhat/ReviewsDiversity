@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
@@ -22,14 +21,12 @@ public class Greedy {
 
 	protected FullPair root = new FullPair(Constants.ROOT_CUI);
 	
-	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult =
-	    new ConcurrentHashMap<>();
-	protected ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult =
-	    new ConcurrentHashMap<>();
+	protected ConcurrentMap<String, StatisticalResult> docToStatisticalResult;
+	protected ConcurrentMap<String, List<ConceptSentimentPair>> docToTopKPairsResult;
 	
 	public Greedy(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult) {
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<ConceptSentimentPair>> docToTopKPairsResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
@@ -40,18 +37,17 @@ public class Greedy {
 	/**
 	 * Run Greedy Algorithm for a doctor's data set
 	 * @param docId - doctor ID
-	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
-	 * @return Result's statistics
+	 * @param conceptSentimentPairs - list of sentiment units/nodes in K-medians
 	 */
-	protected void runGreedyPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
+	void runGreedyPerDoc(String docId, List<ConceptSentimentPair> conceptSentimentPairs) {
 		//long startTime = System.currentTimeMillis();
 		long startTime = System.nanoTime();
 				
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
-		List<FullPair> topK = new ArrayList<FullPair>();	
+		List<FullPair> topK = new ArrayList<>();
 
 //		printInitialization();		
-		List<FullPair> pairs = new ArrayList<FullPair>();
+		List<FullPair> pairs = new ArrayList<>();
 		//initPairs(conceptSentimentPairs, pairs, statisticalResult);
 		FiniteDistanceInitializer.initFullPairs(conceptSentimentPairs, pairs, statisticalResult);
 		
@@ -102,8 +98,8 @@ public class Greedy {
 	private List<ConceptSentimentPair> convertTopKFullPairsToTopKPairs(
 			Collection<ConceptSentimentPair> conceptSentimentPairs,
 			List<FullPair> topK) {
-		List<ConceptSentimentPair> topKPairsResult = new ArrayList<ConceptSentimentPair>();
-		Set<String> topSetIds = new HashSet<String>(); 
+		List<ConceptSentimentPair> topKPairsResult = new ArrayList<>();
+		Set<String> topSetIds = new HashSet<>();
 		for (FullPair fullPair : topK) {
 			topSetIds.add(fullPair.getId());
 		}
@@ -117,11 +113,11 @@ public class Greedy {
 	private void initDistances(List<ConceptSentimentPair> conceptSentimentPairs, 
 			Map<FullPair, Map<FullPair, Integer>> distances, List<FullPair> fullPairs) {
 		
-		distances.put(root, new HashMap<FullPair, Integer>());
+		distances.put(root, new HashMap<>());
 		distances.get(root).put(root, 0);
 		for (int i = 0; i < fullPairs.size(); i++) {
 			FullPair pair = fullPairs.get(i);	
-			distances.put(pair, new HashMap<FullPair, Integer>());
+			distances.put(pair, new HashMap<>());
 			
 			distances.get(root).put(pair, conceptSentimentPairs.get(i).calculateRootDistance());
 			distances.get(pair).put(root, Constants.INVALID_DISTANCE);
@@ -183,7 +179,7 @@ public class Greedy {
 	}
 	
 	private PriorityQueue<FullPair> initHeap(List<FullPair> pairs) {
-		PriorityQueue<FullPair> heap = new PriorityQueue<FullPair>(k, new Comparator<FullPair>(){
+		PriorityQueue<FullPair> heap = new PriorityQueue<>(k, new Comparator<FullPair>(){
 
 			@Override
 			public int compare(FullPair o1, FullPair o2) {			
@@ -269,8 +265,7 @@ public class Greedy {
 	
 		long verifyingCost = 0;
 	
-		List<FullPair> topKPlus = new ArrayList<FullPair>();
-		topKPlus.addAll(topK);
+		List<FullPair> topKPlus = new ArrayList<>(topK);
 		topKPlus.add(root);
 		for (FullPair pair : distances.keySet()) {
 			int minDistance = Integer.MAX_VALUE;

@@ -7,16 +7,16 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset;
  */
 public class RawReview {
 	
-	private int id = 0;
-	private int docID = 0;
+	private String id = "id";
+	private String docID = "docId";
 	private String title;
 	private String body;
 	private int rate = 0;
 	
-	public int getDocID() {
+	public String getDocID() {
 		return docID;
 	}
-	public void setDocID(int docID) {
+	public void setDocID(String docID) {
 		this.docID = docID;
 	}
 	public String getTitle() {
@@ -39,17 +39,16 @@ public class RawReview {
 	}
 	
 	public RawReview () {
-		docID = 0;
 		rate = 0;
 		title = null;
 		body = null;
 	}
 	
-	public RawReview(int id) {
+	public RawReview(String id) {
 		this.id = id;
 	}
 	
-	public RawReview(int id, int docID, String title, String body, int rate) {
+	public RawReview(String id, String docID, String title, String body, int rate) {
 		this.id = id;
 		this.docID = docID;
 		this.title = title;
@@ -57,14 +56,11 @@ public class RawReview {
 		this.rate = rate;
 	}
 
-	
 	@Override
 	public int hashCode() {
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + id;
-		return result;
+		return com.google.common.base.Objects.hashCode(id, docID, title, body, rate);
 	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -74,14 +70,12 @@ public class RawReview {
 		if (getClass() != obj.getClass())
 			return false;
 		RawReview other = (RawReview) obj;
-		if (id != other.id)
-			return false;
-		return true;
+		return id.equals(other.id);
 	}
-	public int getId() {
+	public String getId() {
 		return id;
 	}
-	public void setId(int id) {
+	public void setId(String id) {
 		this.id = id;
 	}	
 }

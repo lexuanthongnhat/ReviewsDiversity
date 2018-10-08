@@ -5,12 +5,12 @@ import java.util.List;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
 
 public class DoctorSentimentReview {
-	private Integer docId;
+	private String docId;
 	private List<SentimentReview> sentimentReviews;
-	public Integer getDocId() {
+	public String getDocId() {
 		return docId;
 	}
-	public void setDocId(Integer docId) {
+	public void setDocId(String docId) {
 		this.docId = docId;
 	}
 	public List<SentimentReview> getSentimentReviews() {
@@ -24,7 +24,8 @@ public class DoctorSentimentReview {
 		super();
 	}
 	
-	public DoctorSentimentReview(Integer docId,
+	public DoctorSentimentReview(
+			String docId,
 			List<SentimentReview> sentimentReviews) {
 		super();
 		this.docId = docId;

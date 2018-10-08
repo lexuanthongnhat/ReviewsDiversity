@@ -26,12 +26,12 @@ public class RandomizedRounding {
 	protected Constants.LPMethod method = Constants.MY_DEFAULT_LP_METHOD;	
 	protected ConceptSentimentPair root = new ConceptSentimentPair(Constants.ROOT_CUI, 0.0f);
 	
-	protected ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult = new ConcurrentHashMap<Integer, StatisticalResult>();
-	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
+	protected ConcurrentMap<String, StatisticalResult> docToStatisticalResult;
+	private ConcurrentMap<String, List<ConceptSentimentPair>> docToTopKPairsResult = new ConcurrentHashMap<>();
 	
 	// For RandomizedRoundingSetThreadImpl
 	public RandomizedRounding(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult) {
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult) {
 		super();
 		this.k = k;
 		this.threshold = threshold;
@@ -39,9 +39,9 @@ public class RandomizedRounding {
 	}
 	
 	// For RandomizedRoundingThreadImpl
-	public RandomizedRounding(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult, 
-			ConcurrentMap<Integer, List<ConceptSentimentPair>> docToTopKPairsResult,
+	RandomizedRounding(int k, float threshold,
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<ConceptSentimentPair>> docToTopKPairsResult,
 			Constants.LPMethod method) {
 		super();
 		this.k = k;
@@ -54,17 +54,16 @@ public class RandomizedRounding {
 	/**
 	 * Run Linear Programming for a doctor's data set then use Natural Randomized Rounding
 	 * @param docId - doctor ID
-	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
-	 * @return Result's statistics
+	 * @param conceptSentimentPairs - list of sentiment units/nodes in K-medians
 	 */
-	protected void runRandomizedRoundingPerDoc(int docId, List<ConceptSentimentPair> conceptSentimentPairs) {
+	void runRandomizedRoundingPerDoc(String docId, List<ConceptSentimentPair> conceptSentimentPairs) {
 		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);
 		statisticalResult.setNumPairs(conceptSentimentPairs.size());
-		List<ConceptSentimentPair> topKPairs = new ArrayList<ConceptSentimentPair>();
+		List<ConceptSentimentPair> topKPairs = new ArrayList<>();
 				
-		List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();		
+		List<ConceptSentimentPair> pairs = new ArrayList<>();
 		pairs.add(root);
 		pairs.addAll(conceptSentimentPairs);
 		
@@ -103,8 +102,8 @@ public class RandomizedRounding {
 			Constants.LPMethod method){
 		long startTime = System.nanoTime();		
 		
-		Map<Integer, Double> openedFacilities = new HashMap<Integer, Double>();
-		Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection = new HashMap<Integer, Map<Integer, Double>>();
+		Map<Integer, Double> openedFacilities = new HashMap<>();
+		Map<Integer, Map<Integer, Double>> openedFacilityToCustomerAndConnection = new HashMap<>();
 		boolean integralModel = false;
 		ILP.executeModel(
 				k, method, integralModel, 
@@ -155,7 +154,7 @@ public class RandomizedRounding {
 		}					
 					
 		// Get top K by original order
-		List<Integer> topKByOriginalOrders = new ArrayList<Integer>();
+		List<Integer> topKByOriginalOrders = new ArrayList<>();
 		for (Integer f : openedFacilities.keySet()) {			// Start from "1" because the first is the root
 			if (f > 0 && openedFacilities.get(f) == 1.0) {
 				topKByOriginalOrders.add(f - 1);
@@ -178,7 +177,7 @@ public class RandomizedRounding {
 		sampleKItemsFaster(openedFacilities, withReplacement);
 			
 		// Assign customer to the closest opened facility
-		Map<Integer, Integer> customerToMinDistance = new HashMap<Integer, Integer>();
+		Map<Integer, Integer> customerToMinDistance = new HashMap<>();
 		openedFacilityToCustomerAndConnection.clear();
 		for (Integer facility : openedFacilities.keySet()) {
 			for (Integer customer : facilityToCustomerAndDistance.get(facility).keySet()) {
@@ -186,13 +185,13 @@ public class RandomizedRounding {
 					customerToMinDistance.put(customer, facilityToCustomerAndDistance.get(facility).get(customer));
 					
 					if (!openedFacilityToCustomerAndConnection.containsKey(facility))
-						openedFacilityToCustomerAndConnection.put(facility, new HashMap<Integer, Double>());
+						openedFacilityToCustomerAndConnection.put(facility, new HashMap<>());
 					openedFacilityToCustomerAndConnection.get(facility).put(customer, 1.0);
 				} else {			
 					if (facilityToCustomerAndDistance.get(facility).get(customer) 
 							< customerToMinDistance.get(customer)) {
 						if (!openedFacilityToCustomerAndConnection.containsKey(facility))
-							openedFacilityToCustomerAndConnection.put(facility, new HashMap<Integer, Double>());
+							openedFacilityToCustomerAndConnection.put(facility, new HashMap<>());
 						
 						customerToMinDistance.put(customer,	facilityToCustomerAndDistance.get(facility).get(customer));
 						openedFacilityToCustomerAndConnection.get(facility).put(customer, 1.0);
@@ -214,7 +213,7 @@ public class RandomizedRounding {
 	private void sampleKItemsFaster(Map<Integer, Double> openedFacilities, boolean withReplacement) {
 		int numCandidates = openedFacilities.size();		
 		double[] candidates = new double[numCandidates - 1];
-		Map<Integer, Integer> indexToFacility = new HashMap<Integer, Integer>();
+		Map<Integer, Integer> indexToFacility = new HashMap<>();
 		int index = 0;
 		for (Integer f : openedFacilities.keySet()) {
 			if (f > 0) {
@@ -226,7 +225,7 @@ public class RandomizedRounding {
 		openedFacilities.clear();
 		openedFacilities.put(0, 1.0);
 		
-		Set<Integer> selected = new HashSet<Integer>();		
+		Set<Integer> selected;
 		if (withReplacement)
 			selected = sampleKItemsWithReplacement(candidates);
 		else
@@ -242,7 +241,7 @@ public class RandomizedRounding {
 		int numCandidates = candidates.length;
 		double[] originalCandidates = candidates.clone();		
 		
-		Set<Integer> selected = new HashSet<Integer>();		 
+		Set<Integer> selected = new HashSet<>();
 		double facilityCost = 0;
 		
 		double[] probs = new double[numCandidates + 1];
@@ -273,8 +272,8 @@ public class RandomizedRounding {
 		int numCandidates = candidates.length;
 		double[] originalCandidates = candidates.clone();		
 		
-		Set<Integer> selected = new HashSet<Integer>();
-		Map<Integer, Integer> swap = new HashMap<Integer, Integer>(); 
+		Set<Integer> selected = new HashSet<>();
+		Map<Integer, Integer> swap = new HashMap<>();
 		double facilityCost = 0;
 		int numLeft = numCandidates;
 		while (facilityCost < k) {
@@ -344,10 +343,7 @@ public class RandomizedRounding {
 	
 	@SuppressWarnings("unused")
 	private boolean rollTheDice(double probability) {
-		if (Math.random() < probability)
-			return true;
-		else 
-			return false;
+		return Math.random() < probability;
 	}
 	
 	protected void gatherFinalResult(double runningTime, int datasetSize, StatisticalResult statisticalResult) {

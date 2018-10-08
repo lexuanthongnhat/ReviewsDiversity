@@ -36,7 +36,7 @@ public class SentimentByDocumentVector {
 		updateSentimentWithVectorMethod(originalDatasetPath, updatedDatasetPath);
 	}
 	
-	public static void updateSentimentWithVectorMethod(
+	private static void updateSentimentWithVectorMethod(
 	    String originalDatasetPath,
 	    String updatedDatasetPath) {
 		long startTime = System.currentTimeMillis();
@@ -51,10 +51,11 @@ public class SentimentByDocumentVector {
 		}
 		
 		
-		Map<Integer, List<SentimentReview>> docToSentimentReviews = importDocToSentimentReviews(originalDatasetPath);
+		Map<String, List<SentimentReview>> docToSentimentReviews = importDocToSentimentReviews(
+				originalDatasetPath);
 		
 		// Re-assign sentiment of concept in sentence
-		for (Integer docId : docToSentimentReviews.keySet()) {
+		for (String docId : docToSentimentReviews.keySet()) {
 			for (SentimentReview review : docToSentimentReviews.get(docId)) {
 				for (SentimentSentence sentence : review.getSentences()) {
 					if (sentenceToSentiment.containsKey(sentence)) {
@@ -73,8 +74,8 @@ public class SentimentByDocumentVector {
 				+ (System.currentTimeMillis() - startTime) + " ms");
 	}
 	
-	public static void outputDoctorSentimentReviewsToJson(
-			Map<Integer, List<SentimentReview>> docToSentimentReviews,
+	private static void outputDoctorSentimentReviewsToJson(
+			Map<String, List<SentimentReview>> docToSentimentReviews,
 			String updatedDatasetPath) {
 		
 		ObjectMapper mapper = new ObjectMapper();
@@ -85,7 +86,7 @@ public class SentimentByDocumentVector {
 		}
 		
 		int count = 1;
-		for (Integer docId : docToSentimentReviews.keySet()) {
+		for (String docId : docToSentimentReviews.keySet()) {
 			try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(updatedDatasetPath), 
 				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 				if (count > 1)						
@@ -103,8 +104,8 @@ public class SentimentByDocumentVector {
 		System.out.println("Num of Outputed docIDs " + count);	
 	}
 
-	private static Map<Integer, List<SentimentReview>> importDocToSentimentReviews(String path) {
-		Map<Integer, List<SentimentReview>> result = new HashMap<Integer, List<SentimentReview>>();
+	private static Map<String, List<SentimentReview>> importDocToSentimentReviews(String path) {
+		Map<String, List<SentimentReview>> result = new HashMap<>();
 
 		ObjectMapper mapper = new ObjectMapper();		
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(path))) {	

@@ -1,14 +1,12 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity.dataset;
 
 import edu.ucr.cs.dblab.nle020.metamap.MetaMapParser;
-import edu.ucr.cs.dblab.nle020.metamap.SemanticTypes;
 import edu.ucr.cs.dblab.nle020.metamap.Sentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
 import gov.nih.nlm.nls.metamap.Ev;
-import gov.nih.nlm.nls.metamap.Position;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -19,7 +17,6 @@ import java.io.Reader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.Date;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,7 +27,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.DoubleStream;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
@@ -46,8 +42,6 @@ import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFRichTextString;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
-import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -67,9 +61,7 @@ public class PairExtractor {
 	}
 	
 	private List<RawReview> rawReviews = null;
-//	private Map<Integer, List<ConceptSentimentPair>> docToPairs = new HashMap<Integer, List<ConceptSentimentPair>>();
-//	private ConcurrentMap<Integer, List<ConceptSentimentPair>> docToPairs = new ConcurrentHashMap<Integer, List<ConceptSentimentPair>>();
-	private ConcurrentMap<Integer, List<SentimentReview>> docToSentimentReviews = new ConcurrentHashMap<Integer, List<SentimentReview>>();
+	private ConcurrentMap<String, List<SentimentReview>> docToSentimentReviews = new ConcurrentHashMap<>();
 		
 	private Workbook wb = new XSSFWorkbook();
 	private XSSFFont redFont = (XSSFFont) wb.createFont();
@@ -92,14 +84,14 @@ public class PairExtractor {
 	
 	private void init() {
 
-		rawReviews = new CopyOnWriteArrayList<RawReview>();
+		rawReviews = new CopyOnWriteArrayList<>();
 		rawReviews.addAll(getReviews(Constants.REVIEWS_PATH));
 		//rawReviews = getReviews(REVIEWS_PATH);
 		
 		initExcelColor();
 	}
 		
-	public void outputExcelFileMultiThread() {
+	void outputExcelFileMultiThread() {
 		long startTime = System.currentTimeMillis();
 		Sheet sheet = wb.createSheet("concept_sentiment");		
 		addHeader(sheet);
@@ -110,20 +102,20 @@ public class PairExtractor {
 		try {			
 			fileOut = new FileOutputStream(outputPath);
 			
-			CopyOnWriteArrayList<Row> rows = new CopyOnWriteArrayList<Row>();
+			CopyOnWriteArrayList<Row> rows = new CopyOnWriteArrayList<>();
 			for (int i = 0; i < rawReviews.size()/Constants.INTERVAL_TO_SAMPLE_REVIEW + 1; i++) {
 				rows.add(sheet.createRow(i + 1));
 			}
 				
-			CopyOnWriteArrayList<RawReview> concurrentReviews = new CopyOnWriteArrayList<RawReview>();
+			CopyOnWriteArrayList<RawReview> concurrentReviews = new CopyOnWriteArrayList<>();
 			concurrentReviews.addAllAbsent(rawReviews);
 			
 			CellStyle cs = wb.createCellStyle();		
 			cs.setWrapText(true);
 			cs.setShrinkToFit(true);
 			
-			ConcurrentMap<RawReview, List<ConceptSentimentPair>> docToReviewsValid = new ConcurrentHashMap<RawReview, List<ConceptSentimentPair>>();
-			ConcurrentMap<RawReview, List<ConceptSentimentPair>> docToReviewsInvalid = new ConcurrentHashMap<RawReview, List<ConceptSentimentPair>>();		
+			ConcurrentMap<RawReview, List<ConceptSentimentPair>> docToReviewsValid = new ConcurrentHashMap<>();
+			ConcurrentMap<RawReview, List<ConceptSentimentPair>> docToReviewsInvalid = new ConcurrentHashMap<>();
 			
 			ExecutorService fixedPool = Executors.newFixedThreadPool(Constants.NUM_THREADS);
 			for (int i = 0; i< Constants.NUM_THREADS; i++) {
@@ -157,16 +149,17 @@ public class PairExtractor {
 				sourcePath + "valid_" + Constants.INTERVAL_TO_SAMPLE_REVIEW + ".txt", 
 				sourcePath + "invalid_" + Constants.INTERVAL_TO_SAMPLE_REVIEW + ".txt");
 	}
-	
+
+	@SuppressWarnings("unused")
 	public void updateExcelFileWithCorrelation() {
 		String outputPath = DESKTOP_FOLDER + "reviews_diversity_" + Constants.INTERVAL_TO_SAMPLE_REVIEW + ".xlsx";
-		
 		updateExcelFileWithCorrelation(outputPath, 
 				DESKTOP_FOLDER + "valid_" + Constants.INTERVAL_TO_SAMPLE_REVIEW + ".txt", 
 				DESKTOP_FOLDER + "invalid_" + Constants.INTERVAL_TO_SAMPLE_REVIEW + ".txt");
 	}
 	
-	private void updateExcelFileWithCorrelation(String excelFilePath, String validConceptPath, String invalidConceptPath) {
+	private void updateExcelFileWithCorrelation(
+	        String excelFilePath, String validConceptPath, String invalidConceptPath) {
 		
 		Map<RawReview, List<ConceptSentimentPair>> reviewToValidCSPairs = readRawReviewToConceptSentimentPairs(validConceptPath);
 		Map<RawReview, List<ConceptSentimentPair>> reviewToInvalidCSPairs = readRawReviewToConceptSentimentPairs(invalidConceptPath);
@@ -190,24 +183,18 @@ public class PairExtractor {
 		}
 	}
 
-	/**
-	 * @param reviewToValidCSPairs
-	 * @param reviewToInvalidCSPairs
-	 * @param row
-	 */
-	private void updateSentimentCellsOfRow(Row row,
+	private void updateSentimentCellsOfRow(
+	        Row row,
 			Map<RawReview, List<ConceptSentimentPair>> reviewToValidCSPairs,
-			Map<RawReview, List<ConceptSentimentPair>> reviewToInvalidCSPairs) {
-		
+			Map<RawReview, List<ConceptSentimentPair>> reviewToInvalidCSPairs
+    ) {
 		Cell cellReviewId = row.getCell(1);
 		if (cellReviewId == null) {
 			System.err.println("Empty row!!!");
-			return;
 		} else {
-			Integer reviewId= (int) cellReviewId.getNumericCellValue();
+			String reviewId= cellReviewId.getStringCellValue();
 			if (reviewId == null) {
 				System.err.println("Empty reviewId");
-				return;
 			} else {
 			
 				RawReview review = new RawReview(reviewId);
@@ -225,13 +212,13 @@ public class PairExtractor {
 		}
 	}
 	
-	private XSSFRichTextString prepareConceptSentimentCorrelationRichText(List<ConceptSentimentPair> pairs) {
-		
+	private XSSFRichTextString prepareConceptSentimentCorrelationRichText(
+	        List<ConceptSentimentPair> pairs) {
 		XSSFRichTextString conceptSentimentString = new XSSFRichTextString();
 		
-		List<Integer> naNPositions = new ArrayList<Integer>();
-		List<Integer> positions = new ArrayList<Integer>();
-		List<Integer> lengthes = new ArrayList<Integer>();
+		List<Integer> naNPositions = new ArrayList<>();
+		List<Integer> positions = new ArrayList<>();
+		List<Integer> lengthes = new ArrayList<>();
 		final int NEGATIVE_LENGTH = 10;
 		final int POSITIVE_LENGTH = 9;
 		int offset = 0;
@@ -278,12 +265,11 @@ public class PairExtractor {
 
 	/**
 	 * Each line of input file is the Json of type DoctorPairs 
-	 * @param doctorPairsPath
 	 * @return map: RawReview --> list of ConceptSentimentPairs
 	 */
-	public static Map<RawReview, List<ConceptSentimentPair>> readRawReviewToConceptSentimentPairs(String doctorPairsPath) {
-		
-		Map<RawReview, List<ConceptSentimentPair>> rawReviewToConceptSentimentPairs = new HashMap<RawReview, List<ConceptSentimentPair>>();
+	static Map<RawReview, List<ConceptSentimentPair>> readRawReviewToConceptSentimentPairs(
+	        String doctorPairsPath) {
+		Map<RawReview, List<ConceptSentimentPair>> rawReviewToConceptSentimentPairs = new HashMap<>();
 		
 		ObjectMapper mapper = new ObjectMapper();
 		try (BufferedReader reader = Files.newBufferedReader(Paths.get(doctorPairsPath))) {
@@ -298,21 +284,19 @@ public class PairExtractor {
 		
 		return rawReviewToConceptSentimentPairs;
 	}
-	
 
-	
-	
+	@SuppressWarnings("unused")
 	public void buildDatasetMultiThreads() {
 		long startTime = System.currentTimeMillis();
 		
-		ConcurrentMap<Integer, List<RawReview>> docToReviews = new ConcurrentHashMap<Integer, List<RawReview>>();
+		ConcurrentMap<String, List<RawReview>> docToReviews = new ConcurrentHashMap<>();
 
 //		for (int i = 0; i < 3000; i += Constants.INTERVAL_TO_SAMPLE_REVIEW) {
 		for (int i = 0; i < rawReviews.size(); i += Constants.INTERVAL_TO_SAMPLE_REVIEW) {
-			RawReview rawReview = rawReviews.get(i);	
-			Integer docID = rawReview.getDocID();
+			RawReview rawReview = rawReviews.get(i);
+			String docID = rawReview.getDocID();
 			if (!docToReviews.containsKey(docID)) {
-				docToReviews.put(docID, new ArrayList<RawReview>());
+				docToReviews.put(docID, new ArrayList<>());
 			}
 			
 			docToReviews.get(docID).add(rawReview);
@@ -338,7 +322,7 @@ public class PairExtractor {
 		}
 	}
 	
-	public void outputDoctorSentimentReviewsToJson() {
+	private void outputDoctorSentimentReviewsToJson() {
 		long startTime = System.currentTimeMillis();
 		
 		String fileOut = DESKTOP_FOLDER + "doc_pairs_" + Constants.INTERVAL_TO_SAMPLE_REVIEW + ".txt";
@@ -351,7 +335,7 @@ public class PairExtractor {
 		}
 		
 		int count = 1;
-		for (Integer docId : docToSentimentReviews.keySet()) {
+		for (String docId : docToSentimentReviews.keySet()) {
 			try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileOut), 
 				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
 				if (count > 1)						
@@ -372,11 +356,12 @@ public class PairExtractor {
 		System.out.println("Finish outputing JSON text file to \"" + fileOut + "\" in " + (finishTime - startTime) + " ms");
 	}
 	
-	public void outputDoctorPairsToJson(String fileOut, ConcurrentMap<RawReview, List<ConceptSentimentPair>> docToConceptSentimentPairs) {
+	private void outputDoctorPairsToJson(
+	        String fileOut, ConcurrentMap<RawReview,
+            List<ConceptSentimentPair>> docToConceptSentimentPairs
+    ) {
 		long startTime = System.currentTimeMillis();
-
 		ObjectMapper mapper = new ObjectMapper();
-
 		try {
 			Files.deleteIfExists(Paths.get(fileOut));
 		} catch (IOException e1) {
@@ -385,7 +370,7 @@ public class PairExtractor {
 		
 		int count = 1;
 		for (RawReview rawReview : docToConceptSentimentPairs.keySet()) {
-			Integer docID = rawReview.getDocID();
+			String docID = rawReview.getDocID();
 			
 			try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileOut), 
 				StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
@@ -407,16 +392,8 @@ public class PairExtractor {
 		System.out.println("Num of Outputed docIDs " + count);
 		Utils.printRunningTime(startTime, "Outputted JSON text file to \"" + fileOut + "\"");
 	}
-	
 
-	public void testSentimentCalculation() {
-		for (RawReview rawReview : rawReviews){
-			if (rawReview.getDocID() == 138856 && rawReview.getBody().startsWith("I would like to share my wonderful experience")) {
-				getConceptSentimentPairs(rawReview);				
-			}
-		}
-	}
-	
+	@SuppressWarnings("unused")
 	private List<ConceptSentimentPair> getConceptSentimentPairs(RawReview rawReview) {			
 		Map<Sentence, List<Ev>> sentenceMap = mmParser.parseToSentenceMap(rawReview.getBody());		
 		return sentimentCalculator.calculateSentiment(sentenceMap);
@@ -502,7 +479,7 @@ public class PairExtractor {
 	public static List<RawReview> getReviews(String file) {
 		long startTime = System.currentTimeMillis();	
 
-		List<RawReview> results = new ArrayList<RawReview>();
+		List<RawReview> results = new ArrayList<>();
 		
 		try {
 			Reader in = new FileReader(file);
@@ -515,8 +492,8 @@ public class PairExtractor {
 					continue;
 				}
 				
-				int id = Integer.parseInt(record.get(0).trim());
-				int docID = Integer.parseInt(record.get(1).trim());
+				String id = record.get(0).trim();
+				String docID = record.get(1).trim();
 				String tittle = record.get(5).trim();
 				String body = record.get(6).trim();
 				body = body.replace("DR.", "DR").replace("dr.", "dr").replace("Dr.", "Dr").replace("dR.", "dR");
@@ -526,10 +503,10 @@ public class PairExtractor {
 				body = body.replace("Mrs.", "Mrs").replace("mrs.", "mrs").replace("MRS.", "MRS");
 				body = body.replace("Miss.", "Miss");
 				
-				// The review "Â " cause MetaMap server to fail				
+				// The review "ï¿½ " cause MetaMap server to fail				
 				body = body.replace("Â ", "");
-				body = body.replace("Â", "");
-				body = body.replaceAll("â€¦", "").replaceAll("¨", "").replaceAll("¦", "").replace("Ã¯»¿", "");
+				body = body.replace("ï¿½", "");
+				body = body.replaceAll("â€¦", "").replaceAll("ï¿½", "").replaceAll("ï¿½", "").replace("Ã¯ï¿½ï¿½", "");
 				
 				if (body.trim().length() == 0)
 					continue;
@@ -551,10 +528,7 @@ public class PairExtractor {
 					}
 					if (sum > 0) {
 						rate = sum/count;
-				//		System.out.println("RawReview: " + body + ", rate: " + rate);
-					} else {
-				//		System.out.println("RawReview: " + body);
-					}				
+					}
 				}
 				
 				if (rate >= 0) {

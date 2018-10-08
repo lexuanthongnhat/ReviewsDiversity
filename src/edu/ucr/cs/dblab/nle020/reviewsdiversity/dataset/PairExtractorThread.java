@@ -13,16 +13,16 @@ import edu.ucr.cs.dblab.nle020.utils.Utils;
 public class PairExtractorThread implements Runnable {
 	private SentimentCalculator sentimentCalculator = new SentimentCalculator();
 	
-	private ConcurrentMap<Integer, List<RawReview>> docToReviews;
-	private ConcurrentMap<Integer, List<SentimentReview>> docToSentimentReviews = new ConcurrentHashMap<Integer, List<SentimentReview>>();
+	private ConcurrentMap<String, List<RawReview>> docToReviews;
+	private ConcurrentMap<String, List<SentimentReview>> docToSentimentReviews;
 
 	private int index;
 	
 	private MetaMapParser mmParser = new MetaMapParser();
 
 	public PairExtractorThread(
-			ConcurrentMap<Integer, List<RawReview>> docToReviews,
-			ConcurrentMap<Integer, List<SentimentReview>> docToSentimentReviews,
+			ConcurrentMap<String, List<RawReview>> docToReviews,
+			ConcurrentMap<String, List<SentimentReview>> docToSentimentReviews,
 			int index) {
 		super();
 		this.docToReviews = docToReviews;
@@ -37,8 +37,8 @@ public class PairExtractorThread implements Runnable {
 
 	public void buildDataset() {
 		long startTime = System.currentTimeMillis();
-		
-		Integer[] docIDs = docToReviews.keySet().toArray(new Integer[docToReviews.size()]);
+
+		String[] docIDs = docToReviews.keySet().toArray(new String[docToReviews.size()]);
 		
 		// Ex. 4 threads, interval = 100 (1% dataset):
 		//			index = 0:  0  , 400, 800
@@ -47,8 +47,8 @@ public class PairExtractorThread implements Runnable {
 		// 			index = 3:  300, 700, 1100
 //		for (int i = 0 + index * Constants.INTERVAL_TO_SAMPLE_REVIEW; i < docToReviews.size(); i += Constants.INTERVAL_TO_SAMPLE_REVIEW * Constants.NUM_THREADS) {
 		for (int i = index; i < docToReviews.size(); i += Constants.NUM_THREADS) {
-			
-			Integer docID = docIDs[i];
+
+			String docID = docIDs[i];
 			List<SentimentReview> sentimentReviews = new ArrayList<SentimentReview>(); 
 			for (RawReview rawReview : docToReviews.get(docID)) {
 			
@@ -65,11 +65,11 @@ public class PairExtractorThread implements Runnable {
 		Utils.printRunningTime(startTime, Thread.currentThread().getName()	+ " finished");
 	}
 	
-	public ConcurrentMap<Integer, List<RawReview>> getDocToReviews() {
+	public ConcurrentMap<String, List<RawReview>> getDocToReviews() {
 		return docToReviews;
 	}
 
-	public void setDocToReviews(ConcurrentMap<Integer, List<RawReview>> docToReviews) {
+	public void setDocToReviews(ConcurrentMap<String, List<RawReview>> docToReviews) {
 		this.docToReviews = docToReviews;
 	}
 

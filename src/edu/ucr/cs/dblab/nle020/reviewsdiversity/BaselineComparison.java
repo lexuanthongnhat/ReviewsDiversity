@@ -76,12 +76,11 @@ public class BaselineComparison {
    * @param sample               percentage of dataset to evaluate
    * @return map from measure to performance result that is a table of method-performance
    */
-  private static Map<Measure, Map<String, Double>> evaluate(int k, double appliedSentThreshold,
-                                                            List<Measure> measures,
-                                                            double sample) {
-    Map<String, Map<Integer, List<SentimentSentence>>> methodToSummaries = importMethodSummaries(
+  private static Map<Measure, Map<String, Double>> evaluate(
+          int k, double appliedSentThreshold, List<Measure> measures, double sample) {
+    Map<String, Map<String, List<SentimentSentence>>> methodToSummaries = importMethodSummaries(
         k, appliedSentThreshold);
-    final List<Integer> sampleDocs = sampleDoctors(methodToSummaries, sample);
+    final List<String> sampleDocs = sampleDoctors(methodToSummaries, sample);
     System.out.println("Number of doctors in the sample: " + sampleDocs.size());
 
     Map<Measure, Map<String, Double>> measureToResults = new HashMap<>();
@@ -104,14 +103,14 @@ public class BaselineComparison {
    * re-sampled a number of time to get stable results.
    */
   private static Double evaluateWithReSample(String method, int k,
-                                             List<Integer> docIds, Measure measure,
+                                             List<String> docIds, Measure measure,
                                              int roundingDigit){
     List<Double> errors = new ArrayList<>();
     for (int i = 0; i < RE_SAMPLE_RANDOM_METHOD; ++i) {
-      Map<Integer, List<SentimentSet>> docToSummaries = FreqBasedTopSets.summarizeDoctorReviews(
+      Map<String, List<SentimentSet>> docToSummaries = FreqBasedTopSets.summarizeDoctorReviews(
           TopPairsProgram.DOC_TO_REVIEWS_PATH, TopPairsProgram.SetOption.SENTENCE, k,method);
-      Map<Integer, List<SentimentSentence>> docToSentimentSets = new HashMap<>();
-      for (Integer doc : docToSummaries.keySet()) {
+      Map<String, List<SentimentSentence>> docToSentimentSets = new HashMap<>();
+      for (String doc : docToSummaries.keySet()) {
         List<SentimentSet> sets = docToSummaries.get(doc);
         docToSentimentSets.put(
             doc,
@@ -130,11 +129,11 @@ public class BaselineComparison {
    * @param sample            percentage of dataset to return
    * @return sample of doctor list
    */
-  private static List<Integer> sampleDoctors(
-      Map<String, Map<Integer, List<SentimentSentence>>> methodToSummaries, double sample) {
-    List<Integer> minimalDocs = new ArrayList<>();
-    for (Map<Integer, List<SentimentSentence>> docToSentences : methodToSummaries.values()) {
-      Set<Integer> currentMethodDocs = docToSentences.keySet();
+  private static List<String> sampleDoctors(
+      Map<String, Map<String, List<SentimentSentence>>> methodToSummaries, double sample) {
+    List<String> minimalDocs = new ArrayList<>();
+    for (Map<String, List<SentimentSentence>> docToSentences : methodToSummaries.values()) {
+      Set<String> currentMethodDocs = docToSentences.keySet();
       if (minimalDocs.isEmpty())
         minimalDocs.addAll(currentMethodDocs);
       minimalDocs.removeIf(doc -> !currentMethodDocs.contains(doc));
@@ -156,9 +155,9 @@ public class BaselineComparison {
    * @param threshold sentiment distance threshold used in summarization process
    * @return map of method to summaries
    */
-  private static Map<String, Map<Integer, List<SentimentSentence>>> importMethodSummaries(
+  private static Map<String, Map<String, List<SentimentSentence>>> importMethodSummaries(
       int k, double threshold) {
-    final Map<String, Map<Integer, List<SentimentSentence>>> mthToSummaries = new HashMap<>();
+    final Map<String, Map<String, List<SentimentSentence>>> mthToSummaries = new HashMap<>();
     for (String method : methods) {
       String summaryPath;
       if (methodToType.get(method) == MethodType.OUR)
@@ -166,7 +165,7 @@ public class BaselineComparison {
             Double.toString(threshold) + "/top_SENTENCE_result_1000_" + method + "_set.txt";
       else
         summaryPath = BASELINE_SUMMARY_DIR + "top_sentence_" + method + "_k" + k + ".txt";
-      final Map<Integer, List<SentimentSentence>> docToTopSentences =
+      final Map<String, List<SentimentSentence>> docToTopSentences =
           importSummaryFromJson(summaryPath);
       mthToSummaries.put(method, docToTopSentences);
     }
@@ -240,13 +239,13 @@ public class BaselineComparison {
     Utils.printRunningTime(startTime, "Finished evaluation", true);
   }
 
-  private static Map<Integer, List<ConceptSentimentPair>> importRawDataset(
+  private static Map<String, List<ConceptSentimentPair>> importRawDataset(
       String docToReviewsPath) {
-    Map<Integer, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = new HashMap<>();
-    Map<Integer, List<SentimentSet>> docToSentences =
-        TopPairsProgram.importDocToSentimentSentences(docToReviewsPath, false);
+    Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairDataset = new HashMap<>();
+    Map<String, List<SentimentSet>> docToSentences =
+        TopPairsProgram.importDocToSentimentSentences(docToReviewsPath, false, -1);
 
-    for (Integer docId : docToSentences.keySet()) {
+    for (String docId : docToSentences.keySet()) {
       docToConceptSentimentPairDataset.put(docId, new ArrayList<>());
       docToSentences.get(docId).forEach(
           sentence -> docToConceptSentimentPairDataset.get(docId).addAll(sentence.getPairs()));
@@ -254,8 +253,8 @@ public class BaselineComparison {
     return docToConceptSentimentPairDataset;
   }
 
-  private static Map<Integer, List<SentimentSentence>> importSummaryFromJson(String inputPath) {
-    Map<Integer, List<SentimentSentence>> result = new HashMap<>();
+  private static Map<String, List<SentimentSentence>> importSummaryFromJson(String inputPath) {
+    Map<String, List<SentimentSentence>> result = new HashMap<>();
     ObjectMapper mapper = new ObjectMapper();
     try (BufferedReader reader = Files.newBufferedReader(Paths.get(inputPath))) {
       result = mapper.readValue(reader,
@@ -277,10 +276,10 @@ public class BaselineComparison {
     private double sentimentDiffThreshold;
     private Function<Double, Double> penalizeFunc;
     private String penalizeName;
-    Map<Integer, List<ConceptSentimentPair>> docToRawData;
+    Map<String, List<ConceptSentimentPair>> docToRawData;
 
     private Measure(MeasureType type, int conceptDiffThreshold, double sentimentDiffThreshold,
-                   Map<Integer, List<ConceptSentimentPair>> docToRawData) {
+                    Map<String, List<ConceptSentimentPair>> docToRawData) {
       this.type = type;
       this.conceptDiffThreshold = conceptDiffThreshold;
       this.sentimentDiffThreshold = sentimentDiffThreshold;
@@ -293,8 +292,8 @@ public class BaselineComparison {
      * @param penalizeFunc calculate the penalty when the concepts and its ancestors are missing in
      *                     the summary.
      */
-    private static Measure initDistErrorMeasure(MeasureType type, Map<Integer,
-                                                List<ConceptSentimentPair>> docToRawData,
+    private static Measure initDistErrorMeasure(MeasureType type,
+                                                Map<String, List<ConceptSentimentPair>> docToRawData,
                                                 Function<Double, Double> penalizeFunc,
                                                 String penalizeName) {
       Measure measure = new Measure(type, -1, -1.0, docToRawData);
@@ -306,7 +305,7 @@ public class BaselineComparison {
     private static List<Measure> initMeasures(int[] conceptDiffThresholds,
                                               double[] sentimentDiffThresholds,
                                               String rawDataPath) {
-      Map<Integer, List<ConceptSentimentPair>> docToRawData = importRawDataset(rawDataPath);
+      Map<String, List<ConceptSentimentPair>> docToRawData = importRawDataset(rawDataPath);
       List<Measure> measures = new ArrayList<>();
       measures.add(Measure.initDistErrorMeasure(MeasureType.DIST_ERROR, docToRawData,
                                                 Math::abs, "no_penalize"));
@@ -322,8 +321,8 @@ public class BaselineComparison {
       return measures;
     }
 
-    public Double evaluate(Map<Integer, List<SentimentSentence>> docToSummary,
-                           List<Integer> docIds,
+    public Double evaluate(Map<String, List<SentimentSentence>> docToSummary,
+                           List<String> docIds,
                            int roundingDigit) {
       if (type == MeasureType.COVERAGE) {
         return evalCoverage(docToSummary, docIds, roundingDigit);
@@ -339,11 +338,11 @@ public class BaselineComparison {
      * @param docToTopSentences map of doctor and corresponding doctor review's summary
      * @return positive, lower is better
      */
-    private Double evalDistError(Map<Integer, List<SentimentSentence>> docToTopSentences,
-                                 List<Integer> docIds,
+    private Double evalDistError(Map<String, List<SentimentSentence>> docToTopSentences,
+                                 List<String> docIds,
                                  int roundingDigit) {
       double error = 0.0;
-      for (Integer docId : docIds) {
+      for (String docId : docIds) {
         List<ConceptSentimentPair> rawPairs = new ArrayList<>(docToRawData.get(docId));
         final Map<String, List<Double>> rawSentDist = collectSentiments(rawPairs);
         Genealogy genealogy = new Genealogy(rawPairs);
@@ -434,11 +433,11 @@ public class BaselineComparison {
      * @param docToTopSentences map of doctor and corresponding doctor review's summary
      * @return Coverage from 0 to 1 (higher is better)
      */
-    private Double evalCoverage(Map<Integer, List<SentimentSentence>> docToTopSentences,
-                                List<Integer> docIds,
+    private Double evalCoverage(Map<String, List<SentimentSentence>> docToTopSentences,
+                                List<String> docIds,
                                 int roundingDigit) {
       List<Double> coverages = new ArrayList<>();
-      for (Integer docId : docIds) {
+      for (String docId : docIds) {
         List<ConceptSentimentPair> pairs = docToRawData.get(docId);
         List<ConceptSentimentPair> uncoveredPairs = new ArrayList<>(pairs);
 

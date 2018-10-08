@@ -3,7 +3,6 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.composite;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
@@ -16,12 +15,12 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
 
-public class RandomizedRoundingSet extends RandomizedRounding {
-	ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult = new ConcurrentHashMap<Integer, List<SentimentSet>>();
+class RandomizedRoundingSet extends RandomizedRounding {
+	private ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult;
 
-	public RandomizedRoundingSet(int k, float threshold,
-			ConcurrentMap<Integer, StatisticalResult> docToStatisticalResult,
-			ConcurrentMap<Integer, List<SentimentSet>> docToTopKSetsResult) {
+	RandomizedRoundingSet(int k, float threshold,
+			ConcurrentMap<String, StatisticalResult> docToStatisticalResult,
+			ConcurrentMap<String, List<SentimentSet>> docToTopKSetsResult) {
 		super(k, threshold, docToStatisticalResult);
 		this.docToTopKSetsResult = docToTopKSetsResult;
 	}
@@ -29,16 +28,15 @@ public class RandomizedRoundingSet extends RandomizedRounding {
 	/**
 	 * Run Integer Linear Programming for a doctor's data set
 	 * @param docId - doctor ID
-	 * @param docToSentimentSets - list of sentiment units/nodes in K-medians
-	 * @return Result's statistics
+	 * @param sentimentSets - list of sentiment units/nodes in K-medians
 	 */
-	protected void runRandomizedRoundingSetPerDoc(int docId, List<SentimentSet> sentimentSets) {
+	void runRandomizedRoundingSetPerDoc(String docId, List<SentimentSet> sentimentSets) {
 		long startTime = System.nanoTime();
 		
 		StatisticalResult statisticalResult = new StatisticalResult(docId, k, threshold);		
-		List<SentimentSet> topKSets = new ArrayList<SentimentSet>();
+		List<SentimentSet> topKSets = new ArrayList<>();
 		
-		List<ConceptSentimentPair> pairs = new ArrayList<ConceptSentimentPair>();
+		List<ConceptSentimentPair> pairs = new ArrayList<>();
 		for (SentimentSet set : sentimentSets) {
 			if (set.getPairs().size() > 0) {
 				for (ConceptSentimentPair pair : set.getPairs()) {

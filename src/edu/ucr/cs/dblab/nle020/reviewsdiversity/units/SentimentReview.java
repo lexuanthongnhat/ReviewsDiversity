@@ -8,7 +8,8 @@ public class SentimentReview extends SentimentSet {
 
 	private RawReview rawReview;
 	private List<SentimentSentence> sentences;
-	
+
+	@SuppressWarnings("unused")
 	public SentimentReview () {
 		super();
 	}

@@ -11,6 +11,8 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
 
+import static edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.NUM_DOCTORS_TO_EXPERIMENT;
+
 /**
  * This class provides frequency-based summarizers that select top k sentences/reviews.
  * <p>
@@ -41,7 +43,7 @@ public class FreqBasedTopSets {
     SetOption setOption = SetOption.SENTENCE;
     for (int k : K_LIST) {
       for (String method : methods.keySet()) {
-        Map<Integer, List<SentimentSet>> docToTopKSentences = summarizeDoctorReviews(
+        Map<String, List<SentimentSet>> docToTopKSentences = summarizeDoctorReviews(
             TopPairsProgram.DOC_TO_REVIEWS_PATH, setOption, k, method);
 
         String outputPath = BaselineComparison.BASELINE_SUMMARY_DIR + "top_" +
@@ -53,10 +55,10 @@ public class FreqBasedTopSets {
     Utils.printRunningTime(startTime, "Finished topK baselines");
   }
 
-  public static Map<Integer, List<SentimentSet>> summarizeDoctorReviews(
+  public static Map<String, List<SentimentSet>> summarizeDoctorReviews(
       String inputPath, TopPairsProgram.SetOption setOption, int k, String method) {
-    Map<Integer, List<SentimentSet>> docToSentimentSets = importSentimentSets(inputPath, setOption);
-    Map<Integer, List<SentimentSet>> docToTopKSets = docToSentimentSets.entrySet().stream()
+    Map<String, List<SentimentSet>> docToSentimentSets = importSentimentSets(inputPath, setOption);
+    Map<String, List<SentimentSet>> docToTopKSets = docToSentimentSets.entrySet().stream()
         .collect(Collectors.toMap(Map.Entry::getKey,
             e -> selectTopKSentimentSets(e.getValue(), k, methods.get(method))));
     return docToTopKSets;
@@ -192,18 +194,21 @@ public class FreqBasedTopSets {
     return currentSet;
   }
 
-  private static Map<Integer, List<SentimentSet>> importSentimentSets(
+  private static Map<String, List<SentimentSet>> importSentimentSets(
       String inputPath, TopPairsProgram.SetOption setOption) {
-    Map<Integer, List<SentimentSet>> docToSentimentSets;
+    Map<String, List<SentimentSet>> docToSentimentSets;
     switch (setOption) {
       case REVIEW:
-        docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath, false);
+        docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(
+            inputPath, false, NUM_DOCTORS_TO_EXPERIMENT);
         break;
       case SENTENCE:
-        docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(inputPath, false);
+        docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(
+            inputPath, false, NUM_DOCTORS_TO_EXPERIMENT);
         break;
       default:
-        docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(inputPath, false);
+        docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(
+            inputPath, false, NUM_DOCTORS_TO_EXPERIMENT);
         break;
     }
     return docToSentimentSets;
