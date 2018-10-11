@@ -3,15 +3,18 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.baseline.FreqBasedTopSets;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.baseline.TextSummarizer;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
+import org.apache.commons.cli.*;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
@@ -28,8 +31,7 @@ public class BaselineComparison {
   private static final String SUMMARY_DIR = TopPairsProgram.OUTPUT_FOLDER;
   public static final String BASELINE_SUMMARY_DIR = SUMMARY_DIR + "baseline/summary/";
   private static final int ROUNDING_DIGIT = 2;
-//  public static final int[] K_LIST = {3, 5, 10, 15, 20};
-  public static final int[] K_LIST = {3};
+  public static final int[] K_LIST = {3, 5, 10, 15, 20};
   private static Map<String, MethodType> methodToType = new HashMap<>();
   private static List<String> methods = new ArrayList<>();
 
@@ -48,8 +50,8 @@ public class BaselineComparison {
     methodToType.put("lsa", MethodType.BASELINE);
 
     methods.addAll(Arrays.asList("greedy",
-                                 "most_popular", "proportional",
-                                 "textrank", "lexrank", "lsa"));
+        "most_popular", "proportional",
+        "textrank", "lexrank", "lsa"));
     randomRelatedMethods.addAll(Arrays.asList("most_popular", "proportional"));
   }
 
@@ -67,6 +69,70 @@ public class BaselineComparison {
   public BaselineComparison() {
   }
 
+  public static void main(String[] args) {
+    CommandLineParser parser = new DefaultParser();
+    Options options = new Options();
+    options.addOption("h", "help", false, "print this message");
+    options.addOption(Option.builder().longOpt("doc-parsed-file").hasArg().argName("FILE")
+        .desc("File contains parsed document with aspects and sentiments extracted.").build());
+    options.addOption(Option.builder().longOpt("output").hasArg().argName("FILE")
+        .desc("Output file path/directory.").build());
+    options.addOption(Option.builder().longOpt("our-summary-dir").hasArg().argName("DIR")
+        .desc("Directory contains summaries created by our summarizers").build());
+    options.addOption(Option.builder().longOpt("baseline-summary-dir").hasArg().argName("DIR")
+        .desc("Directory contains summaries created by baseline summarizers").build());
+    options.addOption(Option.builder().longOpt("sample").hasArg().argName("SAMPLE")
+        .type(Double.class)
+        .desc("Sample ratio of all doc to evaluate, default=1 (all)").build());
+    try {
+      CommandLine commandLine = parser.parse(options, args);
+      String docParsedFile = commandLine.getOptionValue(
+          "doc-parsed-file", TopPairsProgram.DOC_TO_REVIEWS_PATH);
+      String outputDir = commandLine.getOptionValue("output", SUMMARY_DIR + "baseline/");
+      String ourSummaryDir = commandLine.getOptionValue("our-summary-dir",
+          "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/summary/");
+      String baselineSummaryDir = commandLine.getOptionValue("baseline-summary-dir",
+          "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/summary/");
+      double sample = Double.valueOf(commandLine.getOptionValue("sample", "1"));
+
+      startEvaluation(docParsedFile, sample, ourSummaryDir, baselineSummaryDir, outputDir);
+    } catch (ParseException e) {
+      System.out.println("Unexpected exception:" + e.getMessage());
+    }
+  }
+
+  private static void startEvaluation(String docParsedFile, double sample,
+                                      String ourSummaryDir,
+                                      String baselineSummaryDir,
+                                      String outputDir) {
+    // Threshold parameters of COVERAGE measures
+    int[] conceptDiffThresholds = {2, 3, 4};
+    double[] sentimentDiffThresholds = {0.3};
+    List<Measure> measures = Measure.initMeasures(
+        conceptDiffThresholds, sentimentDiffThresholds, docParsedFile);
+
+    double appliedSentThreshold = 0.5;  // Sentiment threshold used when generating summaries
+    // Evaluate with various measures
+
+    Map<Measure, Map<Integer, Map<String, Double>>> measureToKResults = new HashMap<>();
+    for (int k : K_LIST) {
+      Map<Measure, Map<String, Double>> measureToResults = evaluate(
+          k, appliedSentThreshold, measures, sample, ourSummaryDir, baselineSummaryDir);
+      for (Measure measure : measureToResults.keySet()) {
+        if (!measureToKResults.containsKey(measure))
+          measureToKResults.put(measure, new HashMap<>());
+        measureToKResults.get(measure).put(k, measureToResults.get(measure));
+      }
+    }
+
+    // Save results to files, one measure per file
+    for (Measure measure : measures) {
+      exportResultInCsv(Paths.get(outputDir, measure.pathForm() + ".csv"),
+                        measureToKResults.get(measure));
+    }
+    System.out.println("Exported evaluation result to \"" + outputDir + "\"");
+  }
+
   /**
    * Evaluate summaries' quality under multiple measures
    *
@@ -77,9 +143,12 @@ public class BaselineComparison {
    * @return map from measure to performance result that is a table of method-performance
    */
   private static Map<Measure, Map<String, Double>> evaluate(
-          int k, double appliedSentThreshold, List<Measure> measures, double sample) {
+      int k, double appliedSentThreshold, List<Measure> measures, double sample,
+      String ourSummaryDir,
+      String baselineSummaryDir
+  ) {
     Map<String, Map<String, List<SentimentSentence>>> methodToSummaries = importMethodSummaries(
-        k, appliedSentThreshold);
+        k, appliedSentThreshold, ourSummaryDir, baselineSummaryDir);
     final List<String> sampleDocs = sampleDoctors(methodToSummaries, sample);
     System.out.println("Number of doctors in the sample: " + sampleDocs.size());
 
@@ -104,11 +173,11 @@ public class BaselineComparison {
    */
   private static Double evaluateWithReSample(String method, int k,
                                              List<String> docIds, Measure measure,
-                                             int roundingDigit){
+                                             int roundingDigit) {
     List<Double> errors = new ArrayList<>();
     for (int i = 0; i < RE_SAMPLE_RANDOM_METHOD; ++i) {
       Map<String, List<SentimentSet>> docToSummaries = FreqBasedTopSets.summarizeDoctorReviews(
-          TopPairsProgram.DOC_TO_REVIEWS_PATH, TopPairsProgram.SetOption.SENTENCE, k,method);
+          TopPairsProgram.DOC_TO_REVIEWS_PATH, TopPairsProgram.SetOption.SENTENCE, k, method);
       Map<String, List<SentimentSentence>> docToSentimentSets = new HashMap<>();
       for (String doc : docToSummaries.keySet()) {
         List<SentimentSet> sets = docToSummaries.get(doc);
@@ -156,15 +225,17 @@ public class BaselineComparison {
    * @return map of method to summaries
    */
   private static Map<String, Map<String, List<SentimentSentence>>> importMethodSummaries(
-      int k, double threshold) {
+      int k, double threshold, String ourSummaryDir, String baselineSummaryDir) {
     final Map<String, Map<String, List<SentimentSentence>>> mthToSummaries = new HashMap<>();
     for (String method : methods) {
       String summaryPath;
       if (methodToType.get(method) == MethodType.OUR)
-        summaryPath = SUMMARY_DIR + "top_sentence/k" + k + "_threshold" +
-            Double.toString(threshold) + "/top_SENTENCE_result_1000_" + method + "_set.txt";
+        summaryPath = Paths.get(ourSummaryDir,
+            "top_sentence", "k" + k + "_threshold" + Double.toString(threshold),
+            "top_SENTENCE_result_0_" + method + "_set.txt").toString();
       else
-        summaryPath = BASELINE_SUMMARY_DIR + "top_sentence_" + method + "_k" + k + ".txt";
+        summaryPath = Paths.get(baselineSummaryDir, TextSummarizer.summaryFileName(method, k))
+            .toString();
       final Map<String, List<SentimentSentence>> docToTopSentences =
           importSummaryFromJson(summaryPath);
       mthToSummaries.put(method, docToTopSentences);
@@ -173,7 +244,7 @@ public class BaselineComparison {
     return mthToSummaries;
   }
 
-  private static void exportResultInCsv(String outputPath,
+  private static void exportResultInCsv(Path outputPath,
                                         Map<Integer, Map<String, Double>> kToResults) {
     StringBuilder outputString = new StringBuilder();
     outputString.append(resultLineCsv("k", methods));
@@ -187,10 +258,9 @@ public class BaselineComparison {
       outputString.append(resultLineCsv(k, orderedResults));
     }
 
-    try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(outputPath),
+    try (BufferedWriter writer = Files.newBufferedWriter(outputPath,
         StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
       writer.write(outputString.toString());
-      System.out.println("Exported evaluation result to \"" + outputPath + "\"");
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -207,36 +277,6 @@ public class BaselineComparison {
       builder.deleteCharAt(builder.length() - 1);
     builder.append("\n");
     return builder.toString();
-  }
-
-  public static void main(String[] args) {
-    long startTime = System.currentTimeMillis();
-    // Threshold parameters of COVERAGE measures
-    int[] conceptDiffThresholds = {2, 3, 4};
-    double[] sentimentDiffThresholds = {0.3};
-    final List<Measure> measures = Measure.initMeasures(conceptDiffThresholds,
-        sentimentDiffThresholds,
-        TopPairsProgram.DOC_TO_REVIEWS_PATH);
-
-    final double appliedSentThreshold = 0.5;  // Sentiment threshold used when generating summaries
-    // Evaluate with various measures
-    Map<Measure, Map<Integer, Map<String, Double>>> measureToKResults = new HashMap<>();
-    for (int k : K_LIST) {
-      final Map<Measure, Map<String, Double>> measureToResults = evaluate(k, appliedSentThreshold,
-          measures, 1.0);
-      for (Measure measure : measureToResults.keySet()) {
-        if (!measureToKResults.containsKey(measure))
-          measureToKResults.put(measure, new HashMap<>());
-        measureToKResults.get(measure).put(k, measureToResults.get(measure));
-      }
-    }
-
-    // Save results to files, one measure per file
-    for (Measure measure : measures) {
-      String outputPath = SUMMARY_DIR + "baseline/" + measure.pathForm() + ".csv";
-      exportResultInCsv(outputPath, measureToKResults.get(measure));
-    }
-    Utils.printRunningTime(startTime, "Finished evaluation", true);
   }
 
   private static Map<String, List<ConceptSentimentPair>> importRawDataset(
@@ -258,7 +298,7 @@ public class BaselineComparison {
     ObjectMapper mapper = new ObjectMapper();
     try (BufferedReader reader = Files.newBufferedReader(Paths.get(inputPath))) {
       result = mapper.readValue(reader,
-          new TypeReference<Map<Integer, List<SentimentSentence>>>() {
+          new TypeReference<Map<String, List<SentimentSentence>>>() {
           });
     } catch (IOException e) {
       e.printStackTrace();
@@ -289,6 +329,7 @@ public class BaselineComparison {
 
     /**
      * Init Sentiment Distribution Error measure
+     *
      * @param penalizeFunc calculate the penalty when the concepts and its ancestors are missing in
      *                     the summary.
      */
@@ -308,10 +349,10 @@ public class BaselineComparison {
       Map<String, List<ConceptSentimentPair>> docToRawData = importRawDataset(rawDataPath);
       List<Measure> measures = new ArrayList<>();
       measures.add(Measure.initDistErrorMeasure(MeasureType.DIST_ERROR, docToRawData,
-                                                Math::abs, "no_penalize"));
+          Math::abs, "no_penalize"));
       measures.add(Measure.initDistErrorMeasure(MeasureType.DIST_ERROR, docToRawData,
-                                                s -> Math.max(Math.abs(1 - s), Math.abs(-1 - s)),
-                                                "penalize"));
+          s -> Math.max(Math.abs(1 - s), Math.abs(-1 - s)),
+          "penalize"));
       /*for (int conceptDiffThreshold : conceptDiffThresholds) {
         for (double sentimentDiffThreshold : sentimentDiffThresholds) {
           measures.add(new Measure(MeasureType.COVERAGE, conceptDiffThreshold,
@@ -601,7 +642,7 @@ public class BaselineComparison {
     private static boolean is_successor(String ancestorDewey, String childDewey) {
       if (ancestorDewey.startsWith(childDewey)) {
         return ancestorDewey.length() > childDewey.length() &&
-                ancestorDewey.charAt(childDewey.length()) == '.';
+            ancestorDewey.charAt(childDewey.length()) == '.';
       }
       return false;
     }

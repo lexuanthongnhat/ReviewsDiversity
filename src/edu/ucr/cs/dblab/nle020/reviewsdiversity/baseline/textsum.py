@@ -12,7 +12,7 @@ from sumy.utils import get_stop_words
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARN)
+logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
 ch.setFormatter(logging.Formatter('%(asctime)s-%(levelname)s - %(message)s'))
 logger.addHandler(ch)
@@ -189,5 +189,6 @@ if __name__ == '__main__':
     p_add("--output-dir", default="./summary/",
           help='Directory to export summaries, default="{./summary/}"')
     args = parser.parse_args()
+    logger.info(args)
 
     summarize_reviews(args.engine, args.dataset_path, args.output_dir)

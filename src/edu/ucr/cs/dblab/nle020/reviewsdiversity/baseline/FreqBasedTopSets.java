@@ -1,17 +1,17 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity.baseline;
 
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.BaselineComparison;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram.SetOption;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
+import org.apache.commons.cli.*;
 
-import static edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.NUM_DOCTORS_TO_EXPERIMENT;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * This class provides frequency-based summarizers that select top k sentences/reviews.
@@ -39,15 +39,46 @@ public class FreqBasedTopSets {
   }
 
   public static void main(String[] args) {
+    CommandLineParser parser = new DefaultParser();
+    Options options = new Options();
+    options.addOption("h", "help", false, "print this message");
+    options.addOption(Option.builder().longOpt("input-file").hasArg().argName("FILE")
+        .desc("Input file path.").build());
+    options.addOption(Option.builder().longOpt("output-dir").hasArg().argName("DIR")
+        .desc("Output directory.").build());
+    try {
+      CommandLine commandLine = parser.parse(options, args);
+
+      if (commandLine.hasOption("h")) {
+        HelpFormatter formatter = new HelpFormatter();
+        String header = "This class offers frequency-based summarizers that select top " +
+            "k sentences/reviews.\n\nThe general use case is selecting k SentimentSets from a " +
+            "provided SentimentSet list. The summarizers mainly cluster concepts embedded in " +
+            "SentimentSet list into multiple polarized concept groups. For example, concept " +
+            "\"headache\" is divided to \"headache_pos\" and \"headache_neg\". The sentiment and " +
+            "frequency/count of the polarized concepts are utilized for SentimentSet selection.";
+        formatter.printHelp("FreqBasedTopSets", header, options, "", true);
+      } else {
+        String inputFile = commandLine.getOptionValue("input-file", TopPairsProgram.DOC_TO_REVIEWS_PATH);
+        String outputDir = commandLine.getOptionValue("output-dir", BaselineComparison.BASELINE_SUMMARY_DIR);
+        experimentSummarization(inputFile, outputDir);
+      }
+    } catch (ParseException e) {
+      System.out.println("Unexpected exception:" + e.getMessage());
+    }
+  }
+
+  private static void experimentSummarization(String inputFile, String outputDir) {
     long startTime = System.currentTimeMillis();
     SetOption setOption = SetOption.SENTENCE;
     for (int k : K_LIST) {
       for (String method : methods.keySet()) {
         Map<String, List<SentimentSet>> docToTopKSentences = summarizeDoctorReviews(
-            TopPairsProgram.DOC_TO_REVIEWS_PATH, setOption, k, method);
+            inputFile, setOption, k, method);
 
-        String outputPath = BaselineComparison.BASELINE_SUMMARY_DIR + "top_" +
-            setOption.toString().toLowerCase() + "_" + method + "_k" + k + ".txt";
+        String outputPath = Paths.get(outputDir,
+            "top_" + setOption.toString().toLowerCase() + "_" + method + "_k" + k + ".txt")
+            .toString();
         TopPairsProgram.outputTopKToJson(outputPath, docToTopKSentences);
         System.out.println("Exported to \"" + outputPath + "\"");
       }
@@ -200,15 +231,15 @@ public class FreqBasedTopSets {
     switch (setOption) {
       case REVIEW:
         docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(
-            inputPath, false, NUM_DOCTORS_TO_EXPERIMENT);
+            inputPath, false, -1);
         break;
       case SENTENCE:
         docToSentimentSets = TopPairsProgram.importDocToSentimentSentences(
-            inputPath, false, NUM_DOCTORS_TO_EXPERIMENT);
+            inputPath, false, -1);
         break;
       default:
         docToSentimentSets = TopPairsProgram.importDocToSentimentReviews(
-            inputPath, false, NUM_DOCTORS_TO_EXPERIMENT);
+            inputPath, false, -1);
         break;
     }
     return docToSentimentSets;
@@ -305,11 +336,8 @@ public class FreqBasedTopSets {
         return false;
       PolarizedConcept other = (PolarizedConcept) obj;
       if (concept == null) {
-        if (other.concept != null)
-          return false;
-      } else if (!concept.equals(other.concept))
-        return false;
-      return true;
+        return other.concept == null;
+      } else return concept.equals(other.concept);
     }
 
     @Override

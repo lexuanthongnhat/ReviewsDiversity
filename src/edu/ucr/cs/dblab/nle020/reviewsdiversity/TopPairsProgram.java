@@ -1,6 +1,7 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
 import edu.ucr.cs.dblab.nle020.ontology.SnomedGraphBuilder;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.LPMethod;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants.PartialTimeIndex;
@@ -16,6 +17,7 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentReview;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
 import edu.ucr.cs.dblab.nle020.utils.Utils;
+import org.apache.commons.cli.*;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -41,6 +43,7 @@ public class TopPairsProgram {
     private static Set<Integer> randomIndices = Utils.randomIndices(1000,
             Constants.NUM_DOCTORS_TO_EXPERIMENT);
     private final static int NUM_DOCTORS_TO_EXPERIMENT = Constants.NUM_DOCTORS_TO_EXPERIMENT;
+    private final static String EXPECTED_JOB_DONE = "DONE!";
 
     private static final int ILP_INDEX = 0;
     private static final int RR_INDEX = 1;
@@ -50,49 +53,114 @@ public class TopPairsProgram {
             "src/main/resources/doc_pairs_1_prunned_vector.txt";
     final static String OUTPUT_FOLDER = "src/main/resources/performance/";
 
+    private static final String OUR_FOLDER = "src/main/resources/cell/our/";
+    private static final String CELL_PATH =
+            "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/cell/review_transformed.jl";
+
     private enum Algorithm {GREEDY, ILP, RANDOMIZED_ROUNDING}
     private enum SetAlgorithm {GREEDY_SET, ILP_SET, RANDOMIZED_ROUNDING_SET}
     public enum SetOption {REVIEW, SENTENCE}
     private enum NumItem {NUM_PAIRS, NUM_PAIRS_EDGES}
 
     public static void main(String[] args) throws IOException {
+        CommandLineParser parser = new DefaultParser();
+        Options options = new Options();
+        options.addOption("h", "help", false, "print this message");
+        options.addOption("p", "profile-dataset", false,
+            "Explore dataset statistics");
+        options.addOption("s", "synthetic-dataset", false,
+            "Experiment synthetic dataset");
 
-        long startTime = System.currentTimeMillis();
-//		getDatasetStatistics();
-//		examineProblemSizes();
+        options.addOption(Option.builder("t").longOpt("type").hasArg().argName("TYPE")
+            .type(String.class)
+            .desc("Experiment type, one of 3: pair, sentence or review").build());
 
-        List<Integer> kSet = Arrays.asList(10);
-        List<Float> thresholdSet = Arrays.asList(0.5f);
-//		List<Float> thresholdSet = Arrays.asList(0.3f, 0.4f, 0.5f, 0.6f);
-//		List<Float> thresholdSet = Arrays.asList(0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f,
-//		    1.0f, 1.1f, 1.2f, 1.3f, 1.4f, 1.5f, 1.6f, 1.7f, 1.8f, 1.9f, 2.0f);
+        options.addOption(Option.builder().longOpt("input-file").hasArg().argName("FILE")
+            .desc("Input file path").build());
+        options.addOption(Option.builder().longOpt("output-dir").hasArg().argName("DIR")
+            .desc("Output directory").build());
+        options.addOption(Option.builder().longOpt("doc-count").hasArg().argName("COUNT")
+            .type(Integer.class)
+            .desc("Number of doctors. Default 0, use as much as the dataset has").build());
+        options.addOption(Option.builder().longOpt("thread-count").hasArg().argName("COUNT")
+            .type(Integer.class)
+            .desc("Number of threads being used simultaneously.").build());
 
-        topPairsExperiment(kSet, thresholdSet);
-        topSetsExperiment(kSet, thresholdSet, SetOption.SENTENCE);
-        topSetsExperiment(kSet, thresholdSet, SetOption.REVIEW);
+        try {
+            CommandLine commandLine = parser.parse(options, args);
+            int threadCount = Integer.parseInt(commandLine.getOptionValue(
+                "thread-count", String.valueOf(Constants.NUM_THREADS_ALGORITHM)));
 
-//		topPairsSyntheticExperiment();
-        Utils.printRunningTime(startTime, "Finished evaluation");
+            if (commandLine.hasOption("h")) {
+                printHelp(options);
+            } else if (commandLine.hasOption("profile-dataset")) {
+                getDatasetStatistics("src/main/resources/dataset-statistics.txt");
+		            examineProblemSizes("src/main/resources/");
+            } else if (commandLine.hasOption("synthetic-dataset")) {
+                topPairsSyntheticExperiment(threadCount);
+            } else if (commandLine.hasOption("type")) {
+                long startTime = System.currentTimeMillis();
+                String type = commandLine.getOptionValue("type").toLowerCase();
+                String inputFile = commandLine.getOptionValue("input-file", DOC_TO_REVIEWS_PATH);
+                String outputDir = commandLine.getOptionValue("output-dir", OUTPUT_FOLDER);
+                int docCount = Integer.parseInt(
+                    commandLine.getOptionValue("doc-count", "0"));
+
+                List<Integer> kSet = ImmutableList.of(3, 5, 10, 15, 20);
+                List<Float> thresholdSet = ImmutableList.of(0.5f);
+//		            List<Float> thresholdSet = ImmutableList.of(0.3f, 0.4f, 0.5f, 0.6f);
+
+                switch (type) {
+                    case "pair":
+                        topPairsExperiment(kSet, thresholdSet, threadCount, outputDir);
+                        break;
+                    case "sentence":
+                        topSetsExperiment(kSet, thresholdSet, threadCount, SetOption.SENTENCE,
+                            inputFile, docCount, outputDir);
+                        break;
+                    case "review":
+                        topSetsExperiment(kSet, thresholdSet, threadCount, SetOption.REVIEW,
+                            inputFile, docCount, outputDir);
+                        break;
+                     default:
+                    printHelp(options);
+                    break;
+                }
+                Utils.printRunningTime(startTime, "Finished evaluation");
+            } else {
+                printHelp(options);
+            }
+        } catch (ParseException e) {
+            System.out.println("Unexpected exception:" + e.getMessage());
+        }
     }
 
-    private static void topPairsExperiment(List<Integer> kSet, List<Float> thresholdSet)
-            throws IOException {
+    private static void printHelp(Options options) {
+        HelpFormatter formatter = new HelpFormatter();
+        String header = "Main summarization module with our methods.";
+        formatter.printHelp("TopPairsProgram", header, options, "", true);
+    }
+
+    private static void topPairsExperiment(
+            List<Integer> kSet, List<Float> thresholdSet, int threadCount, String outputDir
+    ) throws IOException {
         List<StatisticalResult[]> statisticalResults = new ArrayList<>();
         for (int numChosen : kSet) {
             k = numChosen;
             for (float thres : thresholdSet) {
                 threshold = thres;
-
                 String subFolder = "top_pair/k" + k + "_threshold" + threshold + "/";
-                if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder)))
-                    Files.createDirectories(Paths.get(OUTPUT_FOLDER + subFolder));
-
-                statisticalResults.add(topPairsExperiment(OUTPUT_FOLDER + subFolder));
+                String subOutputDir = outputDir + subFolder;
+                if (!Files.exists(Paths.get(subOutputDir)))
+                    Files.createDirectories(Paths.get(subOutputDir));
+                statisticalResults.add(topPairsExperiment(threadCount, subOutputDir));
             }
         }
 
-        outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER + "/top_pair/", "top_pair");
-        outputThresholdAndCostToCSV(statisticalResults, OUTPUT_FOLDER + "cost_threshold/", "top_pair");
+        outputSummaryStatisticsToCSV(
+            statisticalResults, outputDir + "/top_pair/", "top_pair");
+        outputThresholdAndCostToCSV(
+            statisticalResults, outputDir + "cost_threshold/", "top_pair");
     }
 
     private static void outputThresholdAndCostToCSV(
@@ -141,7 +209,7 @@ public class TopPairsProgram {
                 }
 
                 BufferedWriter writer = Files.newBufferedWriter(
-                        Paths.get(outputFolder + fileNamePrefix + "_" + methodPrefix + "k" + num + ".csv"),
+                        Paths.get(outputFolder, fileNamePrefix + "_" + methodPrefix + "k" + num + ".csv"),
                         StandardOpenOption.CREATE,
                         StandardOpenOption.APPEND);
                 writer.write(sb.toString());
@@ -154,7 +222,7 @@ public class TopPairsProgram {
     /**
      * @return array of size 3 of average result for 3 algorithms, also output csv file
      */
-    private static StatisticalResult[] topPairsExperiment(String outputFolder) {
+    private static StatisticalResult[] topPairsExperiment(int threadCount, String outputFolder) {
 
         long startTime = System.currentTimeMillis();
         Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairs =
@@ -177,16 +245,16 @@ public class TopPairsProgram {
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToTopPairsResultILP);
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToTopPairsResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);
-        LPMethod[] methods = new LPMethod[]{LPMethod.AUTOMATIC, LPMethod.BARRIER,
+        List<LPMethod> methods = ImmutableList.of(LPMethod.AUTOMATIC, LPMethod.BARRIER,
                 LPMethod.CONCURRENT, LPMethod.DETERMINISTIC_CONCURRENT,
-                LPMethod.DUAL_SIMPLEX, LPMethod.PRIMAL_SIMPLEX};
+                LPMethod.DUAL_SIMPLEX, LPMethod.PRIMAL_SIMPLEX);
         for (int trial = 0; trial < NUM_TRIALS; ++trial) {
-            runTopPairsAlgoMultiThreads(Algorithm.GREEDY, Constants.NUM_THREADS_ALGORITHM,
+            runTopPairsAlgoMultiThreads(Algorithm.GREEDY, threadCount,
                     docToConceptSentimentPairs, docToStatisticalResultGreedy, docToTopKPairsResultGreedy);
             outputStatisticalResultToJson(outputPrefix + "_greedy.txt", docToStatisticalResultGreedy);
             outputTopKToJson(outputPrefix + "_greedy_pair.txt", docToTopKPairsResultGreedy);
 
-            runTopPairsAlgoMultiThreads(Algorithm.ILP, Constants.NUM_THREADS_ALGORITHM,
+            runTopPairsAlgoMultiThreads(Algorithm.ILP, threadCount,
                     docToConceptSentimentPairs, docToStatisticalResultILP, docToTopKPairsResultILP);
             outputStatisticalResultToJson(outputPrefix + "_ilp.txt", docToStatisticalResultILP);
             outputTopKToJson(outputPrefix + "_ilp_pair.txt", docToTopKPairsResultILP);
@@ -195,7 +263,7 @@ public class TopPairsProgram {
                 Map<LPMethod, Long> methodToTime = new HashMap<>();
                 for (LPMethod method : methods) {
                     long startTime2 = System.currentTimeMillis();
-                    runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUNDING, Constants.NUM_THREADS_ALGORITHM,
+                    runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUNDING, threadCount,
                             docToConceptSentimentPairs, docToStatisticalResultRR, docToTopKPairsResultRR, method);
                     outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
 
@@ -211,7 +279,7 @@ public class TopPairsProgram {
                 }
                 System.err.println("Best LP Method: " + bestMethod + ", number " + bestMethod.method());
             } else {
-                runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUNDING, Constants.NUM_THREADS_ALGORITHM,
+                runTopPairsAlgoMultiThreads(Algorithm.RANDOMIZED_ROUNDING, threadCount,
                         docToConceptSentimentPairs, docToStatisticalResultRR, docToTopKPairsResultRR);
                 outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
                 outputTopKToJson(outputPrefix + "_rr_pair.txt", docToTopKPairsResultRR);
@@ -256,9 +324,7 @@ public class TopPairsProgram {
                 docToStatisticalResultRRFinal);
     }
 
-
-    @SuppressWarnings("unused")
-    private static void topPairsSyntheticExperiment() {
+    private static void topPairsSyntheticExperiment(int threadCount) {
         long startTime = System.currentTimeMillis();
 
         Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairs;
@@ -274,8 +340,7 @@ public class TopPairsProgram {
         int numDecimals = 1;
 
         docToConceptSentimentPairs = createSyntheticDataset(
-                importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS),
-                Constants.NUM_SYNTHETIC_DOCTORS, numDecimals);
+                importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS), numDecimals);
 
 //		printInitialization(docToConceptSentimentPairs);
 
@@ -284,30 +349,32 @@ public class TopPairsProgram {
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToTopPairsResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);
 
-        runTopPairsAlgoMultiThreads(Algorithm.GREEDY, Constants.NUM_THREADS_ALGORITHM,
+        runTopPairsAlgoMultiThreads(Algorithm.GREEDY, threadCount,
                 docToConceptSentimentPairs, docToStatisticalResultGreedy, docToTopKPairsResultGreedy);
         outputStatisticalResultToJson(outputPrefix + "greedy.txt", docToStatisticalResultGreedy);
 
-/*		runTopPairsAlgoMultiThreads(Algorithm.ILP, Constants.NUM_THREADS_ALGORITHM,
+/*		runTopPairsAlgoMultiThreads(Algorithm.ILP, threadCount,
     docToConceptSentimentPairs, docToTopPairsResultILP, docToTopKPairsResultILP);
 		outputResultToJson(outputPrefix + "_ilp.txt", docToTopPairsResultILP);*/
 
-/*		runRandomizedRoundingMultiThreads(Constants.NUM_THREADS_ALGORITHM, docToConceptSentimentPairs,
+/*		runRandomizedRoundingMultiThreads(threadCount, docToConceptSentimentPairs,
  * 				docToTopPairsResultRR, docToTopKPairsResultRR);
 		outputResultToJson(outputPrefix + "_rr.txt", docToTopPairsResultRR);*/
 
         String outputPath = OUTPUT_FOLDER + "synthetic_k" + k + "_threshold"
                 + Math.round(threshold) / 10f + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
-        boolean isSet = false;
-        outputStatisticalResultToExcel(outputPath, isSet,
+        outputStatisticalResultToExcel(outputPath, false,
                 docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 
         Utils.printRunningTime(startTime, "Finished Top Pairs Synthetic", true);
     }
 
     private static void topSetsExperiment(
-            List<Integer> kSet, List<Float> thresholdSet, SetOption setOption) throws IOException {
-
+            List<Integer> kSet, List<Float> thresholdSet, int threadCount, SetOption setOption,
+            String inputPath,
+            int doctorCount,
+            String outputDir
+    ) throws IOException {
         List<StatisticalResult[]> statisticalResults = new ArrayList<>();
         String setName = setOption.toString().toLowerCase();
 
@@ -315,23 +382,29 @@ public class TopPairsProgram {
             k = numChosen;
             for (float thres : thresholdSet) {
                 threshold = thres;
-                String subFolder = "top_" + setName + "/k" + k + "_threshold"
-                        + Math.round(threshold * 10) / 10.0f + "/";
-
-                if (!Files.exists(Paths.get(OUTPUT_FOLDER + subFolder)))
-                    Files.createDirectories(Paths.get(OUTPUT_FOLDER + subFolder));
-
-                statisticalResults.add(topSetsExperiment(setOption, OUTPUT_FOLDER + subFolder));
+                String subOutputDir = Paths.get(outputDir, "top_" + setName,
+                        "k" + k + "_threshold" + Math.round(threshold * 10) / 10.0f).toString();
+                if (!Files.exists(Paths.get(subOutputDir)))
+                    Files.createDirectories(Paths.get(subOutputDir));
+                statisticalResults.add(topSetsExperiment(
+                    threadCount, setOption, inputPath, doctorCount, subOutputDir));
             }
         }
 
-        outputSummaryStatisticsToCSV(statisticalResults, OUTPUT_FOLDER + "top_" + setName + "/",
+        outputSummaryStatisticsToCSV(statisticalResults,
+                Paths.get(outputDir, "top_" + setName, "/").toString(),
                 "top_" + setName);
-        outputThresholdAndCostToCSV(statisticalResults, OUTPUT_FOLDER +
-                "cost_threshold/", "top_" + setName);
+        outputThresholdAndCostToCSV(statisticalResults,
+                Paths.get(outputDir, "cost_threshold").toString(), "top_" + setName);
     }
 
-    private static StatisticalResult[] topSetsExperiment(SetOption setOption, String outputFolder) {
+    private static StatisticalResult[] topSetsExperiment(
+            int threadCount,
+            SetOption setOption,
+            String inputPath,
+            int doctorCount,
+            String outputFolder
+    ) {
         long startTime = System.currentTimeMillis();
         Map<String, List<SentimentSet>> docToSentimentSets;
 
@@ -350,38 +423,38 @@ public class TopPairsProgram {
         switch (setOption) {
             case REVIEW:
                 docToSentimentSets = importDocToSentimentReviews(
-                        DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS, NUM_DOCTORS_TO_EXPERIMENT);
+                        inputPath, RANDOMIZE_DOCS, doctorCount);
                 break;
             case SENTENCE:
                 docToSentimentSets = importDocToSentimentSentences(
-                        DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS, NUM_DOCTORS_TO_EXPERIMENT);
+                        inputPath, RANDOMIZE_DOCS, doctorCount);
                 break;
             default:
                 docToSentimentSets = importDocToSentimentReviews(
-                        DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS, NUM_DOCTORS_TO_EXPERIMENT);
+                        inputPath, RANDOMIZE_DOCS, doctorCount);
                 break;
         }
 
-        String outputPrefix = outputFolder + "top_" + setOption + "_result_" + NUM_DOCTORS_TO_EXPERIMENT;
+        String outputPrefix = Paths.get(
+            outputFolder, "top_" + setOption + "_result_" + doctorCount).toString();
 //		importResultFromJson(outputPrefix + "_ilp.txt", docToStatisticalResultILP);
 //		importResultFromJson(outputPrefix + "_greedy.txt", docToStatisticalResultGreedy);
 //		importResultFromJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
 
         for (int trial = 0; trial < NUM_TRIALS; ++trial) {
-            runTopSetsAlgoMultiThreads(SetAlgorithm.GREEDY_SET, Constants.NUM_THREADS_ALGORITHM,
+            runTopSetsAlgoMultiThreads(SetAlgorithm.GREEDY_SET, threadCount,
                     docToSentimentSets, docToStatisticalResultGreedy, docToTopKSetsGreedy);
             outputStatisticalResultToJson(outputPrefix + "_greedy.txt", docToStatisticalResultGreedy);
             outputTopKToJson(outputPrefix + "_greedy_set.txt",
                     convertTopKSetsMapToSetResultMap(docToTopKSetsGreedy));
 
-            runTopSetsAlgoMultiThreads(SetAlgorithm.ILP_SET, Constants.NUM_THREADS_ALGORITHM,
+            runTopSetsAlgoMultiThreads(SetAlgorithm.ILP_SET, threadCount,
                     docToSentimentSets, docToStatisticalResultILP, docToTopKSetsILP);
             outputStatisticalResultToJson(outputPrefix + "_ilp.txt", docToStatisticalResultILP);
             outputTopKToJson(outputPrefix + "_ilp_set.txt",
                     convertTopKSetsMapToSetResultMap(docToTopKSetsILP));
 
-            runTopSetsAlgoMultiThreads(SetAlgorithm.RANDOMIZED_ROUNDING_SET,
-                    Constants.NUM_THREADS_ALGORITHM,
+            runTopSetsAlgoMultiThreads(SetAlgorithm.RANDOMIZED_ROUNDING_SET, threadCount,
                     docToSentimentSets, docToStatisticalResultRR, docToTopKSetsRR);
             outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
             outputTopKToJson(outputPrefix + "_rr_set.txt",
@@ -403,8 +476,9 @@ public class TopPairsProgram {
             }
         }
 
-        String outputPath = outputFolder + "review_diversity_" + setOption +
-                "_k" + k + "_threshold" + Math.round(threshold) / 10f + "_" + NUM_DOCTORS_TO_EXPERIMENT + ".xlsx";
+        String outputPath = Paths.get(outputFolder,
+                "review_diversity_" + setOption + "_k" + k + "_threshold" +
+                Math.round(threshold) / 10f + "_" + doctorCount + ".xlsx").toString();
         outputStatisticalResultToExcel(outputPath, true,
                 docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 
@@ -416,17 +490,11 @@ public class TopPairsProgram {
                 docToStatisticalResultGreedyFinal, docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
 
         Utils.printRunningTime(startTime, "Finished Top " + setOption, true);
-
         return summaryStatisticalResultsOfDifferentMethods(docToStatisticalResultGreedyFinal,
-                docToStatisticalResultILPFinal,
-                docToStatisticalResultRRFinal);
+                docToStatisticalResultILPFinal, docToStatisticalResultRRFinal);
     }
 
-    @SuppressWarnings("unused")
-    public static void examineProblemSizes() {
-        String outputFolder = "src/main/resources/";
-        String outputFileNamePrefix = "problem_size";
-
+    private static void examineProblemSizes(String outputFolder) {
         Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairs =
                 importDocToConceptSentimentPairs(DOC_TO_REVIEWS_PATH, RANDOMIZE_DOCS);
 
@@ -482,7 +550,7 @@ public class TopPairsProgram {
             }
 
             try (BufferedWriter writer = Files.newBufferedWriter(
-                    Paths.get(outputFolder + outputFileNamePrefix + "_" + threshold + ".csv"),
+                    Paths.get(outputFolder + "problem_size_" + threshold + ".csv"),
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
                 writer.write(output.toString());
                 writer.flush();
@@ -492,9 +560,7 @@ public class TopPairsProgram {
         }
     }
 
-    @SuppressWarnings("unused")
-    public static void getDatasetStatistics() {
-        String outputPath = "src/main/resources/dataset-statistics.txt";
+    private static void getDatasetStatistics(String outputPath) {
         String output = "";
 
         Map<String, List<SentimentSet>> docToSentimentSets = importDocToSentimentReviews(
@@ -533,7 +599,8 @@ public class TopPairsProgram {
 
         Map<RawReview, Integer> rawReviewToSentenceCount = new HashMap<>();
         for (RawReview rawReview : rawReviews) {
-            int sentenceCount = SentimentCalculator.breakingIntoSentences(rawReview.getBody(), true).size();
+            int sentenceCount = SentimentCalculator.breakingIntoSentences(
+                rawReview.getBody(), true).size();
             rawReviewToSentenceCount.put(rawReview, sentenceCount);
         }
         counts = new ArrayList<>();
@@ -657,15 +724,18 @@ public class TopPairsProgram {
         fixedPool.shutdown();
         try {
             fixedPool.awaitTermination(2, TimeUnit.DAYS);
-
-            Utils.printRunningTime(startTime, algorithm + " there are " + getUnfinishedJobNum(futures, "DONE!") + " unfinished jobs", true);
-            Utils.printRunningTime(startTime, algorithm + " finished " + docToStatisticalResult.size() + " doctors");
         } catch (InterruptedException e) {
             e.printStackTrace();
-
-            Utils.printRunningTime(startTime, algorithm + " there are " + getUnfinishedJobNum(futures, "DONE!") + " unfinished jobs", true);
-            Utils.printRunningTime(startTime, algorithm + " finished " + docToStatisticalResult.size() + " doctors");
         }
+        taskProgress(startTime, futures, algorithm.toString(), docToStatisticalResult.size());
+    }
+
+    private static void taskProgress(
+        long startTime, List<Future<String>> futures, String algorithm, int docCount) {
+        Utils.printRunningTime(startTime,
+            algorithm + " " + countUnfinishedJob(futures) + " unfinished jobs", true);
+        Utils.printRunningTime(startTime,
+            algorithm + " finished " + docCount + " doctors");
     }
 
     // @param method - choosing LP solver. Note that this doesn't affect GREEDY, ILP, only affect Randomized Rounding
@@ -723,29 +793,23 @@ public class TopPairsProgram {
         fixedPool.shutdown();
         try {
             fixedPool.awaitTermination(2, TimeUnit.DAYS);
-
-            Utils.printRunningTime(startTime, setAlgorithm + " there are " + getUnfinishedJobNum(futures, "DONE!") + " unfinished jobs", true);
-            Utils.printRunningTime(startTime, setAlgorithm + " finished " + docToStatisticalResult.size() + " doctors");
         } catch (InterruptedException e) {
             e.printStackTrace();
-
-            Utils.printRunningTime(startTime, setAlgorithm + " there are " + getUnfinishedJobNum(futures, "DONE!") + " unfinished jobs", true);
-            Utils.printRunningTime(startTime, setAlgorithm + " finished " + docToStatisticalResult.size() + " doctors");
         }
+        taskProgress(startTime, futures, setAlgorithm.toString(), docToStatisticalResult.size());
     }
 
-    private static int getUnfinishedJobNum(List<Future<String>> futures, String expectedResult) {
+    private static int countUnfinishedJob(List<Future<String>> futures) {
         int unfinished = 0;
         for (Future<String> job : futures) {
             try {
-                if (job.get() == null || !job.get().equals(expectedResult)) {
+                if (job.get() == null || !job.get().equals(EXPECTED_JOB_DONE)) {
                     ++unfinished;
                 }
             } catch (InterruptedException | ExecutionException e) {
                 e.printStackTrace();
             }
         }
-
         return unfinished;
     }
 
@@ -1196,10 +1260,11 @@ public class TopPairsProgram {
 
     // Make sure: each conceptSentimentPair of a SentimentSentence has an unique hashcode
     public static Map<String, List<SentimentSet>> importDocToSentimentSentences(
-            String path, boolean getSomeRandomItems, int docCount) {
+            String inputPath, boolean getSomeRandomItems, int docCount) {
         Map<String, List<SentimentSet>> result = new HashMap<>();
 
-        List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(path);
+        List<DoctorSentimentReview> doctorSentimentReviews = importDoctorSentimentReviewsDataset(
+                inputPath);
         docCount = docCount <= 0 ? doctorSentimentReviews.size() : docCount;
         Set<Integer> indices = new HashSet<>();
         if (getSomeRandomItems)
@@ -1245,22 +1310,20 @@ public class TopPairsProgram {
         return doctorSentimentReviews;
     }
 
-    // Create synthetic dataset
     private static Map<String, List<ConceptSentimentPair>> createSyntheticDataset(
             Map<String, List<ConceptSentimentPair>> docToConceptSentimentPairs,
-            int numDocs,
             int numDecimals) {
         int forRounding = (int) Math.pow(10, numDecimals);
 
         Map<String, List<ConceptSentimentPair>> result = new HashMap<>();
 
-        for (int i = 0; i < numDocs; ++i) {
+        for (int i = 0; i < Constants.NUM_SYNTHETIC_DOCTORS; ++i) {
             result.put(String.valueOf(i), new ArrayList<>());
         }
 
         int count = 0;
         for (String docID : docToConceptSentimentPairs.keySet()) {
-            int index = count % numDocs;
+            String index = String.valueOf(count % Constants.NUM_SYNTHETIC_DOCTORS);
             /*temp.get(index).addAll(docToConceptSentimentPairs.get(docID));*/
 
             for (ConceptSentimentPair pair : docToConceptSentimentPairs.get(docID)) {
@@ -1475,8 +1538,8 @@ public class TopPairsProgram {
 
     private static void outputSummaryStatisticsToCSV(
             List<StatisticalResult[]> statisticalResults,
-            String finalOutputFolder, String fileNamePrefix) throws IOException {
-
+            String finalOutputFolder, String fileNamePrefix
+    ) throws IOException {
         if (!Files.exists(Paths.get(finalOutputFolder))) {
             Files.createDirectory(Paths.get(finalOutputFolder));
         }
@@ -1491,11 +1554,11 @@ public class TopPairsProgram {
 
         for (Float threshold : thresholdToStatisticalResults.keySet()) {
             int modifiedThresholdForLatexName = (int) (threshold * 10);
-            String fileName = finalOutputFolder + fileNamePrefix + "_" + modifiedThresholdForLatexName
-                    + ".csv";
+            Path file = Paths.get(finalOutputFolder,
+                fileNamePrefix + "_" + modifiedThresholdForLatexName + ".csv");
             String content = prepareCSVSummary(thresholdToStatisticalResults.get(threshold));
 
-            BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileName),
+            BufferedWriter writer = Files.newBufferedWriter(file,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             writer.write(content);
             writer.flush();

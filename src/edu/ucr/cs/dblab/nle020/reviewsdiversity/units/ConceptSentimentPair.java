@@ -10,14 +10,14 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.Constants;
 import edu.ucr.cs.dblab.nle020.umls.SemanticTypeNetwork;
 
 public class ConceptSentimentPair{
-	private String cui;
+	private String cui = "";
 	private String name;
 	private float sentiment;
 //	private float sentimentWithSelfCount;
 	private int count;	
 	private float correlation;
 	private List<String> types;
-	private Set<String> deweys = new HashSet<String>();
+	private Set<String> deweys = new HashSet<>();
 	
 	public ConceptSentimentPair() {
 		super();
@@ -146,7 +146,8 @@ public class ConceptSentimentPair{
 	public boolean isSentimentCover(ConceptSentimentPair p, float threshold) {
 		boolean result = false;
 		
-		if (this.getId().equals(Constants.ROOT_CUI) || p.getId().equals(Constants.ROOT_CUI))
+		if (deweys.contains("$") || p.deweys.contains("$")
+                || this.getId().equals(Constants.ROOT_CUI) || p.getId().equals(Constants.ROOT_CUI))
 			result = true;
 		else if (Math.abs(this.sentiment - p.sentiment) <= threshold)
 			result =  true;
