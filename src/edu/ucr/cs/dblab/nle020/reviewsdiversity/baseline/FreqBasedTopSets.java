@@ -1,6 +1,5 @@
 package edu.ucr.cs.dblab.nle020.reviewsdiversity.baseline;
 
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.BaselineComparison;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram.SetOption;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.ConceptSentimentPair;

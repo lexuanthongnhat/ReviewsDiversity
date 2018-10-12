@@ -53,10 +53,10 @@ public class TopPairsProgram {
 
     public final static String DOC_TO_REVIEWS_PATH =
             "src/main/resources/doc_pairs_1_prunned_vector.txt";
-    final static String OUTPUT_FOLDER = "src/main/resources/performance/";
+    public final static String OUTPUT_FOLDER = "src/main/resources/performance/";
 
     private enum Algorithm {GREEDY, ILP, RANDOMIZED_ROUNDING}
-    private enum SetAlgorithm {GREEDY_SET, ILP_SET, RANDOMIZED_ROUNDING_SET}
+    public enum SetAlgorithm {GREEDY_SET, ILP_SET, RANDOMIZED_ROUNDING_SET}
     public enum SetOption {REVIEW, SENTENCE}
     private enum NumItem {NUM_PAIRS, NUM_PAIRS_EDGES}
 
@@ -525,8 +525,9 @@ public class TopPairsProgram {
                 threshold = thres;
                 long startTime = System.currentTimeMillis();
 
-                Path subOutputDir = Paths.get(outputDir, "top_" + setName,
-                        "k" + k + "_threshold" + Math.round(threshold * 10) / 10.0f);
+                String[] filePaths = setMethodFileName(
+                    setOption, algorithm, doctorCount, k, threshold);
+                Path subOutputDir = Paths.get(outputDir, filePaths[0], filePaths[1]);
                 if (!Files.exists(subOutputDir))
                     Files.createDirectories(subOutputDir);
 
@@ -535,10 +536,7 @@ public class TopPairsProgram {
                 ConcurrentMap<String, List<SentimentSet>> docToTopKSetsGreedy =
                     new ConcurrentHashMap<>();
 
-                String outputPath = Paths.get(subOutputDir.toString(),
-                    "top_" + setOption + "_result_" + doctorCount + "_" +
-                        algorithm.toString().toLowerCase()).toString();
-
+                String outputPath = Paths.get(outputDir, filePaths).toString();
                 for (int trial = 0; trial < NUM_TRIALS; ++trial) {
                     runTopSetsAlgoMultiThreads(algorithm, threadCount,
                             docToSentimentSets, new ConcurrentHashMap<>(), docToTopKSetsGreedy);
@@ -549,6 +547,16 @@ public class TopPairsProgram {
                     "Finished k=" + k + " and threshold=" + threshold);
             }
         }
+    }
+
+    public static String[] setMethodFileName(
+        SetOption setOption, SetAlgorithm setAlgorithm, int doctorCount, int k, double threshold) {
+        String setName = setOption.toString().toLowerCase();
+        String setSubDir = "top_" + setName;
+        String kThresholdSubDir = "k" + k + "_threshold" + threshold;
+        String fileName = "top_" + setName + "_" + doctorCount + "_" +
+                setAlgorithm.toString().toLowerCase() + ".txt";
+        return new String[]{setSubDir, kThresholdSubDir, fileName};
     }
 
     private static void examineProblemSizes(String outputFolder) {

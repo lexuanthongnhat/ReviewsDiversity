@@ -2,7 +2,6 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.baseline;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.ucr.cs.dblab.nle020.reviewsdiversity.BaselineComparison;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
