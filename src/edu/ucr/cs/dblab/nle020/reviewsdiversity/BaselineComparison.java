@@ -353,12 +353,12 @@ public class BaselineComparison {
       measures.add(Measure.initDistErrorMeasure(MeasureType.DIST_ERROR, docToRawData,
           s -> Math.max(Math.abs(1 - s), Math.abs(-1 - s)),
           "penalize"));
-      /*for (int conceptDiffThreshold : conceptDiffThresholds) {
+      for (int conceptDiffThreshold : conceptDiffThresholds) {
         for (double sentimentDiffThreshold : sentimentDiffThresholds) {
           measures.add(new Measure(MeasureType.COVERAGE, conceptDiffThreshold,
               sentimentDiffThreshold, docToRawData));
         }
-      }*/
+      }
       return measures;
     }
 

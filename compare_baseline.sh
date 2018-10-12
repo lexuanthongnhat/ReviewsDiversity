@@ -63,6 +63,7 @@ java -cp "$JAR" "${PACKAGE}.baseline.FreqBasedTopSets" \
 ##################################################
 java -cp "$JAR" "${PACKAGE}.TopPairsProgram" \
     --type sentence \
+    --summarize-only greedy_set \
     --input-file "$doc_parsed_file" \
     --output-dir "$sum_our"
 

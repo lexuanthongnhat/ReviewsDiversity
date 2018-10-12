@@ -31,7 +31,6 @@ public class Constants {
 	public final static String CUI_TO_DEWEYS_PATH = "src/edu/ucr/cs/dblab/nle020/ontology/cui_deweys.txt";
 	public final static String SOURCE_PATH = "D:\\UCR Google Drive\\GD - Review Diversity\\Immediate Results\\";
 	
-	public final static boolean FIND_BEST_LP_METHOD = false;
 	//public final static LPMethod MY_DEFAULT_LP_METHOD = LPMethod.AUTOMATIC;
 	public final static LPMethod MY_DEFAULT_LP_METHOD = LPMethod.DUAL_SIMPLEX;
 	public static enum LPMethod {

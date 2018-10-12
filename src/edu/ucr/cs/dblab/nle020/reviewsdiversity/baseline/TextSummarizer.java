@@ -6,7 +6,6 @@ import edu.ucr.cs.dblab.nle020.reviewsdiversity.BaselineComparison;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
-import edu.ucr.cs.dblab.nle020.utils.Utils;
 import org.apache.commons.cli.*;
 
 import java.io.BufferedReader;
