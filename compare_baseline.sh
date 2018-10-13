@@ -5,7 +5,7 @@
 JAR="target/review-diversity-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
 PACKAGE="edu.ucr.cs.dblab.nle020.reviewsdiversity"
 
-main_dir="$(pwd)/resources/cell"
+main_dir="$(pwd)/resources/cellphone"
 doc_parsed_file="${main_dir}/review_transformed.jl"
 doc_transformed_for_pysum="${main_dir}/review_sentences.json"
 echo "$main_dir"
@@ -76,9 +76,13 @@ java -cp "$JAR" "${PACKAGE}.TopPairsProgram" \
     --input-file "$doc_parsed_file" \
     --output-dir "$sum_our"
 
-# finally compare all methods
+##################################################
+### Finally, compare all, get some plots
+##################################################
 java -cp "$JAR" "${PACKAGE}.baseline.BaselineComparison" \
     --doc-parsed-file "$doc_parsed_file" \
     --output "$eval_dir" \
     --our-summary-dir "$sum_our" \
     --baseline-summary-dir "$sum_baselines"
+
+gnuplot -c resources/comparison.plt "${eval_dir}"

@@ -21,6 +21,11 @@ logger.addHandler(ch)
 DATASET_PATH = "sentence_data.json"
 K_LIST = [3, 5, 10, 15, 20]
 LANGUAGE = "english"
+TEXT_SUMMARIZER = {
+        "textrank": summarize_wth_textrank,
+        "lexrank": summarize_wth_lexrank,
+        "lsa": summarize_wth_lsa
+        }
 SUMY_SUMMARIZER = {
         "lexrank": LexRankSummarizer,
         "lsa": LsaSummarizer
@@ -175,11 +180,6 @@ def export_summary_in_json(k_to_doc_sum, engine, output_dir):
 
 
 if __name__ == '__main__':
-    TEXT_SUMMARIZER = {
-            "textrank": summarize_wth_textrank,
-            "lexrank": summarize_wth_lexrank,
-            "lsa": summarize_wth_lsa
-            }
     parser = argparse.ArgumentParser(description="Text Summarizer")
     p_add = parser.add_argument
     p_add("engine", choices=TEXT_SUMMARIZER.keys(),

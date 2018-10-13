@@ -27,14 +27,14 @@ import static edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram.*;
 public class BaselineComparison {
   private static final String SUMMARY_DIR = OUTPUT_FOLDER;
   static final String BASELINE_SUMMARY_DIR = SUMMARY_DIR + "baseline/summary/";
-  private static final int ROUNDING_DIGIT = 2;
+  private static final int ROUNDING_DIGIT = 3;
   static final int[] K_LIST = {3, 5, 10, 15, 20};
   private static Map<String, MethodType> methodToType = new HashMap<>();
   private static List<String> methods = new ArrayList<>();
 
   // Some randomRelatedMethods should be run (re-sample) several time to get stable performances
   private static List<String> randomRelatedMethods = new ArrayList<>();
-  private static final int RE_SAMPLE_RANDOM_METHOD = 1;
+  private static final int RE_SAMPLE_RANDOM_METHOD_COUNT = 10;
 
   static {
     methodToType.put("greedy", MethodType.OUR);
@@ -72,6 +72,9 @@ public class BaselineComparison {
     options.addOption(Option.builder().longOpt("sample").hasArg().argName("SAMPLE")
         .type(Double.class)
         .desc("Sample ratio of all doc to evaluate, default=1 (all)").build());
+    options.addOption(Option.builder().longOpt("rounding-digit").hasArg().argName("NUM")
+        .type(Integer.class)
+        .desc("Number of digit to round to, default=3").build());
     try {
       CommandLine commandLine = parser.parse(options, args);
       String docParsedFile = commandLine.getOptionValue(
@@ -82,20 +85,22 @@ public class BaselineComparison {
       String baselineSummaryDir = commandLine.getOptionValue("baseline-summary-dir",
           "src/edu/ucr/cs/dblab/nle020/reviewsdiversity/baseline/summary/");
       double sample = Double.valueOf(commandLine.getOptionValue("sample", "1"));
-
-      startEvaluation(docParsedFile, sample, ourSummaryDir, baselineSummaryDir, outputDir);
+      int roundingDigit = Integer.valueOf(
+          commandLine.getOptionValue("rounding-digit", String.valueOf(ROUNDING_DIGIT)));
+      startEvaluation(docParsedFile, sample, roundingDigit,
+                      ourSummaryDir, baselineSummaryDir, outputDir);
     } catch (ParseException e) {
       System.out.println("Unexpected exception:" + e.getMessage());
     }
   }
 
-  private static void startEvaluation(String docParsedFile, double sample,
+  private static void startEvaluation(String docParsedFile, double sample, int roundingDigit,
                                       String ourSummaryDir,
                                       String baselineSummaryDir,
                                       String outputDir) {
     // Threshold parameters of COVERAGE measures
     int[] conceptDiffThresholds = {2, 3, 4};
-    double[] sentimentDiffThresholds = {0.3};
+    double[] sentimentDiffThresholds = {0.3, 0.5};
     List<Measure> measures = Measure.initMeasures(
         conceptDiffThresholds, sentimentDiffThresholds, docParsedFile);
 
@@ -105,7 +110,8 @@ public class BaselineComparison {
     Map<Measure, Map<Integer, Map<String, Double>>> measureToKResults = new HashMap<>();
     for (int k : K_LIST) {
       Map<Measure, Map<String, Double>> measureToResults = evaluate(
-          k, appliedSentThreshold, measures, sample, ourSummaryDir, baselineSummaryDir);
+          k, appliedSentThreshold, measures, sample, roundingDigit,
+          docParsedFile, ourSummaryDir, baselineSummaryDir);
       for (Measure measure : measureToResults.keySet()) {
         if (!measureToKResults.containsKey(measure))
           measureToKResults.put(measure, new HashMap<>());
@@ -131,22 +137,23 @@ public class BaselineComparison {
    * @return map from measure to performance result that is a table of method-performance
    */
   private static Map<Measure, Map<String, Double>> evaluate(
-      int k, double appliedSentThreshold, List<Measure> measures, double sample,
+      int k, double appliedSentThreshold, List<Measure> measures, double sample, int roundingDigit,
+      String docParsedFile,
       String ourSummaryDir,
       String baselineSummaryDir
   ) {
     Map<String, Map<String, List<SentimentSentence>>> methodToSummaries = importMethodSummaries(
         k, appliedSentThreshold, ourSummaryDir, baselineSummaryDir);
-    final List<String> sampleDocs = sampleDoctors(methodToSummaries, sample);
-    System.out.println("Number of doctors in the sample: " + sampleDocs.size());
+    final List<String> docIds = sampleDoctors(methodToSummaries, sample);
+    System.out.println("Evaluating with k = " + k + ", # doctors: " + docIds.size());
 
     Map<Measure, Map<String, Double>> measureToResults = new HashMap<>();
     for (Measure measure : measures) {
       Map<String, Double> results = new HashMap<>();
       for (String method : methods) {
-        double error = randomRelatedMethods.contains(method) && RE_SAMPLE_RANDOM_METHOD > 1 ?
-            evaluateWithReSample(method, k, sampleDocs, measure, ROUNDING_DIGIT) :
-            measure.evaluate(methodToSummaries.get(method), sampleDocs, ROUNDING_DIGIT);
+        double error = randomRelatedMethods.contains(method) && RE_SAMPLE_RANDOM_METHOD_COUNT > 1 ?
+            evaluateWithReSample(method, k, docIds, measure, docParsedFile, roundingDigit) :
+            measure.evaluate(methodToSummaries.get(method), docIds, roundingDigit);
         results.put(method, error);
       }
 
@@ -161,11 +168,12 @@ public class BaselineComparison {
    */
   private static Double evaluateWithReSample(String method, int k,
                                              List<String> docIds, Measure measure,
+                                             String docParsedFile,
                                              int roundingDigit) {
     List<Double> errors = new ArrayList<>();
-    for (int i = 0; i < RE_SAMPLE_RANDOM_METHOD; ++i) {
+    for (int i = 0; i < RE_SAMPLE_RANDOM_METHOD_COUNT; ++i) {
       Map<String, List<SentimentSet>> docToSummaries = FreqBasedTopSets.summarizeDoctorReviews(
-          DOC_TO_REVIEWS_PATH, SetOption.SENTENCE, k, method);
+          docParsedFile, SetOption.SENTENCE, k, method);
       Map<String, List<SentimentSentence>> docToSentimentSets = new HashMap<>();
       for (String doc : docToSummaries.keySet()) {
         List<SentimentSet> sets = docToSummaries.get(doc);

@@ -2,6 +2,7 @@ package edu.ucr.cs.dblab.nle020.reviewsdiversity.baseline;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.ucr.cs.dblab.nle020.reviewsdiversity.SetResult;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.TopPairsProgram;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSentence;
 import edu.ucr.cs.dblab.nle020.reviewsdiversity.units.SentimentSet;
@@ -68,7 +69,7 @@ public class TextSummarizer {
     for (String summarizer : summarizers) {
       final Map<Integer, Map<String, List<String>>> kToDocSummaries = importSummaries(inputDir,
           summarizer);
-      final Map<Integer, Map<String, List<SentimentSet>>> kToDocSentences = inferSummaries(
+      final Map<Integer, Map<String, List<SetResult>>> kToDocSentences = inferSummaries(
           docParsedFile, kToDocSummaries);
       exportSummaries(kToDocSentences, outputDir, summarizer);
     }
@@ -107,12 +108,12 @@ public class TextSummarizer {
    * @param kToDocSummaries summaries in form of sentence id list
    * @return summaries in form of SentimentSentence list
    */
-  private static Map<Integer, Map<String, List<SentimentSet>>> inferSummaries(
+  private static Map<Integer, Map<String, List<SetResult>>> inferSummaries(
       String docParsedFile, Map<Integer, Map<String, List<String>>> kToDocSummaries) {
     Map<String, List<SentimentSet>> docToAllSentences = TopPairsProgram
         .importDocToSentimentSentences(docParsedFile, false, 0);
 
-    Map<Integer, Map<String, List<SentimentSet>>> kToDocSentences = new HashMap<>();
+    Map<Integer, Map<String, List<SetResult>>> kToDocSentences = new HashMap<>();
     for (Integer k : kToDocSummaries.keySet()) {
       Map<String, List<String>> docToSummary = kToDocSummaries.get(k);
       Map<String, List<SentimentSet>> docToSentences = new HashMap<>();
@@ -126,22 +127,22 @@ public class TextSummarizer {
           }
         }
       }
-      kToDocSentences.put(k, docToSentences);
+      kToDocSentences.put(k, TopPairsProgram.convertTopKSetsMapToSetResultMap(docToSentences));
     }
     return kToDocSentences;
   }
 
   private static void exportSummaries(
-      Map<Integer, Map<String, List<SentimentSet>>> kToDocSentences,
+      Map<Integer, Map<String, List<SetResult>>> kToDocSentences,
       String outputDir, String summarizer) {
     for (Integer k : kToDocSentences.keySet()) {
-      Map<String, List<SentimentSet>> docToTopKSentences = kToDocSentences.get(k);
+      Map<String, List<SetResult>> docToTopKSentences = kToDocSentences.get(k);
       String outputPath = Paths.get(outputDir, summaryFileName(summarizer, k)).toString();
       TopPairsProgram.outputTopKToJson(outputPath, docToTopKSentences);
     }
   }
 
-  public static String summaryFileName(String summarizer, int topK) {
+  static String summaryFileName(String summarizer, int topK) {
     return "top_sentence_" + summarizer + "_k" + topK + ".txt";
   }
 

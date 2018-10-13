@@ -85,7 +85,7 @@ public class FreqBasedTopSets {
     Utils.printRunningTime(startTime, "Finished topK baselines");
   }
 
-  public static Map<String, List<SentimentSet>> summarizeDoctorReviews(
+  static Map<String, List<SentimentSet>> summarizeDoctorReviews(
       String inputPath, TopPairsProgram.SetOption setOption, int k, String method) {
     Map<String, List<SentimentSet>> docToSentimentSets = importSentimentSets(inputPath, setOption);
     Map<String, List<SentimentSet>> docToTopKSets = docToSentimentSets.entrySet().stream()

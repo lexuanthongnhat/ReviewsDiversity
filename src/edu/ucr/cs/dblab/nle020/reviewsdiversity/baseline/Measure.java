@@ -63,8 +63,8 @@ public class Measure {
   }
 
   static List<Measure> initMeasures(int[] conceptDiffThresholds,
-                                            double[] sentimentDiffThresholds,
-                                            String rawDataPath) {
+                                    double[] sentimentDiffThresholds,
+                                    String rawDataPath) {
     Map<String, List<ConceptSentimentPair>> docToRawData = importRawDataset(rawDataPath);
     List<Measure> measures = new ArrayList<>();
     measures.add(Measure.initDistErrorMeasure(MeasureType.DIST_ERROR, docToRawData,
@@ -302,23 +302,16 @@ public class Measure {
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-
     Measure measure = (Measure) o;
     return conceptDiffThreshold == measure.conceptDiffThreshold &&
         Double.compare(measure.sentimentDiffThreshold, sentimentDiffThreshold) == 0 &&
-        penalizeName.equalsIgnoreCase(((Measure) o).penalizeName) &&
-        type == measure.type;
+        type == measure.type &&
+        Objects.equals(penalizeName, measure.penalizeName);
   }
 
   @Override
   public int hashCode() {
-    int result;
-    long temp;
-    result = type.hashCode();
-    result = 31 * result + conceptDiffThreshold;
-    temp = Double.doubleToLongBits(sentimentDiffThreshold);
-    result = 31 * result + (int) (temp ^ (temp >>> 32));
-    result = 31 * result + penalizeName.hashCode();
-    return result;
+
+    return Objects.hash(type, conceptDiffThreshold, sentimentDiffThreshold, penalizeName);
   }
 }

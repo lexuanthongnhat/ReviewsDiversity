@@ -390,7 +390,8 @@ public class TopPairsProgram {
         outputStatisticalResultToJson(outputPrefix + "_rr.txt", docToStatisticalResultRR);
 
         Path outputPath = Paths.get(outputDir,
-                "synthetic_k" + k + "_threshold" + Math.round(threshold) / 10f + "_" + docCount + ".xlsx");
+                "synthetic_k" + k + "_threshold" + Math.round(threshold * 10) / 10f + "_" +
+                    docCount + ".xlsx");
         outputStatisticalResultToExcel(outputPath, false,
                 docToStatisticalResultGreedy, docToStatisticalResultILP, docToStatisticalResultRR);
 
@@ -517,8 +518,7 @@ public class TopPairsProgram {
         int doctorCount,
         String outputDir
     ) throws IOException {
-        String setName = setOption.toString().toLowerCase();
-
+        int trialCount = algorithm == SetAlgorithm.GREEDY_SET ? 1 : NUM_TRIALS;
         for (int numChosen : kSet) {
             k = numChosen;
             for (float thres : thresholdSet) {
@@ -537,7 +537,7 @@ public class TopPairsProgram {
                     new ConcurrentHashMap<>();
 
                 String outputPath = Paths.get(outputDir, filePaths).toString();
-                for (int trial = 0; trial < NUM_TRIALS; ++trial) {
+                for (int trial = 0; trial < trialCount; ++trial) {
                     runTopSetsAlgoMultiThreads(algorithm, threadCount,
                             docToSentimentSets, new ConcurrentHashMap<>(), docToTopKSetsGreedy);
                     outputTopKToJson(outputPath,
@@ -553,7 +553,7 @@ public class TopPairsProgram {
         SetOption setOption, SetAlgorithm setAlgorithm, int doctorCount, int k, double threshold) {
         String setName = setOption.toString().toLowerCase();
         String setSubDir = "top_" + setName;
-        String kThresholdSubDir = "k" + k + "_threshold" + threshold;
+        String kThresholdSubDir = "k" + k + "_threshold" + Math.round(threshold * 10) / 10f;
         String fileName = "top_" + setName + "_" + doctorCount + "_" +
                 setAlgorithm.toString().toLowerCase() + ".txt";
         return new String[]{setSubDir, kThresholdSubDir, fileName};
@@ -703,10 +703,10 @@ public class TopPairsProgram {
         return heading + ": min " + min + ", max " + max + ", average " + average + "\n";
     }
 
-    private static ConcurrentMap<String, List<SetResult>> convertTopKSetsMapToSetResultMap(
-            ConcurrentMap<String, List<SentimentSet>> docToTopSentimentSets) {
+    public static Map<String, List<SetResult>> convertTopKSetsMapToSetResultMap(
+        Map<String, List<SentimentSet>> docToTopSentimentSets) {
 
-        ConcurrentMap<String, List<SetResult>> docToSetResults = new ConcurrentHashMap<>();
+        Map<String, List<SetResult>> docToSetResults = new HashMap<>();
         for (String docId : docToTopSentimentSets.keySet()) {
             List<SetResult> setResults = new ArrayList<>();
             for (SentimentSet set : docToTopSentimentSets.get(docId)) {
