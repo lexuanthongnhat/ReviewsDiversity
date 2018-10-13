@@ -6,8 +6,8 @@ JAR="target/review-diversity-0.0.1-SNAPSHOT-jar-with-dependencies.jar"
 PACKAGE="edu.ucr.cs.dblab.nle020.reviewsdiversity"
 
 main_dir="$(pwd)/resources/cell"
-doc_parsed_file="${main_dir}/review_transformed_5.jl"
-doc_transformed_for_pysum="${main_dir}/review_sentences_5.json"
+doc_parsed_file="${main_dir}/review_transformed.jl"
+doc_transformed_for_pysum="${main_dir}/review_sentences.json"
 echo "$main_dir"
 
 # make a new directory if needed

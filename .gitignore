@@ -5,6 +5,7 @@ src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/doc2vecsent/reviews/*.npy
 # python virtualenv
 src/edu/ucr/cs/dblab/nle020/reviewsdiversity/dataset/doc2vecsent/.env/
 **/.env
+**/Pipfile.lock
 # My experiment results
 src/main/resources/performance/Top Pairs/
 src/main/resources/performance/Top SENTENCE/

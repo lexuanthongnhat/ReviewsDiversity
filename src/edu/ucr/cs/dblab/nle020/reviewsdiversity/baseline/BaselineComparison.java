@@ -226,7 +226,9 @@ public class BaselineComparison {
             .toString();
       final Map<String, List<SentimentSentence>> docToTopSentences =
           importSummaryFromJson(summaryPath);
-      mthToSummaries.put(method, docToTopSentences);
+      if (!docToTopSentences.isEmpty()) {
+        mthToSummaries.put(method, docToTopSentences);
+      }
     }
 
     return mthToSummaries;
